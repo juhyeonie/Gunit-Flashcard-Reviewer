@@ -77,56 +77,66 @@ function Shell() {
 
       {!isReview && <BottomNav />}
 
-      <DeckModal
-        open={modal.kind === 'deck-new' || modal.kind === 'deck-edit'}
-        mode={modal.kind === 'deck-edit' ? 'edit' : 'create'}
-        deck={modal.deck}
-        onClose={close}
-        onSave={(draft) => {
-          if (modal.kind === 'deck-edit') {
-            updateDeck(modal.deck.id, draft)
-            say('Deck updated')
-          } else {
-            const deck = addDeck(draft)
-            say('Deck created — add your first card')
-            navigate(`/decks/${deck.id}`)
-          }
-        }}
-        // Clicking "Import a file" inside Create a Deck: this modal closes and
-        // the Import modal opens, carrying whatever has been typed.
-        onRequestImport={(draft) => openImport(null, draft)}
-      />
+      {/*
+        Modals mount only while open, and are keyed by what they are editing, so
+        their draft state comes from useState on mount rather than an effect
+        that resets it.
+      */}
+      {(modal.kind === 'deck-new' || modal.kind === 'deck-edit') && (
+        <DeckModal
+          key={modal.deck ? `deck-${modal.deck.id}` : 'deck-new'}
+          mode={modal.kind === 'deck-edit' ? 'edit' : 'create'}
+          deck={modal.deck}
+          onClose={close}
+          onSave={(draft) => {
+            if (modal.kind === 'deck-edit') {
+              updateDeck(modal.deck.id, draft)
+              say('Deck updated')
+            } else {
+              const deck = addDeck(draft)
+              say('Deck created — add your first card')
+              navigate(`/decks/${deck.id}`)
+            }
+          }}
+          // Clicking "Import a file" inside Create a Deck: this modal closes and
+          // the Import modal opens, carrying whatever has been typed.
+          onRequestImport={(draft) => openImport(null, draft)}
+        />
+      )}
 
-      <ImportFileModal
-        open={modal.kind === 'import'}
-        pendingDeck={modal.pendingDeck}
-        initialDraft={modal.draft}
-        deckId={modal.deck?.id}
-        onClose={close}
-        onCreateDeck={addDeck}
-        onAddCards={(deckId, cards) => {
-          addCards(deckId, cards)
-          say(`${cards.length} cards drafted`)
-        }}
-        onOpenDeck={(deckId) => deckId && navigate(`/decks/${deckId}`)}
-        say={say}
-      />
+      {modal.kind === 'import' && (
+        <ImportFileModal
+          pendingDeck={modal.pendingDeck}
+          initialDraft={modal.draft}
+          deckId={modal.deck?.id}
+          onClose={close}
+          onCreateDeck={addDeck}
+          onAddCards={(deckId, cards) => {
+            addCards(deckId, cards)
+            say(`${cards.length} cards drafted`)
+          }}
+          onOpenDeck={(deckId) => deckId && navigate(`/decks/${deckId}`)}
+          say={say}
+        />
+      )}
 
-      <CardModal
-        open={modal.kind === 'card-new' || modal.kind === 'card-edit'}
-        mode={modal.kind === 'card-edit' ? 'edit' : 'new'}
-        card={modal.card}
-        onClose={close}
-        onSave={(card) => {
-          if (modal.kind === 'card-edit') {
-            updateCard(modal.deck.id, modal.index, card)
-            say('Card saved')
-          } else {
-            addCards(modal.deck.id, [card])
-            say('Card added')
-          }
-        }}
-      />
+      {(modal.kind === 'card-new' || modal.kind === 'card-edit') && (
+        <CardModal
+          key={modal.kind === 'card-edit' ? `card-${modal.deck.id}-${modal.index}` : 'card-new'}
+          mode={modal.kind === 'card-edit' ? 'edit' : 'new'}
+          card={modal.card}
+          onClose={close}
+          onSave={(card) => {
+            if (modal.kind === 'card-edit') {
+              updateCard(modal.deck.id, modal.index, card)
+              say('Card saved')
+            } else {
+              addCards(modal.deck.id, [card])
+              say('Card added')
+            }
+          }}
+        />
+      )}
 
       <ConfirmModal
         open={modal.kind === 'card-delete'}

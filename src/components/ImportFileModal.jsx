@@ -22,9 +22,11 @@ const describe = (file) => ({
  * empty (dropzone) → selected (file list) → loading (simulated drafting) →
  * done (summary). `pendingDeck` means no deck exists yet, so the deck fields
  * appear above the dropzone and the deck is created on confirm.
+ *
+ * Mounted only while open, so every phase and draft field starts fresh from
+ * useState rather than being reset by an effect.
  */
 export default function ImportFileModal({
-  open,
   pendingDeck = false,
   initialDraft,
   deckId,
@@ -37,28 +39,17 @@ export default function ImportFileModal({
   const [phase, setPhase] = useState('empty')
   const [files, setFiles] = useState([])
   const [pct, setPct] = useState(0)
-  const [draft, setDraft] = useState({ title: '', subject: '', desc: '' })
+  const [draft, setDraft] = useState(() => ({
+    title: initialDraft?.title ?? '',
+    subject: initialDraft?.subject ?? '',
+    desc: initialDraft?.desc ?? '',
+  }))
   const [dragging, setDragging] = useState(false)
   const [result, setResult] = useState({ total: 0, title: '' })
   const inputRef = useRef(null)
   const timer = useRef(null)
-  const targetDeck = useRef(null)
+  const targetDeck = useRef(deckId ?? null)
   const progress = useRef(0)
-
-  useEffect(() => {
-    if (!open) return
-    setPhase('empty')
-    setFiles([])
-    setPct(0)
-    setDragging(false)
-    setResult({ total: 0, title: '' })
-    setDraft({
-      title: initialDraft?.title ?? '',
-      subject: initialDraft?.subject ?? '',
-      desc: initialDraft?.desc ?? '',
-    })
-    targetDeck.current = deckId ?? null
-  }, [open, initialDraft, deckId])
 
   useEffect(() => () => clearInterval(timer.current), [])
 
@@ -129,7 +120,7 @@ export default function ImportFileModal({
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       maxWidth={520}
       kicker={pendingDeck ? 'New deck from a file' : 'Import material'}
@@ -175,7 +166,8 @@ export default function ImportFileModal({
 
       <div className="mb-6 flex flex-col gap-[11px]">
         {phase === 'empty' && (
-          <div
+          <button
+            type="button"
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault()
@@ -187,8 +179,10 @@ export default function ImportFileModal({
               setDragging(false)
               addFiles(e.dataTransfer.files)
             }}
-            className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition-colors ${
-              dragging ? 'border-accent bg-accent-soft' : 'border-line bg-transparent hover:border-accent hover:bg-accent-soft'
+            className={`flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              dragging
+                ? 'border-accent bg-accent-soft'
+                : 'border-line bg-transparent hover:border-accent hover:bg-accent-soft'
             }`}
           >
             <span className="grid h-[42px] w-[42px] place-items-center rounded-full border border-line bg-surface text-[17px] text-ink-3">
@@ -203,7 +197,7 @@ export default function ImportFileModal({
             <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">
               PDF · PPTX · DOCX · TXT — up to 25 MB
             </span>
-          </div>
+          </button>
         )}
 
         {(phase === 'selected' || phase === 'loading') && (
