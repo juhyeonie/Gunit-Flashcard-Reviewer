@@ -16,7 +16,7 @@ import ProgressBar from './ProgressBar.jsx'
  * button nested inside it. The edit button is lifted above the stretched layer
  * so it stays independently clickable.
  */
-export default function DeckCard({ deck, variant = 'library', onEdit }) {
+export default function DeckCard({ deck, variant = 'library', headingLevel = 2, onEdit }) {
   const accent = accentOf(deck)
   const badge = badgeFor(deck)
   const pct = Math.round(deck.progress * 100)
@@ -52,10 +52,12 @@ export default function DeckCard({ deck, variant = 'library', onEdit }) {
     </div>
   )
 
-  const meter = <ProgressBar value={pct} accent={accent} />
+  const meter = <ProgressBar value={pct} accent={accent} label={`${deck.title} progress`} />
+
+  const Heading = `h${headingLevel}`
 
   const title = (
-    <h3
+    <Heading
       className={`m-0 font-serif font-normal text-pretty ${
         isDashboard ? 'text-[21px] leading-[1.22]' : 'text-[23px] leading-[1.2]'
       }`}
@@ -66,7 +68,7 @@ export default function DeckCard({ deck, variant = 'library', onEdit }) {
       >
         {deck.title}
       </Link>
-    </h3>
+    </Heading>
   )
 
   const cardCount = deck.cards.length ? `${deck.cards.length} cards` : 'No cards'

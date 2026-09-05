@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import DeckCard from '../components/DeckCard.jsx'
 import { useApp } from '../data/AppContext.jsx'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 const FILTERS = ['All decks', 'In progress', 'Mastered', 'Drafts']
 const SORTS = ['Recently studied', 'Alphabetical', 'Most cards']
 
 export default function Decks({ onNewDeck, onEditDeck }) {
   const { decks } = useApp()
+  useDocumentTitle('My decks')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All decks')
   const [sort, setSort] = useState('Recently studied')
@@ -86,11 +88,14 @@ export default function Decks({ onNewDeck, onEditDeck }) {
       </div>
 
       {rows.length ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(310px,1fr))]">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(310px,1fr))]">
           {rows.map((deck) => (
-            <DeckCard key={deck.id} deck={deck} onEdit={onEditDeck} />
+            <li key={deck.id} className="contents">
+              {/* Directly under the page h1 here, so h2 — no level is skipped. */}
+              <DeckCard deck={deck} headingLevel={2} onEdit={onEditDeck} />
+            </li>
           ))}
-        </div>
+        </ul>
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
           <div className="font-serif text-[24px] leading-[1.2]">

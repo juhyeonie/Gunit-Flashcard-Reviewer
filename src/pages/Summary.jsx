@@ -3,6 +3,7 @@ import Button from '../components/Button.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { streak } from '../data/activity.js'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 export default function Summary() {
   const { id } = useParams()
@@ -10,6 +11,7 @@ export default function Summary() {
   const navigate = useNavigate()
   const { decks, sessions } = useApp()
   const deck = decks.find((d) => d.id === id)
+  useDocumentTitle('Session complete')
 
   if (!deck) {
     return (
@@ -69,7 +71,12 @@ export default function Summary() {
           <span>Deck progress</span>
           <span>{pct}%</span>
         </div>
-        <ProgressBar value={pct} height={5} track="var(--color-line-soft)" />
+        <ProgressBar
+          value={pct}
+          height={5}
+          track="var(--color-line-soft)"
+          label="Deck progress"
+        />
       </div>
 
       <div className="flex flex-wrap justify-center gap-2">
