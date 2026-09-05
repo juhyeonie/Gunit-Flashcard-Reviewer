@@ -6,6 +6,7 @@ import { useApp } from '../data/AppContext.jsx'
 import { accentOf } from '../data/seed.js'
 import { dueCount } from '../data/scheduler.js'
 import { canQuiz } from '../data/quiz.js'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { formatRelative, lastSevenDays, minutesToday, streak } from '../data/activity.js'
 
 /** Copy for the streak panel, which has to read sensibly at 0, 1 and many. */
@@ -40,6 +41,7 @@ function Panel({ className = '', children }) {
 
 export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
   const { decks, settings, sessions } = useApp()
+  useDocumentTitle(null)
   const navigate = useNavigate()
 
   // Prefer a deck with cards waiting; fall back to any deck with content.
@@ -113,6 +115,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
                   value={Math.round(resume.progress * 100)}
                   height={4}
                   accent={accentOf(resume)}
+                  label={`${resume.title} deck progress`}
                 />
               </div>
               <div className="flex flex-wrap gap-2">
@@ -154,7 +157,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
                   {doneToday} / {goal} min
                 </span>
               </div>
-              <ProgressBar value={goalPct} height={4} />
+              <ProgressBar value={goalPct} height={4} label="Today's study goal" />
             </div>
             <div className="flex gap-1.5">
               {week.map((d) => (
@@ -231,9 +234,12 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
         </div>
 
         {decks.length ? (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(268px,1fr))]">
+          <ul className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(268px,1fr))]">
             {decks.slice(0, 6).map((deck) => (
-              <DeckCard key={deck.id} deck={deck} variant="dashboard" onEdit={onEditDeck} />
+              <li key={deck.id} className="contents">
+                {/* Under the "Study decks" h2, so these are h3. */}
+                <DeckCard deck={deck} variant="dashboard" headingLevel={3} onEdit={onEditDeck} />
+              </li>
             ))}
             <button
               type="button"
@@ -248,7 +254,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
                 Write your own cards, or import a file.
               </span>
             </button>
-          </div>
+          </ul>
         ) : (
           <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-6 py-[76px] text-center">
             <div className="font-serif text-[26px] leading-[1.2]">Nothing to study yet</div>

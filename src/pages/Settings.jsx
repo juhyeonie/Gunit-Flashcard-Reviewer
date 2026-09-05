@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 function Row({ label, hint, children }) {
   return (
@@ -36,6 +37,7 @@ const textInput =
 
 export default function Settings() {
   const { theme, toggleTheme, settings, updateSettings, say } = useApp()
+  useDocumentTitle('Preferences')
   const navigate = useNavigate()
 
   return (

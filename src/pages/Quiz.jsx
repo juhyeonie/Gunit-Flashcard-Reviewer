@@ -3,12 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { MIN_QUIZ_CARDS, buildQuestions, verdictFor } from '../data/quiz.js'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 export default function Quiz() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { decks, recordGrades, recordSession } = useApp()
   const deck = decks.find((d) => d.id === id)
+  useDocumentTitle(deck ? `Quiz · ${deck.title}` : 'Quiz')
 
   const questions = useMemo(() => (deck ? buildQuestions(deck.cards) : []), [deck])
   const [qIdx, setQIdx] = useState(0)

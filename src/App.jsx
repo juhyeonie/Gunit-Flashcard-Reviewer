@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AppProvider, useApp } from './data/AppContext.jsx'
 import { BottomNav, TopNav } from './components/Navbar.jsx'
@@ -31,6 +31,18 @@ function Shell() {
 
   const isReview = /\/review$/.test(pathname)
 
+  // Read after the route renders, so it reflects the title that route just set.
+  const [announcement, setAnnouncement] = useState('')
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return undefined
+    }
+    const id = setTimeout(() => setAnnouncement(document.title), 100)
+    return () => clearTimeout(id)
+  }, [pathname])
+
   const openNewDeck = () => setModal({ kind: 'deck-new' })
   const openEditDeck = (deck) => setModal({ kind: 'deck-edit', deck })
   const openNewCard = (deck) => setModal({ kind: 'card-new', deck })
@@ -45,6 +57,15 @@ function Shell() {
   return (
     <div className="flex min-h-screen flex-col bg-paper">
       {!isReview && <TopNav />}
+
+      {/*
+        Screen readers announce a page change from the document title on a full
+        page load; a single-page app never triggers that. This says it instead,
+        after the route has had a moment to set its own title.
+      */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
 
       <main className="flex-1 px-4 pt-[22px] pb-[30px] sm:px-7 sm:pt-[34px] sm:pb-12 lg:px-12 lg:pt-11 lg:pb-[72px]">
         {/*

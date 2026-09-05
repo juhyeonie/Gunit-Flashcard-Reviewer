@@ -6,6 +6,7 @@ import { PencilIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { dueCount } from '../data/scheduler.js'
 import { MIN_QUIZ_CARDS, canQuiz } from '../data/quiz.js'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { formatRelative } from '../data/activity.js'
 
 export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDeleteCard, onImport }) {
@@ -13,6 +14,7 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
   const navigate = useNavigate()
   const { decks, say } = useApp()
   const deck = decks.find((d) => d.id === id)
+  useDocumentTitle(deck?.title)
 
   const [studyMenu, setStudyMenu] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
@@ -163,9 +165,9 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
       </div>
 
       {hasCards ? (
-        <div className="flex flex-col gap-2.5">
+        <ul className="flex flex-col gap-2.5">
           {deck.cards.map((card, i) => (
-            <div
+            <li
               key={i}
               className="relative flex flex-col gap-3.5 rounded-xl border border-line bg-surface px-[22px] py-5 shadow-sh1 transition-[border-color,box-shadow] duration-200 hover:border-ink-3 hover:shadow-sh2"
             >
@@ -210,9 +212,9 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
               <div className="border-t border-line-soft pt-3.5 text-sm leading-[1.55] text-ink-2 text-pretty sm:pl-11">
                 {card.back}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
           <div className="font-serif text-[24px] leading-[1.2]">No cards yet</div>

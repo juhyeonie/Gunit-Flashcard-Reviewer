@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { buildQueue, entryFor, formatInterval, preview } from '../data/scheduler.js'
+import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 const NAV_HINTS = [
   { key: 'Space', label: 'flip', w: 'auto' },
@@ -51,6 +52,7 @@ export default function Review() {
   const navigate = useNavigate()
   const { decks, settings, say, recordGrades, recordSession } = useApp()
   const deck = decks.find((d) => d.id === id)
+  useDocumentTitle(deck ? `Reviewing ${deck.title}` : 'Review')
 
   // Reviewing ahead pulls in cards that aren't due yet.
   const [ahead, setAhead] = useState(false)
