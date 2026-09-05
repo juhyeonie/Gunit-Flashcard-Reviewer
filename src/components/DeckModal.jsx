@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
 
@@ -13,20 +13,17 @@ const SOURCES = [
  *
  * In create mode, clicking "Import a file" hands off: this modal closes and the
  * Import modal opens carrying whatever has been typed so far.
+ *
+ * Mounted only while open, and keyed by the deck being edited, so the draft
+ * starts fresh from useState rather than being reset by an effect.
  */
-export default function DeckModal({ open, mode = 'create', deck, onClose, onSave, onRequestImport }) {
-  const [draft, setDraft] = useState({ title: '', subject: '', desc: '' })
+export default function DeckModal({ mode = 'create', deck, onClose, onSave, onRequestImport }) {
+  const [draft, setDraft] = useState(() =>
+    mode === 'edit' && deck
+      ? { title: deck.title, subject: deck.subject, desc: deck.desc }
+      : { title: '', subject: '', desc: '' },
+  )
   const [source, setSource] = useState('write')
-
-  useEffect(() => {
-    if (!open) return
-    setSource('write')
-    setDraft(
-      mode === 'edit' && deck
-        ? { title: deck.title, subject: deck.subject, desc: deck.desc }
-        : { title: '', subject: '', desc: '' },
-    )
-  }, [open, mode, deck])
 
   const set = (key) => (e) => setDraft((d) => ({ ...d, [key]: e.target.value }))
   const valid = draft.title.trim() && draft.subject.trim()
@@ -40,7 +37,7 @@ export default function DeckModal({ open, mode = 'create', deck, onClose, onSave
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       kicker={isEdit ? 'Edit deck' : 'New deck'}
       title={isEdit ? 'Deck details' : 'Create a deck'}
@@ -65,6 +62,8 @@ export default function DeckModal({ open, mode = 'create', deck, onClose, onSave
           value={draft.title}
           onChange={set('title')}
           placeholder="e.g. Roman Provinces"
+          // Moving focus into a dialog on open is the expected behaviour here.
+          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
         />
         <Field

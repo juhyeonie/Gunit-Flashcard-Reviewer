@@ -1,21 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
 
-export default function CardModal({ open, mode = 'new', card, onClose, onSave }) {
-  const [draft, setDraft] = useState({ front: '', back: '' })
-
-  useEffect(() => {
-    if (!open) return
-    setDraft(mode === 'edit' && card ? { front: card.front, back: card.back } : { front: '', back: '' })
-  }, [open, mode, card])
+/**
+ * Mounted only while open, and keyed by the card being edited, so the draft
+ * starts fresh from useState rather than being reset by an effect.
+ */
+export default function CardModal({ mode = 'new', card, onClose, onSave }) {
+  const [draft, setDraft] = useState(() =>
+    mode === 'edit' && card ? { front: card.front, back: card.back } : { front: '', back: '' },
+  )
 
   const set = (key) => (e) => setDraft((d) => ({ ...d, [key]: e.target.value }))
   const valid = draft.front.trim() && draft.back.trim()
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       maxWidth={520}
       kicker={mode === 'edit' ? 'Edit card' : 'New card'}
@@ -43,6 +44,8 @@ export default function CardModal({ open, mode = 'new', card, onClose, onSave })
           value={draft.front}
           onChange={set('front')}
           placeholder="What was the cursus honorum?"
+          // Moving focus into a dialog on open is the expected behaviour here.
+          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
         />
         <Field

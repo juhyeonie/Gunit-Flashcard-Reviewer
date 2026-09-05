@@ -36,8 +36,19 @@ export default function Modal({
   if (!open) return null
 
   return (
+    /*
+     * Click-to-dismiss on the backdrop is a pointer convenience only: the same
+     * action is available to the keyboard through Escape (handled above) and
+     * the always-visible Close button, so the backdrop needs no key handler of
+     * its own and should stay out of the tab order.
+     */
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
-      onClick={onClose}
+      // Only a click on the backdrop itself closes; clicks inside the dialog
+      // bubble up to here but are ignored, so the dialog needs no handler.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.()
+      }}
       className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-6 backdrop-blur-[3px]"
       style={{ background: 'oklch(0.245 0.012 60 / .38)' }}
     >
@@ -45,7 +56,6 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        onClick={(e) => e.stopPropagation()}
         style={{ maxWidth }}
         className="rise-in relative w-full rounded-[14px] border border-line bg-surface p-7 shadow-sh3"
       >

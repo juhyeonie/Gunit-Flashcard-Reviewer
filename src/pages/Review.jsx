@@ -64,6 +64,9 @@ export default function Review() {
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [grades, setGrades] = useState({})
+  // Read once per mount rather than on every render: calling Date.now() during
+  // render makes output depend on when React happens to re-run the component.
+  const [mountedAt] = useState(() => Date.now())
   const revealTimer = useRef(null)
   const built = useRef(false)
 
@@ -184,7 +187,7 @@ export default function Review() {
   }
 
   if (!order.length) {
-    const waiting = nextDueLabel(deck, Date.now())
+    const waiting = nextDueLabel(deck, mountedAt)
     return (
       <div className="rise-in mx-auto flex max-w-[520px] flex-col items-center gap-4 py-24 text-center">
         <div className="kicker text-accent">{deck.cards.length ? 'All caught up' : 'Empty deck'}</div>
@@ -257,6 +260,13 @@ export default function Review() {
 
       <div className="flex flex-1 flex-col items-center justify-center gap-[26px] py-2.5 sm:py-5">
         <div className="w-full max-w-[720px] [perspective:2000px]">
+          {/*
+            Flipping by clicking the card is a pointer convenience. The
+            keyboard path is the global Space handler above plus the visible
+            "Reveal answer" button, and the card face says so, so this element
+            stays out of the tab order rather than becoming a second control.
+          */}
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
           <div
             onClick={() => setFlipped((f) => !f)}
             className="relative min-h-[320px] w-full cursor-pointer transition-transform duration-[340ms] ease-[cubic-bezier(0.77,0,0.175,1)] [transform-style:preserve-3d] sm:min-h-[380px]"
