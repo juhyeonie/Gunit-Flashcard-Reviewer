@@ -35,7 +35,7 @@ const verdictFor = (score, total) => {
 export default function Quiz() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, recordGrades } = useApp()
+  const { decks, recordGrades, recordSession } = useApp()
   const deck = decks.find((d) => d.id === id)
 
   const questions = useMemo(() => (deck ? buildQuestions(deck.cards) : []), [deck])
@@ -46,6 +46,9 @@ export default function Quiz() {
   // A quiz answer grades the underlying card too, so quiz and flashcard
   // sessions feed the same schedule.
   const [grades, setGrades] = useState({})
+  // Real elapsed time for the activity log. A lazy initialiser reads the clock
+  // once; useRef(Date.now()) would re-read it on every render.
+  const [startedAt, setStartedAt] = useState(() => Date.now())
 
   if (!deck || !questions.length) {
     return (
@@ -75,6 +78,11 @@ export default function Quiz() {
   const advance = () => {
     if (qIdx >= questions.length - 1) {
       recordGrades(id, grades)
+      recordSession({
+        deckId: id,
+        reviewed: questions.length,
+        seconds: (Date.now() - startedAt) / 1000,
+      })
       setDone(true)
       return
     }
@@ -106,6 +114,7 @@ export default function Quiz() {
                 setScore(0)
                 setGrades({})
                 setDone(false)
+                setStartedAt(Date.now())
               }}
             >
               Retake quiz

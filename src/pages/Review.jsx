@@ -49,7 +49,7 @@ const nextDueLabel = (deck, now) => {
 export default function Review() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, settings, say, recordGrades } = useApp()
+  const { decks, settings, say, recordGrades, recordSession } = useApp()
   const deck = decks.find((d) => d.id === id)
 
   // Reviewing ahead pulls in cards that aren't due yet.
@@ -69,6 +69,9 @@ export default function Review() {
   const [mountedAt] = useState(() => Date.now())
   const revealTimer = useRef(null)
   const built = useRef(false)
+  // Mirrors `grades` for the unmount handler, which cannot read state set after
+  // its own effect was created.
+  const gradesRef = useRef({})
 
   useEffect(() => {
     if (!deck || built.current) return
@@ -88,6 +91,19 @@ export default function Review() {
 
   const exit = useCallback(() => navigate(`/decks/${id}`), [navigate, id])
 
+  /**
+   * Log the session on the way out, whichever way that happens — finishing the
+   * queue or leaving part-way. Recording here rather than at "finish" means
+   * time spent on an abandoned session still counts toward the streak.
+   */
+  useEffect(() => {
+    return () => {
+      const reviewed = Object.keys(gradesRef.current).length
+      if (!reviewed) return
+      recordSession({ deckId: id, reviewed, seconds: (Date.now() - mountedAt) / 1000 })
+    }
+  }, [id, mountedAt, recordSession])
+
   /** Grades are already saved by the time we get here; this only reports. */
   const finish = useCallback(
     (tally) => {
@@ -97,11 +113,12 @@ export default function Review() {
           reviewed: values.length,
           known: values.filter((v) => v !== 'again').length,
           again: values.filter((v) => v === 'again').length,
+          seconds: (Date.now() - mountedAt) / 1000,
         },
         replace: true,
       })
     },
-    [id, navigate],
+    [id, navigate, mountedAt],
   )
 
   const next = useCallback(() => {
@@ -139,6 +156,7 @@ export default function Review() {
       if (!card) return
       recordGrades(id, { [card.id]: level })
       const merged = { ...grades, [card.id]: level }
+      gradesRef.current = merged
       setGrades(merged)
       say(`Scheduled — due in ${formatInterval(previews[level])}`)
       if (idx >= order.length - 1) {

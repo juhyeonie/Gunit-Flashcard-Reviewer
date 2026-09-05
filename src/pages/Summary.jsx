@@ -2,12 +2,13 @@ import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/AppContext.jsx'
+import { streak } from '../data/activity.js'
 
 export default function Summary() {
   const { id } = useParams()
   const { state } = useLocation()
   const navigate = useNavigate()
-  const { decks } = useApp()
+  const { decks, sessions } = useApp()
   const deck = decks.find((d) => d.id === id)
 
   if (!deck) {
@@ -28,13 +29,16 @@ export default function Summary() {
   const known = state?.known ?? 0
   const again = state?.again ?? 0
   const pct = Math.round(deck.progress * 100)
-  const minutes = Math.max(1, Math.round(reviewed * 0.55))
+  // Real elapsed time from the session that just ended, not a guess scaled off
+  // the card count.
+  const minutes = Math.max(1, Math.round((state?.seconds ?? 0) / 60))
+  const days = streak(sessions)
 
   const stats = [
     { label: 'Reviewed', value: String(reviewed), color: 'var(--color-ink)' },
     { label: 'Known', value: String(known), color: 'var(--color-ok)' },
     { label: 'Again', value: String(again), color: 'var(--color-err)' },
-    { label: 'Streak', value: '12', color: 'var(--color-ink)' },
+    { label: 'Streak', value: String(days), color: 'var(--color-ink)' },
   ]
 
   return (

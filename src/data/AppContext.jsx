@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { DECKS, uid } from './seed.js'
 import { grade } from './scheduler.js'
+import { appendSession } from './activity.js'
 
 const STORAGE_KEY = 'gunit.state.v2'
 
@@ -9,6 +10,9 @@ const AppContext = createContext(null)
 const DEFAULTS = {
   decks: DECKS,
   theme: 'light',
+  // When study actually happened. Drives the streak, the weekly chart and the
+  // daily goal — all of which were hardcoded before this existed.
+  sessions: [],
   settings: {
     cardsPer: 20,
     autoReveal: false,
@@ -72,6 +76,7 @@ const normalizeDeck = (deck, now = Date.now()) => {
 const normalize = (state, now = Date.now()) => ({
   ...state,
   decks: state.decks.map((deck) => normalizeDeck(deck, now)),
+  sessions: Array.isArray(state.sessions) ? state.sessions : [],
 })
 
 const load = () => {
@@ -199,9 +204,27 @@ export function AppProvider({ children }) {
     }))
   }, [])
 
+  /**
+   * Logs a finished study session. `seconds` is real elapsed time, measured by
+   * the page that ran the session, not estimated from the card count.
+   */
+  const recordSession = useCallback(({ deckId, reviewed, seconds }) => {
+    if (!reviewed) return
+    setState((s) => ({
+      ...s,
+      sessions: appendSession(s.sessions, {
+        at: Date.now(),
+        deckId,
+        reviewed,
+        seconds: Math.max(0, Math.round(seconds)),
+      }),
+    }))
+  }, [])
+
   const value = useMemo(
     () => ({
       decks: state.decks,
+      sessions: state.sessions,
       theme: state.theme,
       settings: state.settings,
       toast,
@@ -215,9 +238,11 @@ export function AppProvider({ children }) {
       updateCard,
       removeCard,
       recordGrades,
+      recordSession,
     }),
     [
       state.decks,
+      state.sessions,
       state.theme,
       state.settings,
       toast,
@@ -231,6 +256,7 @@ export function AppProvider({ children }) {
       updateCard,
       removeCard,
       recordGrades,
+      recordSession,
     ],
   )
 
