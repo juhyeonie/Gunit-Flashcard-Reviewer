@@ -17,6 +17,7 @@ export default function Modal({
   onConfirm,
   confirmVariant = 'primary',
   confirmDisabled = false,
+  secondaryAction,
   maxWidth = 460,
 }) {
   useEffect(() => {
@@ -75,7 +76,10 @@ export default function Modal({
 
         {children}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex items-center justify-end gap-2">
+          {/* Destructive actions sit apart from the confirm button so they
+              cannot be hit by someone reaching for "Save". */}
+          {secondaryAction && <div className="mr-auto">{secondaryAction}</div>}
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
