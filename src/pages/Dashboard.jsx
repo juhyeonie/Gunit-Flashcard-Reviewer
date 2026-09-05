@@ -5,26 +5,17 @@ import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { accentOf } from '../data/seed.js'
 import { dueCount } from '../data/scheduler.js'
+import { lastSevenDays, minutesToday, streak } from '../data/activity.js'
 
-const WEEK = [
-  ['M', 1],
-  ['T', 1],
-  ['W', 1],
-  ['T', 0],
-  ['F', 1],
-  ['S', 1],
-  ['S', 0],
-]
-
-const MINUTES = [
-  ['M', 18],
-  ['T', 32],
-  ['W', 12],
-  ['T', 0],
-  ['F', 26],
-  ['S', 41],
-  ['S', 22],
-]
+/** Copy for the streak panel, which has to read sensibly at 0, 1 and many. */
+const streakNote = (days, minutesDone, goal) => {
+  if (!days) return 'No streak yet. One session today starts it.'
+  const left = Math.max(0, goal - minutesDone)
+  const run = days === 1 ? 'One day down' : `${days} days without a gap`
+  return left > 0
+    ? `${run}. ${left} more ${left === 1 ? 'minute' : 'minutes'} today keeps it alive.`
+    : `${run}, and today's goal is already met.`
+}
 
 const greeting = () => {
   const h = new Date().getHours()
@@ -47,7 +38,7 @@ function Panel({ className = '', children }) {
 }
 
 export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
-  const { decks, settings } = useApp()
+  const { decks, settings, sessions } = useApp()
   const navigate = useNavigate()
 
   // Prefer a deck with cards waiting; fall back to any deck with content.
@@ -58,8 +49,15 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
   const totalCards = decks.reduce((n, d) => n + d.cards.length, 0)
   const totalDue = decks.reduce((n, d) => n + dueCount(d), 0)
   const resumeDue = resume ? dueCount(resume) : 0
+
+  // Everything below comes from the session log rather than fixed arrays.
+  const week = lastSevenDays(sessions)
+  const days = streak(sessions)
+  const doneToday = minutesToday(sessions)
+  const goal = settings.goalMinutes
+  const goalPct = goal ? Math.min(100, Math.round((doneToday / goal) * 100)) : 0
+  const peak = Math.max(1, ...week.map((d) => d.minutes))
   const firstName = settings.name.split(' ')[0]
-  const peak = Math.max(...MINUTES.map((m) => m[1]))
 
   const stats = [
     { label: 'Decks', value: String(decks.length), unit: 'in library' },
@@ -133,35 +131,40 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
           </div>
           <div>
             <div className="mb-2 flex items-baseline gap-[9px]">
-              <span className="font-serif text-[48px] leading-none tracking-[-0.02em]">12</span>
-              <span className="text-sm text-ink-3">days running</span>
+              <span className="font-serif text-[48px] leading-none tracking-[-0.02em]">{days}</span>
+              <span className="text-sm text-ink-3">
+                {days === 1 ? 'day running' : 'days running'}
+              </span>
             </div>
             <div className="text-[13.5px] leading-[1.5] text-ink-2 text-pretty">
-              Twelve days without a gap — your longest run yet. Ten minutes today keeps it alive.
+              {streakNote(days, doneToday, goal)}
             </div>
           </div>
           <div className="mt-auto flex flex-col gap-[18px]">
             <div className="flex flex-col gap-[9px]">
               <div className="flex justify-between font-mono text-[10px] leading-none font-medium tracking-[0.08em] text-ink-3 uppercase">
                 <span>Today&rsquo;s goal</span>
-                <span>14 / {settings.goalMinutes} min</span>
+                <span>
+                  {doneToday} / {goal} min
+                </span>
               </div>
-              <ProgressBar value={70} height={4} />
+              <ProgressBar value={goalPct} height={4} />
             </div>
             <div className="flex gap-1.5">
-              {WEEK.map(([day, on], i) => (
-                <div key={i} className="flex flex-1 flex-col items-center gap-2">
+              {week.map((d) => (
+                <div key={d.key} className="flex flex-1 flex-col items-center gap-2">
                   <div
+                    title={`${d.minutes} min`}
                     className={`h-[26px] w-full rounded-[5px] border ${
-                      on ? 'border-accent-line bg-accent-soft' : 'border-line bg-transparent'
+                      d.active ? 'border-accent-line bg-accent-soft' : 'border-line bg-transparent'
                     }`}
                   />
                   <span
                     className={`font-mono text-[10px] leading-none font-medium tracking-[0.06em] ${
-                      on ? 'text-accent' : 'text-ink-3'
+                      d.active ? 'text-accent' : 'text-ink-3'
                     }`}
                   >
-                    {day}
+                    {d.day}
                   </span>
                 </div>
               ))}
@@ -175,17 +178,17 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
             <span className="kicker !tracking-[0.08em] normal-case">this week</span>
           </div>
           <div className="flex h-[108px] items-end gap-[7px]">
-            {MINUTES.map(([day, mins], i) => (
-              <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-[9px]">
+            {week.map((d) => (
+              <div key={d.key} className="flex h-full flex-1 flex-col items-center justify-end gap-[9px]">
                 <span className="font-mono text-[10px] leading-none font-medium text-ink-3">
-                  {mins || '–'}
+                  {d.minutes || '–'}
                 </span>
                 <div
-                  className={`w-full rounded-sm ${mins ? 'bg-accent' : 'bg-line-soft'}`}
-                  style={{ height: Math.max(3, (mins / peak) * 68) }}
+                  className={`w-full rounded-sm ${d.minutes ? 'bg-accent' : 'bg-line-soft'}`}
+                  style={{ height: Math.max(3, (d.minutes / peak) * 68) }}
                 />
                 <span className="font-mono text-[10px] leading-none font-medium tracking-[0.08em] text-ink-3">
-                  {day}
+                  {d.day}
                 </span>
               </div>
             ))}

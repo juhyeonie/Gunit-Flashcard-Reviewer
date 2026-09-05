@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useApp } from '../data/AppContext.jsx'
+import { streak } from '../data/activity.js'
 
 export const NAV = [
   { to: '/', label: 'Home', short: 'Home', end: true },
@@ -17,7 +18,8 @@ const initialsOf = (name) =>
 
 /** Desktop and tablet: sticky glass bar with a pill nav group. */
 export function TopNav() {
-  const { settings, theme, toggleTheme } = useApp()
+  const { settings, sessions, theme, toggleTheme } = useApp()
+  const days = streak(sessions)
 
   return (
     <nav
@@ -59,7 +61,9 @@ export function TopNav() {
           <span className="grid h-7 w-7 place-items-center rounded-full border border-accent-line bg-accent-soft text-[11px] leading-none font-semibold text-accent">
             {initialsOf(settings.name)}
           </span>
-          <span className="kicker !tracking-[0.1em] whitespace-nowrap">12 day streak</span>
+          <span className="kicker !tracking-[0.1em] whitespace-nowrap">
+            {days ? `${days} day streak` : 'No streak yet'}
+          </span>
         </div>
       </div>
     </nav>
