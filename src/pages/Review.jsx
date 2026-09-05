@@ -1,14 +1,31 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
+import { buildQueue, entryFor, formatInterval, preview } from '../data/scheduler.js'
 
-const KEY_HINTS = [
+const NAV_HINTS = [
   { key: 'Space', label: 'flip', w: 'auto' },
   { key: '←', label: 'back', w: 22 },
   { key: '→', label: 'next', w: 22 },
   { key: 'Esc', label: 'exit', w: 'auto' },
 ]
+
+const RATE_HINTS = [
+  { key: '1', label: 'again', w: 22 },
+  { key: '2', label: 'good', w: 22 },
+  { key: '3', label: 'easy', w: 22 },
+  { key: 'Esc', label: 'exit', w: 'auto' },
+]
+
+// Tones lifted from the prototype's `ratings` table.
+const RATINGS = [
+  { key: 'again', label: 'Again', className: 'border-err text-err hover:bg-err-soft' },
+  { key: 'good', label: 'Good', className: 'border-line text-ink hover:bg-raised' },
+  { key: 'easy', label: 'Easy', className: 'border-ok-line bg-ok-soft text-ok hover:bg-ok-soft' },
+]
+
+const AUTO_REVEAL_MS = 4000
 
 const shuffleOrder = (order) => {
   const next = [...order]
@@ -21,39 +38,115 @@ const shuffleOrder = (order) => {
   return next
 }
 
+const nextDueLabel = (deck, now) => {
+  const upcoming = deck.cards
+    .map((c) => entryFor(deck, c)?.due)
+    .filter((due) => typeof due === 'number' && due > now)
+  if (!upcoming.length) return null
+  return formatInterval((Math.min(...upcoming) - now) / 60_000)
+}
+
 export default function Review() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, settings, say, recordSession } = useApp()
+  const { decks, settings, say, recordGrades } = useApp()
   const deck = decks.find((d) => d.id === id)
 
-  const [order, setOrder] = useState(() => {
-    const base = deck ? deck.cards.map((_, i) => i) : []
-    return settings.shuffleFirst ? shuffleOrder(base) : base
-  })
+  // Reviewing ahead pulls in cards that aren't due yet.
+  const [ahead, setAhead] = useState(false)
+
+  /**
+   * The queue is built once per session (or when the user opts to review
+   * ahead): due cards soonest-first, then new ones, capped at the
+   * "cards per session" preference.
+   */
+  const [order, setOrder] = useState([])
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [grades, setGrades] = useState({})
+  const revealTimer = useRef(null)
+  const built = useRef(false)
+
+  useEffect(() => {
+    if (!deck || built.current) return
+    built.current = true
+    const queue = buildQueue(deck, { limit: settings.cardsPer, all: ahead })
+    setOrder(settings.shuffleFirst ? shuffleOrder(queue) : queue)
+  }, [deck, settings.cardsPer, settings.shuffleFirst, ahead])
+
+  const startAhead = () => {
+    if (!deck) return
+    const queue = buildQueue(deck, { limit: settings.cardsPer, all: true })
+    setAhead(true)
+    setOrder(settings.shuffleFirst ? shuffleOrder(queue) : queue)
+    setIdx(0)
+    setFlipped(false)
+  }
 
   const exit = useCallback(() => navigate(`/decks/${id}`), [navigate, id])
 
-  const finish = useCallback(() => {
-    recordSession(id, { known: order.length, total: order.length })
-    navigate(`/decks/${id}/summary`, { state: { reviewed: order.length } })
-  }, [recordSession, id, order.length, navigate])
+  /** Grades are already saved by the time we get here; this only reports. */
+  const finish = useCallback(
+    (tally) => {
+      const values = Object.values(tally)
+      navigate(`/decks/${id}/summary`, {
+        state: {
+          reviewed: values.length,
+          known: values.filter((v) => v !== 'again').length,
+          again: values.filter((v) => v === 'again').length,
+        },
+        replace: true,
+      })
+    },
+    [id, navigate],
+  )
 
   const next = useCallback(() => {
     if (idx >= order.length - 1) {
-      finish()
+      finish(grades)
       return
     }
     setIdx((i) => i + 1)
     setFlipped(false)
-  }, [idx, order.length, finish])
+  }, [idx, order.length, finish, grades])
 
   const prev = useCallback(() => {
     setIdx((i) => Math.max(0, i - 1))
     setFlipped(false)
   }, [])
+
+  const card = deck?.cards[order[idx]]
+
+  /** Intervals each grade would produce for the card on screen. */
+  const previews = useMemo(() => {
+    if (!deck || !card) return {}
+    const entry = entryFor(deck, card)
+    return Object.fromEntries(RATINGS.map((r) => [r.key, preview(entry, r.key)]))
+  }, [deck, card])
+
+  /**
+   * Grades the current card, then moves on. The rating drives both the deck's
+   * progress and when the card comes back.
+   *
+   * Each grade is committed as it is given rather than batched to the end of
+   * the session, so leaving part-way through keeps the work already done.
+   */
+  const rate = useCallback(
+    (level) => {
+      if (!card) return
+      recordGrades(id, { [card.id]: level })
+      const merged = { ...grades, [card.id]: level }
+      setGrades(merged)
+      say(`Scheduled — due in ${formatInterval(previews[level])}`)
+      if (idx >= order.length - 1) {
+        finish(merged)
+        return
+      }
+      setIdx((i) => i + 1)
+      setFlipped(false)
+    },
+    [card, recordGrades, id, grades, say, previews, idx, order.length, finish],
+  )
 
   useEffect(() => {
     const onKey = (e) => {
@@ -63,17 +156,26 @@ export default function Review() {
       } else if (e.key === 'ArrowRight') next()
       else if (e.key === 'ArrowLeft') prev()
       else if (e.key === 'Escape') exit()
+      else if (flipped && ['1', '2', '3'].includes(e.key)) {
+        rate(RATINGS[Number(e.key) - 1].key)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [next, prev, exit])
+  }, [next, prev, exit, rate, flipped])
 
-  if (!deck || !order.length) {
+  // "Reveal answer automatically": flip the face-up card after four seconds.
+  useEffect(() => {
+    clearTimeout(revealTimer.current)
+    if (!settings.autoReveal || flipped) return undefined
+    revealTimer.current = setTimeout(() => setFlipped(true), AUTO_REVEAL_MS)
+    return () => clearTimeout(revealTimer.current)
+  }, [settings.autoReveal, flipped, idx])
+
+  if (!deck) {
     return (
       <div className="mx-auto max-w-xl py-20 text-center">
-        <div className="font-serif text-2xl">
-          {deck ? 'This deck has no cards to review yet.' : 'That deck no longer exists.'}
-        </div>
+        <div className="font-serif text-2xl">That deck no longer exists.</div>
         <Button as={Link} to="/decks" className="mt-5">
           All decks
         </Button>
@@ -81,8 +183,35 @@ export default function Review() {
     )
   }
 
-  const card = deck.cards[order[idx]]
+  if (!order.length) {
+    const waiting = nextDueLabel(deck, Date.now())
+    return (
+      <div className="rise-in mx-auto flex max-w-[520px] flex-col items-center gap-4 py-24 text-center">
+        <div className="kicker text-accent">{deck.cards.length ? 'All caught up' : 'Empty deck'}</div>
+        <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
+          {deck.cards.length ? 'Nothing is due right now' : 'No cards yet'}
+        </h1>
+        <p className="m-0 max-w-[380px] text-[15px] text-ink-2 text-pretty">
+          {deck.cards.length
+            ? waiting
+              ? `The next card in ${deck.title} comes due in ${waiting}. You can review ahead, but spacing works better if you wait.`
+              : `Every card in ${deck.title} has been scheduled.`
+            : 'Add a card or import a file before studying this deck.'}
+        </p>
+        <div className="mt-2 flex flex-wrap justify-center gap-2">
+          {deck.cards.length > 0 && (
+            <Button onClick={startAhead}>Review ahead</Button>
+          )}
+          <Button as={Link} to={`/decks/${deck.id}`} variant="outline">
+            Back to deck
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const scale = ((idx + (flipped ? 1 : 0)) / order.length).toFixed(3)
+  const hints = flipped ? RATE_HINTS : NAV_HINTS
 
   const face =
     'absolute inset-0 flex flex-col rounded-[14px] bg-surface p-[22px] shadow-sh2 sm:p-[34px] [backface-visibility:hidden]'
@@ -95,6 +224,7 @@ export default function Review() {
         </Button>
         <div className="min-w-0 text-center">
           <div className="truncate font-serif text-[18px] leading-[1.2]">{deck.title}</div>
+          {ahead && <div className="kicker mt-1">Reviewing ahead</div>}
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs font-medium tracking-[0.08em] text-ink-3">
@@ -106,11 +236,11 @@ export default function Review() {
             title="Shuffle"
             aria-label="Shuffle"
             onClick={() => {
-              const next = shuffleOrder(order)
-              setOrder(next)
+              const shuffledOrder = shuffleOrder(order)
+              setOrder(shuffledOrder)
               setIdx(0)
               setFlipped(false)
-              say(`Shuffled ${next.length} cards`)
+              say(`Shuffled ${shuffledOrder.length} cards`)
             }}
           >
             ⇄
@@ -156,7 +286,27 @@ export default function Review() {
           </div>
         </div>
 
-        {!flipped && (
+        {flipped ? (
+          <div className="flex flex-col items-center gap-2.5">
+            <span className="kicker">How well did you know it?</span>
+            <div className="flex flex-wrap justify-center gap-2">
+              {RATINGS.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => rate(r.key)}
+                  className={`flex min-w-[104px] cursor-pointer flex-col items-center gap-1.5 rounded-lg border bg-transparent px-[22px] py-2.5 transition-colors active:scale-[0.975] ${r.className}`}
+                >
+                  <span className="text-sm leading-none font-semibold">{r.label}</span>
+                  {/* The real next interval for this card, not a fixed label. */}
+                  <span className="font-mono text-[10px] leading-none tracking-[0.06em] opacity-70">
+                    {formatInterval(previews[r.key])}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
           <Button className="px-[26px] py-[13px]" onClick={() => setFlipped(true)}>
             Reveal answer
           </Button>
@@ -168,7 +318,7 @@ export default function Review() {
           ← Previous
         </Button>
         <div className="hidden flex-wrap items-center justify-center gap-3.5 sm:flex">
-          {KEY_HINTS.map((k) => (
+          {hints.map((k) => (
             <div key={k.key} className="flex items-center gap-[7px]">
               <kbd
                 style={{ minWidth: k.w }}

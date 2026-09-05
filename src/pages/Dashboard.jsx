@@ -4,6 +4,7 @@ import DeckCard from '../components/DeckCard.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { accentOf } from '../data/seed.js'
+import { dueCount } from '../data/scheduler.js'
 
 const WEEK = [
   ['M', 1],
@@ -49,15 +50,21 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
   const { decks, settings } = useApp()
   const navigate = useNavigate()
 
-  const resume = decks.find((d) => d.cards.length) ?? decks[0]
+  // Prefer a deck with cards waiting; fall back to any deck with content.
+  const resume =
+    decks.find((d) => d.cards.length && dueCount(d) > 0) ??
+    decks.find((d) => d.cards.length) ??
+    decks[0]
   const totalCards = decks.reduce((n, d) => n + d.cards.length, 0)
+  const totalDue = decks.reduce((n, d) => n + dueCount(d), 0)
+  const resumeDue = resume ? dueCount(resume) : 0
   const firstName = settings.name.split(' ')[0]
   const peak = Math.max(...MINUTES.map((m) => m[1]))
 
   const stats = [
     { label: 'Decks', value: String(decks.length), unit: 'in library' },
     { label: 'Cards', value: String(totalCards), unit: 'total' },
-    { label: 'Retention', value: '86', unit: 'per cent' },
+    { label: 'Due now', value: String(totalDue), unit: 'to review' },
   ]
 
   return (
@@ -91,7 +98,10 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
               </div>
               <div className="text-[13.5px] text-ink-3">
                 {Math.round(resume.progress * resume.cards.length)} of {resume.cards.length} cards
-                known · last studied {resume.studied.toLowerCase()}
+                known ·{' '}
+                {resumeDue
+                  ? `${resumeDue} due now`
+                  : `last studied ${resume.studied.toLowerCase()}`}
               </div>
             </div>
             <div className="mt-auto flex flex-col gap-[18px]">
