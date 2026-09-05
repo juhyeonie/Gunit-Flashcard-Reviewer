@@ -3,8 +3,7 @@
 A flashcard reviewer: build decks by hand or from your own course material, study
 them on a spaced-repetition schedule, and quiz yourself.
 
-React + Vite + Tailwind v4. The UI follows the Claude Design prototype kept in
-`design/`.
+React + Vite + Tailwind v4.
 
 ## Running it
 
