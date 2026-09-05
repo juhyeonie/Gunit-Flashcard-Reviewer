@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
@@ -34,9 +35,41 @@ function Toggle({ on, onClick, label }) {
 const textInput =
   'w-[220px] rounded-[5px] border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-accent'
 
+/**
+ * Preferences are edited as a draft.
+ *
+ * Every field used to write straight through on each keystroke, which made both
+ * buttons untrue: "Save changes" announced a save when nothing was pending, and
+ * "Cancel" navigated away from edits that had already been kept — mistype your
+ * name, press Cancel, and the mistake stayed.
+ *
+ * Theme is the one setting applied as you pick it, because choosing a theme
+ * without seeing it is no choice at all. Cancel puts it back.
+ */
 export default function Settings() {
   const { theme, toggleTheme, settings, updateSettings, say } = useApp()
   const navigate = useNavigate()
+
+  const [draft, setDraft] = useState(settings)
+  // State rather than a ref: this is read while rendering, to work out whether
+  // anything is unsaved.
+  const [themeOnEntry, setThemeOnEntry] = useState(theme)
+  const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
+
+  const dirty =
+    theme !== themeOnEntry ||
+    Object.keys(draft).some((k) => draft[k] !== settings[k])
+
+  const save = () => {
+    updateSettings(draft)
+    setThemeOnEntry(theme)
+    say('Preferences saved')
+  }
+
+  const cancel = () => {
+    if (theme !== themeOnEntry) toggleTheme()
+    navigate('/')
+  }
 
   return (
     <div className="rise-in mx-auto flex max-w-[680px] flex-col gap-[38px]">
@@ -81,13 +114,13 @@ export default function Settings() {
               min="5"
               max="60"
               step="5"
-              value={settings.cardsPer}
+              value={draft.cardsPer}
               aria-label="Cards per session"
-              onChange={(e) => updateSettings({ cardsPer: Number(e.target.value) })}
+              onChange={(e) => set({ cardsPer: Number(e.target.value) })}
               className="w-[150px] accent-accent"
             />
             <span className="w-16 font-mono text-xs font-medium whitespace-nowrap text-ink-2">
-              {settings.cardsPer} cards
+              {draft.cardsPer} cards
             </span>
           </div>
         </Row>
@@ -97,15 +130,15 @@ export default function Settings() {
         >
           <Toggle
             label="Reveal answer automatically"
-            on={settings.autoReveal}
-            onClick={() => updateSettings({ autoReveal: !settings.autoReveal })}
+            on={draft.autoReveal}
+            onClick={() => set({ autoReveal: !draft.autoReveal })}
           />
         </Row>
         <Row label="Shuffle new sessions" hint="Start each session in random order.">
           <Toggle
             label="Shuffle new sessions"
-            on={settings.shuffleFirst}
-            onClick={() => updateSettings({ shuffleFirst: !settings.shuffleFirst })}
+            on={draft.shuffleFirst}
+            onClick={() => set({ shuffleFirst: !draft.shuffleFirst })}
           />
         </Row>
       </section>
@@ -114,27 +147,30 @@ export default function Settings() {
         <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Account</h2>
         <Row label="Name" hint="Shown on the dashboard greeting.">
           <input
-            value={settings.name}
+            value={draft.name}
             aria-label="Name"
-            onChange={(e) => updateSettings({ name: e.target.value })}
+            onChange={(e) => set({ name: e.target.value })}
             className={textInput}
           />
         </Row>
         <Row label="Email" hint="Used for the weekly study summary.">
           <input
-            value={settings.email}
+            value={draft.email}
             aria-label="Email"
-            onChange={(e) => updateSettings({ email: e.target.value })}
+            onChange={(e) => set({ email: e.target.value })}
             className={textInput}
           />
         </Row>
       </section>
 
-      <div className="flex gap-2">
-        <Button onClick={() => say('Preferences saved')}>Save changes</Button>
-        <Button variant="ghost" onClick={() => navigate('/')}>
+      <div className="flex items-center gap-2">
+        <Button onClick={save} disabled={!dirty}>
+          Save changes
+        </Button>
+        <Button variant="ghost" onClick={cancel}>
           Cancel
         </Button>
+        {dirty && <span className="kicker">Unsaved changes</span>}
       </div>
     </div>
   )
