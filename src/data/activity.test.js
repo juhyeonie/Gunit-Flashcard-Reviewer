@@ -7,8 +7,10 @@ import {
   lastSevenDays,
   minutesThisWeek,
   minutesToday,
+  parseLegacyStudied,
   startOfDay,
   streak,
+  formatRelative,
 } from './activity.js'
 
 // Local noon on a fixed date, so day bucketing can't be pushed across a
@@ -141,5 +143,87 @@ describe('appendSession', () => {
     expect(capped).toHaveLength(MAX_SESSIONS)
     // The newest entry survives; the oldest are dropped.
     expect(capped[capped.length - 1].at).toBe(NOW)
+  })
+})
+
+describe('formatRelative', () => {
+  const ago = (ms) => NOW - ms
+  const MIN = 60_000
+  const HOUR = 3_600_000
+
+  it('reads Never with no timestamp', () => {
+    expect(formatRelative(null, NOW)).toBe('Never')
+    expect(formatRelative(undefined, NOW)).toBe('Never')
+  })
+
+  it('reads Just now for something that only just happened', () => {
+    expect(formatRelative(NOW, NOW)).toBe('Just now')
+    expect(formatRelative(ago(30_000), NOW)).toBe('Just now')
+  })
+
+  it('counts minutes, then hours', () => {
+    expect(formatRelative(ago(5 * MIN), NOW)).toBe('5 minutes ago')
+    expect(formatRelative(ago(1 * HOUR), NOW)).toBe('1 hour ago')
+    expect(formatRelative(ago(3 * HOUR), NOW)).toBe('3 hours ago')
+  })
+
+  it('says Yesterday for the previous calendar day', () => {
+    // NOW is local noon, so 18 hours back lands yesterday evening.
+    expect(formatRelative(ago(18 * HOUR), NOW)).toBe('Yesterday')
+  })
+
+  it('uses calendar days, not rolling 24-hour windows', () => {
+    // 23:00 last night is "Yesterday" even though it is only ~13 hours ago.
+    const lateYesterday = new Date(NOW)
+    lateYesterday.setDate(lateYesterday.getDate() - 1)
+    lateYesterday.setHours(23, 0, 0, 0)
+    expect(formatRelative(lateYesterday.getTime(), NOW)).toBe('Yesterday')
+  })
+
+  it('counts days, then weeks, then months', () => {
+    expect(formatRelative(ago(3 * DAY_MS), NOW)).toBe('3 days ago')
+    expect(formatRelative(ago(9 * DAY_MS), NOW)).toBe('A week ago')
+    expect(formatRelative(ago(21 * DAY_MS), NOW)).toBe('3 weeks ago')
+    expect(formatRelative(ago(60 * DAY_MS), NOW)).toBe('2 months ago')
+  })
+
+  it('does not read a clock skew into the future as a negative age', () => {
+    expect(formatRelative(NOW + 5 * MIN, NOW)).toBe('Just now')
+  })
+
+  it('ages, unlike the stored string it replaced', () => {
+    const studied = ago(2 * HOUR)
+    expect(formatRelative(studied, NOW)).toBe('2 hours ago')
+    expect(formatRelative(studied, NOW + 5 * DAY_MS)).toBe('5 days ago')
+  })
+})
+
+describe('parseLegacyStudied', () => {
+  it('maps the phrases the seed decks and old saves used', () => {
+    expect(parseLegacyStudied('Never', NOW)).toBeNull()
+    expect(parseLegacyStudied('Just now', NOW)).toBe(NOW)
+    expect(parseLegacyStudied('Yesterday', NOW)).toBe(NOW - DAY_MS)
+    expect(parseLegacyStudied('2 hours ago', NOW)).toBe(NOW - 2 * 3_600_000)
+    expect(parseLegacyStudied('3 days ago', NOW)).toBe(NOW - 3 * DAY_MS)
+    expect(parseLegacyStudied('A week ago', NOW)).toBe(NOW - 7 * DAY_MS)
+  })
+
+  it('round-trips back to the same phrase it came from', () => {
+    for (const phrase of ['Yesterday', '2 hours ago', '3 days ago']) {
+      expect(formatRelative(parseLegacyStudied(phrase, NOW), NOW)).toBe(phrase)
+    }
+  })
+
+  it('orders the seed phrases correctly, which is what the sort needs', () => {
+    const order = ['2 hours ago', 'Yesterday', '3 days ago', '5 days ago', 'A week ago']
+      .map((p) => parseLegacyStudied(p, NOW))
+    expect(order).toEqual([...order].sort((a, b) => b - a))
+  })
+
+  it('returns null for anything it does not recognise', () => {
+    expect(parseLegacyStudied('sometime last term', NOW)).toBeNull()
+    expect(parseLegacyStudied('', NOW)).toBeNull()
+    expect(parseLegacyStudied(undefined, NOW)).toBeNull()
+    expect(parseLegacyStudied(12345, NOW)).toBeNull()
   })
 })

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { DECKS, uid } from './seed.js'
 import { grade } from './scheduler.js'
-import { appendSession } from './activity.js'
+import { appendSession, parseLegacyStudied } from './activity.js'
 
 const STORAGE_KEY = 'gunit.state.v2'
 
@@ -45,6 +45,7 @@ export const progressOf = (deck) => {
  * Two older shapes are migrated in place:
  *   - a bare `progress` number (the seed decks) becomes concrete "good" grades
  *   - a flat `outcomes` map becomes real schedule entries with due dates
+ *   - a `studied` phrase ("2 hours ago") becomes a `studiedAt` timestamp
  *
  * After either, progress is always derived and never stored independently.
  */
@@ -66,8 +67,12 @@ const normalizeDeck = (deck, now = Date.now()) => {
     }
   }
 
-  const { outcomes: _legacy, ...rest } = deck
-  const next = { ...rest, cards, schedule }
+  // Recency is a timestamp now: the old string never aged, so a deck saved as
+  // "Just now" still claimed that weeks later, and it could not be sorted on.
+  const studiedAt = deck.studiedAt ?? parseLegacyStudied(deck.studied, now)
+
+  const { outcomes: _legacyOutcomes, studied: _legacyStudied, ...rest } = deck
+  const next = { ...rest, cards, schedule, studiedAt }
   return { ...next, progress: progressOf(next) }
 }
 
@@ -129,7 +134,7 @@ export function AppProvider({ children }) {
       title: title.trim(),
       subject: subject.trim() || 'General',
       desc: desc.trim(),
-      studied: 'Never',
+      studiedAt: null,
       progress: 0,
       cards: [],
       schedule: {},
@@ -198,7 +203,7 @@ export function AppProvider({ children }) {
         Object.entries(grades).forEach(([cardId, g]) => {
           schedule[cardId] = grade(schedule[cardId], g, now)
         })
-        const next = { ...d, studied: 'Just now', schedule }
+        const next = { ...d, studiedAt: Date.now(), schedule }
         return { ...next, progress: progressOf(next) }
       }),
     }))

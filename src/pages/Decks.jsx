@@ -21,6 +21,11 @@ export default function Decks({ onNewDeck, onEditDeck }) {
       if (filter === 'Drafts') return d.cards.length === 0
       return true
     })
+    if (sort === 'Recently studied') {
+      // Was a no-op: recency used to be an English string, so there was nothing
+      // to order by. Never-studied decks sort last.
+      out = [...out].sort((a, b) => (b.studiedAt ?? 0) - (a.studiedAt ?? 0))
+    }
     if (sort === 'Alphabetical') out = [...out].sort((a, b) => a.title.localeCompare(b.title))
     if (sort === 'Most cards') out = [...out].sort((a, b) => b.cards.length - a.cards.length)
     return out
