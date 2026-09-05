@@ -1,10 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Button from './Button.jsx'
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),' +
+  'select:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
+const focusableIn = (root) =>
+  [...root.querySelectorAll(FOCUSABLE)].filter((el) => el.offsetParent !== null)
 
 /**
  * The prototype's single modal shell: mono kicker, serif title, body copy,
  * arbitrary content, then Cancel + a confirm button whose tone varies
  * (ink for ordinary actions, err for deletes).
+ *
+ * Rendered through a portal so the rest of the app can be marked `inert` while
+ * it is open. `aria-modal="true"` promises assistive technology that everything
+ * behind the dialog is unavailable; without inert that promise is false — the
+ * page behind stays focusable and readable.
  */
 export default function Modal({
   open,
@@ -20,23 +33,72 @@ export default function Modal({
   secondaryAction,
   maxWidth = 460,
 }) {
+  const dialogRef = useRef(null)
+  const returnFocusTo = useRef(null)
+
+  /**
+   * Everything that has to be undone in a fixed order lives in one effect:
+   * focus can only be restored after `inert` is lifted, and separate effects
+   * give no guarantee about which cleanup runs first.
+   */
   useEffect(() => {
     if (!open) return undefined
+
+    returnFocusTo.current = document.activeElement
+
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.()
     }
     document.addEventListener('keydown', onKey)
-    const previous = document.body.style.overflow
+
+    const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+
+    const root = document.getElementById('root')
+    if (root) root.inert = true
+
+    // Focus moves in only after the trigger has been captured above, which is
+    // why no field here uses autoFocus: that fires during commit, before this
+    // effect, and would make the "previous" element the dialog's own input.
+    const dialog = dialogRef.current
+    const firstField = dialog?.querySelector('input,textarea,select')
+    ;(firstField ?? dialog)?.focus()
+
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = previous
+      document.body.style.overflow = previousOverflow
+      // Lift inert first: focusing anything under an inert root is refused,
+      // which would silently drop the reader onto <body>.
+      if (root) root.inert = false
+      const target = returnFocusTo.current
+      if (target?.isConnected) target.focus()
     }
   }, [open, onClose])
 
+  /** Keeps Tab and Shift+Tab cycling inside the dialog. */
+  const onKeyDown = (e) => {
+    if (e.key !== 'Tab') return
+    const items = focusableIn(e.currentTarget)
+    if (!items.length) {
+      e.preventDefault()
+      return
+    }
+    const first = items[0]
+    const last = items[items.length - 1]
+    const active = document.activeElement
+
+    if (e.shiftKey && (active === first || active === e.currentTarget)) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   if (!open) return null
 
-  return (
+  return createPortal(
     /*
      * Click-to-dismiss on the backdrop is a pointer convenience only: the same
      * action is available to the keyboard through Escape (handled above) and
@@ -53,12 +115,21 @@ export default function Modal({
       className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-6 backdrop-blur-[3px]"
       style={{ background: 'oklch(0.245 0.012 60 / .38)' }}
     >
+      {/*
+        The Tab handler is the focus trap itself — a keyboard listener on the
+        dialog container is how the pattern is built, not an accessibility
+        slip. The dialog is reachable only programmatically (tabIndex -1).
+      */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
         style={{ maxWidth }}
-        className="rise-in relative w-full rounded-[14px] border border-line bg-surface p-7 shadow-sh3"
+        className="rise-in relative w-full rounded-[14px] border border-line bg-surface p-7 shadow-sh3 outline-none"
       >
         <button
           type="button"
@@ -83,16 +154,12 @@ export default function Modal({
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            size="sm"
-            variant={confirmVariant}
-            onClick={onConfirm}
-            disabled={confirmDisabled}
-          >
+          <Button size="sm" variant={confirmVariant} onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

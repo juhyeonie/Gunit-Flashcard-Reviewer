@@ -44,9 +44,6 @@ export default function CardModal({ mode = 'new', card, onClose, onSave }) {
           value={draft.front}
           onChange={set('front')}
           placeholder="What was the cursus honorum?"
-          // Moving focus into a dialog on open is the expected behaviour here.
-          // eslint-disable-next-line jsx-a11y/no-autofocus
-          autoFocus
         />
         <Field
           id="card-back"
