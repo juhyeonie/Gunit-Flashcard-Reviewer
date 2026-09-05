@@ -5,6 +5,7 @@ import Menu, { MenuItem } from '../components/Menu.jsx'
 import { PencilIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { dueCount } from '../data/scheduler.js'
+import { MIN_QUIZ_CARDS, canQuiz } from '../data/quiz.js'
 import { formatRelative } from '../data/activity.js'
 
 export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDeleteCard, onImport }) {
@@ -44,6 +45,17 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
       return
     }
     go()
+  }
+
+  // Quiz has a higher bar than flashcards: without other cards to draw wrong
+  // answers from, every question would show only the right one.
+  const quizGuard = () => {
+    setStudyMenu(false)
+    if (!canQuiz(deck)) {
+      say(`A quiz needs ${MIN_QUIZ_CARDS} cards — this deck has ${deck.cards.length}`)
+      return
+    }
+    navigate(`/decks/${deck.id}/quiz`)
   }
 
   return (
@@ -99,7 +111,7 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
               <MenuItem
                 title="Quiz"
                 hint="Answer multiple choice and get scored."
-                onClick={guard(() => navigate(`/decks/${deck.id}/quiz`))}
+                onClick={quizGuard}
               />
             </Menu>
           </div>

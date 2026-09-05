@@ -5,6 +5,7 @@ import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { accentOf } from '../data/seed.js'
 import { dueCount } from '../data/scheduler.js'
+import { canQuiz } from '../data/quiz.js'
 import { formatRelative, lastSevenDays, minutesToday, streak } from '../data/activity.js'
 
 /** Copy for the streak panel, which has to read sensibly at 0, 1 and many. */
@@ -116,7 +117,12 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => navigate(`/decks/${resume.id}/review`)}>Resume review</Button>
-                <Button variant="outline" onClick={() => navigate(`/decks/${resume.id}/quiz`)}>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/decks/${resume.id}/quiz`)}
+                  disabled={!canQuiz(resume)}
+                  title={canQuiz(resume) ? undefined : 'This deck is too small to quiz'}
+                >
                   Quiz me
                 </Button>
               </div>
