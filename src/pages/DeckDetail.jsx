@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import Menu, { MenuItem } from '../components/Menu.jsx'
 import { PencilIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/AppContext.jsx'
+import { dueCount } from '../data/scheduler.js'
 
 export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDeleteCard, onImport }) {
   const { id } = useParams()
@@ -27,8 +28,10 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
   }
 
   const hasCards = deck.cards.length > 0
+  const due = dueCount(deck)
   const stats = [
     { label: 'Cards', value: String(deck.cards.length) },
+    { label: 'Due now', value: String(due), accent: due > 0 },
     { label: 'Known', value: `${Math.round(deck.progress * 100)}%` },
     { label: 'Last studied', value: deck.studied },
   ]
@@ -135,7 +138,12 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
       <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-0.5">
         {stats.map((s) => (
           <div key={s.label} className="py-0.5 pr-5">
-            <div className="mb-[7px] font-serif text-[26px] leading-none">{s.value}</div>
+            <div
+              className="mb-[7px] font-serif text-[26px] leading-none"
+              style={s.accent ? { color: 'var(--color-accent)' } : undefined}
+            >
+              {s.value}
+            </div>
             <div className="kicker !tracking-[0.12em]">{s.label}</div>
           </div>
         ))}

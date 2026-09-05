@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { DECKS, uid } from './seed.js'
+import { grade } from './scheduler.js'
 
 const STORAGE_KEY = 'gunit.state.v2'
 
@@ -18,14 +19,69 @@ const DEFAULTS = {
   },
 }
 
+/**
+ * A card counts as known once its last grade was anything other than "again".
+ * Cards never reviewed are not known, so a deck's progress reflects real
+ * coverage rather than the fact that a session happened to finish.
+ */
+export const progressOf = (deck) => {
+  if (!deck.cards.length) return 0
+  const known = deck.cards.filter((c) => {
+    const last = deck.schedule?.[c.id]?.last
+    return last && last !== 'again'
+  }).length
+  return known / deck.cards.length
+}
+
+/**
+ * Brings a deck up to the current shape: every card carries an id (schedule
+ * entries are keyed by it, so indices shifting on delete can't corrupt them),
+ * and every deck carries a schedule map.
+ *
+ * Two older shapes are migrated in place:
+ *   - a bare `progress` number (the seed decks) becomes concrete "good" grades
+ *   - a flat `outcomes` map becomes real schedule entries with due dates
+ *
+ * After either, progress is always derived and never stored independently.
+ */
+const normalizeDeck = (deck, now = Date.now()) => {
+  const cards = deck.cards.map((c) => (c.id ? c : { ...c, id: uid() }))
+
+  let schedule = deck.schedule
+  if (!schedule) {
+    schedule = {}
+    if (deck.outcomes) {
+      Object.entries(deck.outcomes).forEach(([cardId, g]) => {
+        schedule[cardId] = grade(undefined, g, now)
+      })
+    } else {
+      const knownCount = Math.round((deck.progress ?? 0) * cards.length)
+      cards.slice(0, knownCount).forEach((c) => {
+        schedule[c.id] = grade(undefined, 'good', now)
+      })
+    }
+  }
+
+  const { outcomes: _legacy, ...rest } = deck
+  const next = { ...rest, cards, schedule }
+  return { ...next, progress: progressOf(next) }
+}
+
+// Wrapped rather than passed to map directly: map would supply the array index
+// as normalizeDeck's `now`, scheduling every card relative to epoch 0.
+const normalize = (state, now = Date.now()) => ({
+  ...state,
+  decks: state.decks.map((deck) => normalizeDeck(deck, now)),
+})
+
 const load = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) }
+    if (raw) return normalize({ ...DEFAULTS, ...JSON.parse(raw) })
   } catch {
     // Corrupt or unavailable storage falls back to the seed content.
   }
-  return DEFAULTS
+  return normalize(DEFAULTS)
 }
 
 export function AppProvider({ children }) {
@@ -71,6 +127,7 @@ export function AppProvider({ children }) {
       studied: 'Never',
       progress: 0,
       cards: [],
+      schedule: {},
     }
     setState((s) => ({ ...s, decks: [deck, ...s.decks] }))
     return deck
@@ -88,9 +145,12 @@ export function AppProvider({ children }) {
   }, [])
 
   const addCards = useCallback((deckId, cards) => {
+    const withIds = cards.map((c) => ({ ...c, id: uid() }))
     setState((s) => ({
       ...s,
-      decks: s.decks.map((d) => (d.id === deckId ? { ...d, cards: [...d.cards, ...cards] } : d)),
+      decks: s.decks.map((d) =>
+        d.id === deckId ? { ...d, cards: [...d.cards, ...withIds], progress: progressOf({ ...d, cards: [...d.cards, ...withIds] }) } : d,
+      ),
     }))
   }, [])
 
@@ -98,7 +158,9 @@ export function AppProvider({ children }) {
     setState((s) => ({
       ...s,
       decks: s.decks.map((d) =>
-        d.id === deckId ? { ...d, cards: d.cards.map((c, i) => (i === index ? card : c)) } : d,
+        d.id === deckId
+          ? { ...d, cards: d.cards.map((c, i) => (i === index ? { ...card, id: c.id } : c)) }
+          : d,
       ),
     }))
   }, [])
@@ -106,25 +168,34 @@ export function AppProvider({ children }) {
   const removeCard = useCallback((deckId, index) => {
     setState((s) => ({
       ...s,
-      decks: s.decks.map((d) =>
-        d.id === deckId ? { ...d, cards: d.cards.filter((_, i) => i !== index) } : d,
-      ),
+      decks: s.decks.map((d) => {
+        if (d.id !== deckId) return d
+        const gone = d.cards[index]
+        const { [gone?.id]: _dropped, ...schedule } = d.schedule ?? {}
+        const next = { ...d, cards: d.cards.filter((_, i) => i !== index), schedule }
+        return { ...next, progress: progressOf(next) }
+      }),
     }))
   }, [])
 
-  /** Records the outcome of a review session against the deck. */
-  const recordSession = useCallback((deckId, { known, total }) => {
+  /**
+   * Applies a session's grades through the scheduler and re-derives progress.
+   * `grades` maps card id to 'again' | 'good' | 'easy'; each is folded into the
+   * card's existing schedule entry so intervals grow across sessions.
+   */
+  const recordGrades = useCallback((deckId, grades) => {
+    const now = Date.now()
     setState((s) => ({
       ...s,
-      decks: s.decks.map((d) =>
-        d.id === deckId
-          ? {
-              ...d,
-              studied: 'Just now',
-              progress: total ? Math.max(d.progress, known / total) : d.progress,
-            }
-          : d,
-      ),
+      decks: s.decks.map((d) => {
+        if (d.id !== deckId) return d
+        const schedule = { ...d.schedule }
+        Object.entries(grades).forEach(([cardId, g]) => {
+          schedule[cardId] = grade(schedule[cardId], g, now)
+        })
+        const next = { ...d, studied: 'Just now', schedule }
+        return { ...next, progress: progressOf(next) }
+      }),
     }))
   }, [])
 
@@ -143,7 +214,7 @@ export function AppProvider({ children }) {
       addCards,
       updateCard,
       removeCard,
-      recordSession,
+      recordGrades,
     }),
     [
       state.decks,
@@ -159,7 +230,7 @@ export function AppProvider({ children }) {
       addCards,
       updateCard,
       removeCard,
-      recordSession,
+      recordGrades,
     ],
   )
 

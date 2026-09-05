@@ -35,7 +35,7 @@ const verdictFor = (score, total) => {
 export default function Quiz() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, recordSession } = useApp()
+  const { decks, recordGrades } = useApp()
   const deck = decks.find((d) => d.id === id)
 
   const questions = useMemo(() => (deck ? buildQuestions(deck.cards) : []), [deck])
@@ -43,6 +43,9 @@ export default function Quiz() {
   const [selected, setSelected] = useState(null)
   const [score, setScore] = useState(0)
   const [done, setDone] = useState(false)
+  // A quiz answer grades the underlying card too, so quiz and flashcard
+  // sessions feed the same schedule.
+  const [grades, setGrades] = useState({})
 
   if (!deck || !questions.length) {
     return (
@@ -63,13 +66,15 @@ export default function Quiz() {
 
   const pick = (i) => {
     if (answered) return
+    const right = i === q.answer
     setSelected(i)
-    if (i === q.answer) setScore((s) => s + 1)
+    if (right) setScore((s) => s + 1)
+    setGrades((g) => ({ ...g, [q.card.id]: right ? 'good' : 'again' }))
   }
 
   const advance = () => {
     if (qIdx >= questions.length - 1) {
-      recordSession(id, { known: score, total: questions.length })
+      recordGrades(id, grades)
       setDone(true)
       return
     }
@@ -99,6 +104,7 @@ export default function Quiz() {
                 setQIdx(0)
                 setSelected(null)
                 setScore(0)
+                setGrades({})
                 setDone(false)
               }}
             >

@@ -111,9 +111,6 @@ export const badgeFor = (deck) => {
   return { label: 'In progress', bg: 'var(--color-raised)', fg: 'var(--color-ink-2)', line: 'var(--color-line)' }
 }
 
-/** Spaced-repetition intervals surfaced in the "Scheduled" toast. */
-export const DUE = { again: '10 minutes', good: '3 days', easy: '10 days' }
-
 export const SUBJECT_SUGGESTIONS = ['Ancient Rome', 'Roman law']
 
 export const uid = () => Math.random().toString(36).slice(2, 10)

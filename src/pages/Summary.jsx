@@ -21,10 +21,14 @@ export default function Summary() {
     )
   }
 
-  const reviewed = state?.reviewed ?? deck.cards.length
-  const known = Math.round(deck.progress * reviewed)
-  const again = Math.max(0, reviewed - known)
+  // Real counts from the session that just ended, not a figure back-derived
+  // from deck progress. A direct visit with no session state shows zeroes
+  // rather than inventing a result.
+  const reviewed = state?.reviewed ?? 0
+  const known = state?.known ?? 0
+  const again = state?.again ?? 0
   const pct = Math.round(deck.progress * 100)
+  const minutes = Math.max(1, Math.round(reviewed * 0.55))
 
   const stats = [
     { label: 'Reviewed', value: String(reviewed), color: 'var(--color-ink)' },
@@ -38,10 +42,10 @@ export default function Summary() {
       <div className="text-center">
         <div className="kicker mb-4 text-accent">Session complete</div>
         <h1 className="m-0 mb-3 font-serif text-[34px] leading-[1.06] tracking-[-0.02em] sm:text-[46px]">
-          {reviewed} cards reviewed
+          {reviewed} {reviewed === 1 ? 'card' : 'cards'} reviewed
         </h1>
         <p className="m-0 text-[16px] text-ink-2 text-pretty">
-          Session on {deck.title} · {Math.max(1, Math.round(reviewed * 0.55))} minutes
+          Session on {deck.title} · {minutes} {minutes === 1 ? 'minute' : 'minutes'}
         </p>
       </div>
 

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { accentOf, badgeFor } from '../data/seed.js'
+import { dueCount } from '../data/scheduler.js'
 import { EditButton } from './Icons.jsx'
 import ProgressBar from './ProgressBar.jsx'
 
@@ -14,6 +15,13 @@ export default function DeckCard({ deck, variant = 'library', onEdit }) {
   const badge = badgeFor(deck)
   const pct = Math.round(deck.progress * 100)
   const isDashboard = variant === 'dashboard'
+  const due = dueCount(deck)
+
+  // When cards are waiting, the card says so instead of when it was last
+  // opened — that is the more useful of the two.
+  const status = due
+    ? { text: `${due} due`, color: 'var(--color-accent)' }
+    : { text: deck.studied, color: undefined }
 
   const header = (
     <div className="flex items-center justify-between gap-2.5">
@@ -67,7 +75,7 @@ export default function DeckCard({ deck, variant = 'library', onEdit }) {
               </span>
               {meter}
               <span className="flex items-center justify-between gap-2.5 font-mono text-[11px] leading-none font-medium tracking-[0.04em] text-ink-3">
-                <span>{deck.studied}</span>
+                <span style={{ color: status.color }}>{status.text}</span>
                 <span style={{ color: accent }}>{pct}% known</span>
               </span>
             </span>
@@ -81,7 +89,7 @@ export default function DeckCard({ deck, variant = 'library', onEdit }) {
           <div className="flex flex-col gap-[9px]">
             <div className="flex justify-between font-mono text-[10px] leading-none font-medium tracking-[0.06em] text-ink-3">
               <span>{deck.cards.length ? `${deck.cards.length} cards` : 'No cards'}</span>
-              <span>{deck.studied}</span>
+              <span style={{ color: status.color }}>{status.text}</span>
             </div>
             {meter}
           </div>
