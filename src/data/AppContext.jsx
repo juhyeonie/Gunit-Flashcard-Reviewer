@@ -1,97 +1,37 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { DECKS, uid } from './seed.js'
+import { uid } from './seed.js'
 import { grade } from './scheduler.js'
-import { appendSession, parseLegacyStudied } from './activity.js'
+import { appendSession } from './activity.js'
+import { DEFAULT_STATE, normalizeState, parseStoredState, progressOf } from './normalize.js'
 
 const STORAGE_KEY = 'gunit.state.v2'
 
+// Where an unreadable payload is parked. Overwriting it on the next save would
+// destroy the only copy of whatever the reader had.
+const SALVAGE_KEY = 'gunit.state.unreadable'
+
 const AppContext = createContext(null)
 
-const DEFAULTS = {
-  decks: DECKS,
-  theme: 'light',
-  // When study actually happened. Drives the streak, the weekly chart and the
-  // daily goal — all of which were hardcoded before this existed.
-  sessions: [],
-  settings: {
-    cardsPer: 20,
-    autoReveal: false,
-    shuffleFirst: false,
-    name: 'Mara Kessler',
-    email: 'mara.kessler@university.edu',
-    goalMinutes: 20,
-  },
-}
-
-/**
- * A card counts as known once its last grade was anything other than "again".
- * Cards never reviewed are not known, so a deck's progress reflects real
- * coverage rather than the fact that a session happened to finish.
- */
-export const progressOf = (deck) => {
-  if (!deck.cards.length) return 0
-  const known = deck.cards.filter((c) => {
-    const last = deck.schedule?.[c.id]?.last
-    return last && last !== 'again'
-  }).length
-  return known / deck.cards.length
-}
-
-/**
- * Brings a deck up to the current shape: every card carries an id (schedule
- * entries are keyed by it, so indices shifting on delete can't corrupt them),
- * and every deck carries a schedule map.
- *
- * Two older shapes are migrated in place:
- *   - a bare `progress` number (the seed decks) becomes concrete "good" grades
- *   - a flat `outcomes` map becomes real schedule entries with due dates
- *   - a `studied` phrase ("2 hours ago") becomes a `studiedAt` timestamp
- *
- * After either, progress is always derived and never stored independently.
- */
-const normalizeDeck = (deck, now = Date.now()) => {
-  const cards = deck.cards.map((c) => (c.id ? c : { ...c, id: uid() }))
-
-  let schedule = deck.schedule
-  if (!schedule) {
-    schedule = {}
-    if (deck.outcomes) {
-      Object.entries(deck.outcomes).forEach(([cardId, g]) => {
-        schedule[cardId] = grade(undefined, g, now)
-      })
-    } else {
-      const knownCount = Math.round((deck.progress ?? 0) * cards.length)
-      cards.slice(0, knownCount).forEach((c) => {
-        schedule[c.id] = grade(undefined, 'good', now)
-      })
-    }
-  }
-
-  // Recency is a timestamp now: the old string never aged, so a deck saved as
-  // "Just now" still claimed that weeks later, and it could not be sorted on.
-  const studiedAt = deck.studiedAt ?? parseLegacyStudied(deck.studied, now)
-
-  const { outcomes: _legacyOutcomes, studied: _legacyStudied, ...rest } = deck
-  const next = { ...rest, cards, schedule, studiedAt }
-  return { ...next, progress: progressOf(next) }
-}
-
-// Wrapped rather than passed to map directly: map would supply the array index
-// as normalizeDeck's `now`, scheduling every card relative to epoch 0.
-const normalize = (state, now = Date.now()) => ({
-  ...state,
-  decks: state.decks.map((deck) => normalizeDeck(deck, now)),
-  sessions: Array.isArray(state.sessions) ? state.sessions : [],
-})
+export { progressOf }
 
 const load = () => {
+  let raw = null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return normalize({ ...DEFAULTS, ...JSON.parse(raw) })
+    raw = localStorage.getItem(STORAGE_KEY)
   } catch {
-    // Corrupt or unavailable storage falls back to the seed content.
+    // Storage unavailable (private mode, blocked cookies): run in memory.
+    return normalizeState(DEFAULT_STATE)
   }
-  return normalize(DEFAULTS)
+
+  const { state, ok } = parseStoredState(raw)
+  if (!ok && raw) {
+    try {
+      localStorage.setItem(SALVAGE_KEY, raw)
+    } catch {
+      // Nothing more to do; the app still starts.
+    }
+  }
+  return state
 }
 
 export function AppProvider({ children }) {
