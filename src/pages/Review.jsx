@@ -283,14 +283,23 @@ export default function Review() {
             keyboard path is the global Space handler above plus the visible
             "Reveal answer" button, and the card face says so, so this element
             stays out of the tab order rather than becoming a second control.
+
+            aria-live carries the flip and the move to the next card, both of
+            which are otherwise a silent change of text.
           */}
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
           <div
             onClick={() => setFlipped((f) => !f)}
+            aria-live="polite"
             className="relative min-h-[320px] w-full cursor-pointer transition-transform duration-[340ms] ease-[cubic-bezier(0.77,0,0.175,1)] [transform-style:preserve-3d] sm:min-h-[380px]"
             style={{ transform: flipped ? 'rotateY(180deg)' : 'none' }}
           >
-            <div className={`${face} border border-line`}>
+            {/*
+              backface-visibility hides pixels, not semantics: without this the
+              answer sat in the accessibility tree beside the question and was
+              read out with it, which defeats the point of a flashcard.
+            */}
+            <div className={`${face} border border-line`} aria-hidden={flipped}>
               <div className="kicker">Question</div>
               <div className="grid flex-1 place-items-center py-[22px]">
                 <p className="m-0 text-center font-serif text-[24px] leading-[1.28] tracking-[-0.01em] text-pretty sm:text-[34px]">
@@ -300,7 +309,10 @@ export default function Review() {
               <div className="kicker text-center !tracking-[0.1em]">Click card or press space</div>
             </div>
 
-            <div className={`${face} border border-accent-line [transform:rotateY(180deg)]`}>
+            <div
+              className={`${face} border border-accent-line [transform:rotateY(180deg)]`}
+              aria-hidden={!flipped}
+            >
               <div className="kicker text-accent">Answer</div>
               <div className="grid flex-1 place-items-center py-[22px]">
                 <p className="m-0 text-center font-serif text-[18px] leading-[1.42] text-pretty sm:text-[22px]">
