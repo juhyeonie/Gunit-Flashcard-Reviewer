@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+/*
+  Gunit design tokens — ported verbatim from the Claude Design prototype
+  ("Flashcard Reviewer.dc.html"). Values are oklch so the warm paper greys and
+  the olive accent stay perceptually even between light and dark.
+
+  The brand accent #4C5D3A is oklch(0.455 0.058 130) — the --accent below.
+  Registering these under Tailwind's --color-* namespace means utilities like
+  `bg-surface`, `text-ink-3` and `border-line-soft` resolve to them, and the
+  dark theme works by redefining the same custom properties.
+*/
+@theme {
+  --color-paper: oklch(0.982 0.006 85);
+  --color-frame: oklch(0.945 0.008 85);
+  --color-surface: oklch(0.998 0.003 85);
+  --color-raised: oklch(0.968 0.006 85);
+  --color-line: oklch(0.888 0.009 85);
+  --color-line-soft: oklch(0.932 0.007 85);
+  --color-ink: oklch(0.245 0.012 60);
+  --color-ink-2: oklch(0.4 0.011 65);
+  --color-ink-3: oklch(0.585 0.01 70);
+  --color-accent: oklch(0.455 0.058 130);
+  --color-accent-2: oklch(0.545 0.062 130);
+  --color-accent-soft: oklch(0.945 0.022 130);
+  --color-accent-line: oklch(0.855 0.035 130);
+  --color-ok: oklch(0.455 0.058 130);
+  --color-ok-soft: oklch(0.945 0.022 130);
+  --color-ok-line: oklch(0.855 0.035 130);
+  --color-clay: oklch(0.585 0.085 52);
+  --color-clay-soft: oklch(0.955 0.025 60);
+  --color-err: oklch(0.505 0.135 28);
+  --color-err-soft: oklch(0.958 0.022 30);
+
+  --font-sans: Archivo, Helvetica, sans-serif;
+  --font-serif: Newsreader, Georgia, serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --shadow-sh1: 0 1px 1px oklch(0.245 0.012 60 / 0.04);
+  --shadow-sh2:
+    0 10px 30px -14px oklch(0.245 0.012 60 / 0.18), 0 1px 2px oklch(0.245 0.012 60 / 0.05);
+  --shadow-sh3: 0 30px 70px -30px oklch(0.245 0.012 60 / 0.32);
+
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* The glass nav needs the paper colour at partial alpha, which can't live in
+   the --color-* namespace without Tailwind generating a bogus utility. */
+:root {
+  --glass: oklch(0.982 0.006 85 / 0.82);
+}
+
+[data-theme="dark"] {
+  --color-paper: oklch(0.178 0.006 260);
+  --color-frame: oklch(0.142 0.006 260);
+  --color-surface: oklch(0.212 0.007 260);
+  --color-raised: oklch(0.246 0.008 260);
+  --color-line: oklch(0.292 0.009 260);
+  --color-line-soft: oklch(0.24 0.008 260);
+  --color-ink: oklch(0.965 0.004 260);
+  --color-ink-2: oklch(0.808 0.006 260);
+  --color-ink-3: oklch(0.632 0.008 260);
+  --color-accent: oklch(0.8 0.098 132);
+  --color-accent-2: oklch(0.72 0.092 132);
+  --color-accent-soft: oklch(0.272 0.038 132);
+  --color-accent-line: oklch(0.372 0.052 132);
+  --color-ok: oklch(0.8 0.098 132);
+  --color-ok-soft: oklch(0.272 0.038 132);
+  --color-ok-line: oklch(0.372 0.052 132);
+  --color-clay: oklch(0.8 0.098 62);
+  --color-clay-soft: oklch(0.272 0.038 62);
+  --color-err: oklch(0.74 0.115 22);
+  --color-err-soft: oklch(0.278 0.048 22);
+
+  --shadow-sh1: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-sh2: 0 12px 28px -18px oklch(0 0 0 / 0.72), 0 1px 2px oklch(0 0 0 / 0.35);
+  --shadow-sh3: 0 28px 64px -28px oklch(0 0 0 / 0.8);
+
+  --glass: oklch(0.142 0.006 260 / 0.84);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-frame);
+  color: var(--color-ink);
+  font: 400 15px/1.55 Archivo, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: riseIn 0.2s var(--ease-out-quint) both;
+}
+
+.toast-in {
+  animation: toastIn 0.2s var(--ease-out-quint) both;
+}
+
+/* The mono, letterspaced, uppercase label that headlines nearly every block in
+   the prototype. Frequent enough to earn a class rather than five utilities. */
+.kicker {
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes riseIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  * {
+    transition-duration: 120ms !important;
+    animation-duration: 160ms !important;
+  }
+}
