@@ -1,15 +1,5 @@
 @import "tailwindcss";
 
-/*
-  Gunit design tokens — ported verbatim from the Claude Design prototype
-  ("Flashcard Reviewer.dc.html"). Values are oklch so the warm paper greys and
-  the olive accent stay perceptually even between light and dark.
-
-  The brand accent #4C5D3A is oklch(0.455 0.058 130) — the --accent below.
-  Registering these under Tailwind's --color-* namespace means utilities like
-  `bg-surface`, `text-ink-3` and `border-line-soft` resolve to them, and the
-  dark theme works by redefining the same custom properties.
-*/
 @theme {
   --color-paper: oklch(0.982 0.006 85);
   --color-frame: oklch(0.945 0.008 85);
