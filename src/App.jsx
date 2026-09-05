@@ -20,7 +20,8 @@ const CLOSED = { kind: null }
 function Shell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { addDeck, updateDeck, addCards, updateCard, removeCard, say, toast } = useApp()
+  const { addDeck, updateDeck, removeDeck, addCards, updateCard, removeCard, say, toast } =
+    useApp()
 
   // One value rather than a flag per modal, so the Create -> Import handoff is
   // a single swap and two modals can never be open at once.
@@ -34,6 +35,7 @@ function Shell() {
   const openNewCard = (deck) => setModal({ kind: 'card-new', deck })
   const openEditCard = (deck, index, card) => setModal({ kind: 'card-edit', deck, index, card })
   const openDeleteCard = (deck, index) => setModal({ kind: 'card-delete', deck, index })
+  const openDeleteDeck = (deck) => setModal({ kind: 'deck-delete', deck })
 
   /** Import against an existing deck, or standing alone as a new-deck flow. */
   const openImport = (deck, draft) =>
@@ -101,8 +103,26 @@ function Shell() {
           // Clicking "Import a file" inside Create a Deck: this modal closes and
           // the Import modal opens, carrying whatever has been typed.
           onRequestImport={(draft) => openImport(null, draft)}
+          onDelete={openDeleteDeck}
         />
       )}
+
+      <ConfirmModal
+        open={modal.kind === 'deck-delete'}
+        kicker="Delete deck"
+        title={`Delete “${modal.deck?.title ?? ''}”?`}
+        body="Its cards and review history will be removed. This cannot be undone."
+        confirmLabel="Delete deck"
+        onClose={close}
+        onConfirm={() => {
+          const { id, title } = modal.deck
+          removeDeck(id)
+          say(`Deleted “${title}”`)
+          // Leaving the deleted deck's own page open would strand the user on a
+          // "no longer exists" screen.
+          if (pathname.startsWith(`/decks/${id}`)) navigate('/decks')
+        }}
+      />
 
       {modal.kind === 'import' && (
         <ImportFileModal

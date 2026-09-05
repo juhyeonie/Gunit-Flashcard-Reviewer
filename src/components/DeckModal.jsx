@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Modal from './Modal.jsx'
+import Button from './Button.jsx'
 import Field from './Field.jsx'
 
 const SOURCES = [
@@ -17,7 +18,7 @@ const SOURCES = [
  * Mounted only while open, and keyed by the deck being edited, so the draft
  * starts fresh from useState rather than being reset by an effect.
  */
-export default function DeckModal({ mode = 'create', deck, onClose, onSave, onRequestImport }) {
+export default function DeckModal({ mode = 'create', deck, onClose, onSave, onDelete, onRequestImport }) {
   const [draft, setDraft] = useState(() =>
     mode === 'edit' && deck
       ? { title: deck.title, subject: deck.subject, desc: deck.desc }
@@ -47,6 +48,13 @@ export default function DeckModal({ mode = 'create', deck, onClose, onSave, onRe
           : 'Name it, then choose how its cards get written.'
       }
       confirmLabel={isEdit ? 'Save changes' : 'Create deck'}
+      secondaryAction={
+        isEdit && onDelete ? (
+          <Button variant="danger" size="sm" onClick={() => onDelete(deck)}>
+            Delete deck
+          </Button>
+        ) : null
+      }
       confirmDisabled={!valid}
       onConfirm={() => {
         if (!valid) return
