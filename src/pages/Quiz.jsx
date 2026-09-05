@@ -2,35 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
-
-const shuffled = (arr) => {
-  const next = [...arr]
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
-    const swap = next[i]
-    next[i] = next[j]
-    next[j] = swap
-  }
-  return next
-}
-
-/**
- * Questions come from the deck itself: the card front is the prompt, its back
- * the right answer, and up to three other backs are the distractors.
- */
-const buildQuestions = (cards) =>
-  shuffled(cards).map((card) => {
-    const distractors = shuffled(cards.filter((c) => c !== card)).slice(0, 3)
-    const options = shuffled([card, ...distractors])
-    return { card, options, answer: options.indexOf(card) }
-  })
-
-const verdictFor = (score, total) => {
-  const ratio = total ? score / total : 0
-  if (ratio >= 0.85) return 'Strong recall across the deck. Ready to move to a longer interval.'
-  if (ratio >= 0.5) return 'A solid pass. Another flashcard run will close the remaining gaps.'
-  return 'Worth another pass through the deck before quizzing again.'
-}
+import { MIN_QUIZ_CARDS, buildQuestions, verdictFor } from '../data/quiz.js'
 
 export default function Quiz() {
   const { id } = useParams()
@@ -50,15 +22,43 @@ export default function Quiz() {
   // once; useRef(Date.now()) would re-read it on every render.
   const [startedAt, setStartedAt] = useState(() => Date.now())
 
-  if (!deck || !questions.length) {
+  if (!deck) {
     return (
       <div className="mx-auto max-w-xl py-20 text-center">
-        <div className="font-serif text-2xl">
-          {deck ? 'This deck has no cards to quiz yet.' : 'That deck no longer exists.'}
-        </div>
+        <div className="font-serif text-2xl">That deck no longer exists.</div>
         <Button as={Link} to="/decks" className="mt-5">
           All decks
         </Button>
+      </div>
+    )
+  }
+
+  // Fewer than four cards cannot make a real question: the answer would sit
+  // among one or two options, and picking it would still grade the card and
+  // push out its interval as though something had been recalled.
+  if (deck.cards.length < MIN_QUIZ_CARDS) {
+    const has = deck.cards.length
+    return (
+      <div className="rise-in mx-auto flex max-w-[520px] flex-col items-center gap-4 py-24 text-center">
+        <div className="kicker">Not enough cards</div>
+        <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
+          A quiz needs {MIN_QUIZ_CARDS} cards
+        </h1>
+        <p className="m-0 max-w-[400px] text-[15px] text-ink-2 text-pretty">
+          {deck.title} has {has === 0 ? 'none yet' : has === 1 ? 'one' : `only ${has}`}. Multiple
+          choice needs other cards to draw the wrong answers from, so until then a quiz would only
+          ever show the right one.
+        </p>
+        <div className="mt-2 flex flex-wrap justify-center gap-2">
+          <Button as={Link} to={`/decks/${deck.id}`}>
+            Add cards
+          </Button>
+          {has > 0 && (
+            <Button as={Link} to={`/decks/${deck.id}/review`} variant="outline">
+              Study with flashcards
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
