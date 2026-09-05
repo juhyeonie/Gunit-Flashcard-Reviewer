@@ -7,6 +7,7 @@ import DeckModal from './components/DeckModal.jsx'
 import ImportFileModal from './components/ImportFileModal.jsx'
 import CardModal from './components/CardModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Decks from './pages/Decks.jsx'
 import DeckDetail from './pages/DeckDetail.jsx'
@@ -46,7 +47,13 @@ function Shell() {
       {!isReview && <TopNav />}
 
       <main className="flex-1 px-4 pt-[22px] pb-[30px] sm:px-7 sm:pt-[34px] sm:pb-12 lg:px-12 lg:pt-11 lg:pb-[72px]">
-        <Routes>
+        {/*
+          Keyed by path so a crashed page clears itself when the reader
+          navigates elsewhere, and scoped inside <main> so the nav stays usable
+          rather than going down with the page.
+        */}
+        <ErrorBoundary key={pathname}>
+          <Routes>
           <Route
             path="/"
             element={
@@ -74,7 +81,8 @@ function Shell() {
           <Route path="/decks/:id/quiz" element={<Quiz />} />
           <Route path="/decks/:id/summary" element={<Summary />} />
           <Route path="/settings" element={<Settings />} />
-        </Routes>
+          </Routes>
+        </ErrorBoundary>
       </main>
 
       {!isReview && <BottomNav />}
@@ -178,8 +186,12 @@ function Shell() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <Shell />
-    </AppProvider>
+    // Outer net for anything the per-route boundary sits below — the provider
+    // itself, or the shell around the routes.
+    <ErrorBoundary>
+      <AppProvider>
+        <Shell />
+      </AppProvider>
+    </ErrorBoundary>
   )
 }
