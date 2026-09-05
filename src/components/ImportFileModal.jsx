@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
-import { DRAFTED } from '../data/seed.js'
+import { generateCards } from '../data/generate.js'
 
 const ACCEPT =
   '.pdf,.pptx,.docx,.txt,application/pdf,' +
@@ -38,6 +38,7 @@ export default function ImportFileModal({
 }) {
   const [phase, setPhase] = useState('empty')
   const [files, setFiles] = useState([])
+  const [picked, setPicked] = useState([])
   const [pct, setPct] = useState(0)
   const [draft, setDraft] = useState(() => ({
     title: initialDraft?.title ?? '',
@@ -46,6 +47,7 @@ export default function ImportFileModal({
   }))
   const [dragging, setDragging] = useState(false)
   const [result, setResult] = useState({ total: 0, title: '' })
+  const [error, setError] = useState(null)
   const inputRef = useRef(null)
   const timer = useRef(null)
   const targetDeck = useRef(deckId ?? null)
@@ -56,34 +58,48 @@ export default function ImportFileModal({
   const addFiles = (picked) => {
     const list = Array.from(picked || [])
     if (!list.length) return
+    setError(null)
+    // The File objects themselves are kept for upload; `describe` is only the
+    // display row.
+    setPicked((p) => [...p, ...list])
     setFiles((f) => [...f, ...list.map(describe)])
     setPhase('selected')
   }
 
-  // Mirrors the prototype's simulated drafting: 11% every 220ms, then the
-  // DRAFTED cards land on the target deck.
-  //
-  // Progress is tracked in a ref rather than read back through a setState
-  // updater: the completion step has side effects (it writes cards to the
-  // deck), and StrictMode invokes updater functions twice, which would import
-  // every card twice over.
-  const generate = () => {
+  /**
+   * Sends the files to the server-side generator and adds what comes back.
+   *
+   * The bar creeps toward 90% while the request is in flight — the API returns
+   * one response rather than progress events, so this is an honest "working"
+   * indicator that only reaches 100% when cards actually arrive.
+   */
+  const generate = async (deckId, title) => {
     setPhase('loading')
-    progress.current = 8
-    setPct(8)
+    setError(null)
+    progress.current = 6
+    setPct(6)
     clearInterval(timer.current)
     timer.current = setInterval(() => {
-      progress.current += 11
-      if (progress.current < 100) {
-        setPct(progress.current)
-        return
-      }
+      progress.current = Math.min(90, progress.current + 3)
+      setPct(progress.current)
+    }, 700)
+
+    try {
+      const cards = await generateCards(picked, {
+        count: Math.max(6, Math.min(30, picked.length * 12)),
+        deckTitle: title,
+      })
       clearInterval(timer.current)
       setPct(100)
-      onAddCards(targetDeck.current, DRAFTED)
-      setResult({ total: DRAFTED.length, title: draft.title || 'this deck' })
+      onAddCards(deckId, cards)
+      setResult({ total: cards.length, title: title || 'this deck' })
       setPhase('done')
-    }, 220)
+    } catch (err) {
+      clearInterval(timer.current)
+      setPct(0)
+      setError(err.message)
+      setPhase('selected')
+    }
   }
 
   const confirm = () => {
@@ -109,8 +125,10 @@ export default function ImportFileModal({
       })
       targetDeck.current = deck.id
       setResult((r) => ({ ...r, title: deck.title }))
+      generate(deck.id, deck.title)
+      return
     }
-    generate()
+    generate(targetDeck.current, draft.title)
   }
 
   const set = (key) => (e) => setDraft((d) => ({ ...d, [key]: e.target.value }))
@@ -130,7 +148,7 @@ export default function ImportFileModal({
           ? 'They are saved to the deck — open it to edit the wording.'
           : phase === 'loading'
             ? 'Reading your files and drafting cards.'
-            : 'Drop a reading, lecture slides or notes and Gunit drafts the cards for you. Nothing leaves your device in this prototype.'
+            : 'Drop a reading, lecture slides or notes and Claude drafts the cards. Your file is sent to the Anthropic API to be read.'
       }
       confirmLabel={confirmLabel}
       confirmDisabled={phase === 'loading'}
@@ -223,7 +241,7 @@ export default function ImportFileModal({
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm leading-[1.3] font-medium">{f.name}</span>
                   <span className="font-mono text-[11px] leading-[1.5] tracking-[0.04em] text-ink-3">
-                    {phase === 'loading' ? 'Drafting cards…' : f.size}
+                    {phase === 'loading' ? 'Reading and drafting…' : f.size}
                   </span>
                   {phase === 'loading' && (
                     <span className="mt-[7px] block h-[3px] overflow-hidden rounded-sm bg-raised">
@@ -240,6 +258,8 @@ export default function ImportFileModal({
                     onClick={() => {
                       const next = files.filter((_, j) => j !== i)
                       setFiles(next)
+                      setPicked((p) => p.filter((_, j) => j !== i))
+                      setError(null)
                       if (!next.length) setPhase('empty')
                     }}
                     aria-label={`Remove ${f.name}`}
@@ -251,6 +271,16 @@ export default function ImportFileModal({
               </div>
             ))}
           </>
+        )}
+
+        {error && (
+          <div
+            role="alert"
+            className="rounded-lg border border-err bg-err-soft px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2"
+          >
+            <div className="mb-1 text-[13px] font-semibold text-err">Could not draft cards</div>
+            {error}
+          </div>
         )}
 
         {phase === 'done' && (
