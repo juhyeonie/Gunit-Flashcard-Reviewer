@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { accentOf, badgeFor } from '../data/seed.js'
 import { dueCount } from '../data/scheduler.js'
+import { formatRelative } from '../data/activity.js'
 import { EditButton } from './Icons.jsx'
 import ProgressBar from './ProgressBar.jsx'
 
@@ -26,7 +27,7 @@ export default function DeckCard({ deck, variant = 'library', onEdit }) {
   // opened — that is the more useful of the two.
   const status = due
     ? { text: `${due} due`, color: 'var(--color-accent)' }
-    : { text: deck.studied, color: undefined }
+    : { text: formatRelative(deck.studiedAt), color: undefined }
 
   const header = (
     <div className="flex items-center justify-between gap-2.5">

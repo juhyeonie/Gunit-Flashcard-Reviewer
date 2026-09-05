@@ -5,7 +5,7 @@ import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { accentOf } from '../data/seed.js'
 import { dueCount } from '../data/scheduler.js'
-import { lastSevenDays, minutesToday, streak } from '../data/activity.js'
+import { formatRelative, lastSevenDays, minutesToday, streak } from '../data/activity.js'
 
 /** Copy for the streak panel, which has to read sensibly at 0, 1 and many. */
 const streakNote = (days, minutesDone, goal) => {
@@ -99,7 +99,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
                 known ·{' '}
                 {resumeDue
                   ? `${resumeDue} due now`
-                  : `last studied ${resume.studied.toLowerCase()}`}
+                  : `last studied ${formatRelative(resume.studiedAt).toLowerCase()}`}
               </div>
             </div>
             <div className="mt-auto flex flex-col gap-[18px]">

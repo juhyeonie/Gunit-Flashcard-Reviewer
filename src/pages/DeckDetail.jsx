@@ -5,6 +5,7 @@ import Menu, { MenuItem } from '../components/Menu.jsx'
 import { PencilIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { dueCount } from '../data/scheduler.js'
+import { formatRelative } from '../data/activity.js'
 
 export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDeleteCard, onImport }) {
   const { id } = useParams()
@@ -33,7 +34,7 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
     { label: 'Cards', value: String(deck.cards.length) },
     { label: 'Due now', value: String(due), accent: due > 0 },
     { label: 'Known', value: `${Math.round(deck.progress * 100)}%` },
-    { label: 'Last studied', value: deck.studied },
+    { label: 'Last studied', value: formatRelative(deck.studiedAt) },
   ]
 
   const guard = (go) => () => {

@@ -104,3 +104,60 @@ export const MAX_SESSIONS = 500
 
 export const appendSession = (sessions = [], session) =>
   [...sessions, session].slice(-MAX_SESSIONS)
+
+const MINUTE_MS = 60_000
+const HOUR_MS = 3_600_000
+
+/**
+ * "Never", "Just now", "2 hours ago", "Yesterday", "3 days ago".
+ *
+ * Deck recency used to be a stored string, which meant it never aged: a deck
+ * saved as "Just now" still said so weeks later. It is derived from a timestamp
+ * instead, so it is right whenever it is read.
+ */
+export function formatRelative(ts, now = Date.now()) {
+  if (!ts) return 'Never'
+
+  const diff = now - ts
+  if (diff < 0) return 'Just now'
+  if (diff < 2 * MINUTE_MS) return 'Just now'
+  if (diff < HOUR_MS) {
+    const mins = Math.round(diff / MINUTE_MS)
+    return `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`
+  }
+
+  // Calendar-aware from here: "yesterday" means the previous calendar day, not
+  // a rolling 24 hours, which is how people actually read it.
+  const days = Math.round((startOfDay(now) - startOfDay(ts)) / DAY_MS)
+  if (days === 0) {
+    const hours = Math.round(diff / HOUR_MS)
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+  }
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+  if (days < 14) return 'A week ago'
+  if (days < 31) return `${Math.floor(days / 7)} weeks ago`
+  const months = Math.floor(days / 30)
+  return `${months} ${months === 1 ? 'month' : 'months'} ago`
+}
+
+/**
+ * Converts the old stored strings into approximate timestamps so decks saved
+ * before recency was a timestamp — and the seed decks, which still ship these
+ * phrases — keep a sensible position in the sort.
+ */
+export function parseLegacyStudied(value, now = Date.now()) {
+  if (typeof value !== 'string') return null
+  const text = value.trim().toLowerCase()
+  if (!text || text === 'never') return null
+  if (text === 'just now') return now
+  if (text === 'yesterday') return now - DAY_MS
+
+  const match = text.match(/^(a|an|\d+)\s+(minute|hour|day|week|month)s?\s+ago$/)
+  if (!match) return null
+  const count = match[1] === 'a' || match[1] === 'an' ? 1 : Number(match[1])
+  const unit = { minute: MINUTE_MS, hour: HOUR_MS, day: DAY_MS, week: 7 * DAY_MS, month: 30 * DAY_MS }[
+    match[2]
+  ]
+  return now - count * unit
+}
