@@ -2,10 +2,8 @@ import { useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import DeckCard from '../components/DeckCard.jsx'
 import { useApp } from '../data/AppContext.jsx'
+import { FILTERS, SORTS, filterAndSortDecks } from '../data/library.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
-
-const FILTERS = ['All decks', 'In progress', 'Mastered', 'Drafts']
-const SORTS = ['Recently studied', 'Alphabetical', 'Most cards']
 
 export default function Decks({ onNewDeck, onEditDeck }) {
   const { decks } = useApp()
@@ -14,24 +12,10 @@ export default function Decks({ onNewDeck, onEditDeck }) {
   const [filter, setFilter] = useState('All decks')
   const [sort, setSort] = useState('Recently studied')
 
-  const rows = useMemo(() => {
-    let out = decks.filter((d) => {
-      const haystack = `${d.title} ${d.subject} ${d.cards.map((c) => c.front).join(' ')}`.toLowerCase()
-      if (search && !haystack.includes(search.toLowerCase())) return false
-      if (filter === 'In progress') return d.progress > 0 && d.progress < 0.85
-      if (filter === 'Mastered') return d.progress >= 0.85
-      if (filter === 'Drafts') return d.cards.length === 0
-      return true
-    })
-    if (sort === 'Recently studied') {
-      // Was a no-op: recency used to be an English string, so there was nothing
-      // to order by. Never-studied decks sort last.
-      out = [...out].sort((a, b) => (b.studiedAt ?? 0) - (a.studiedAt ?? 0))
-    }
-    if (sort === 'Alphabetical') out = [...out].sort((a, b) => a.title.localeCompare(b.title))
-    if (sort === 'Most cards') out = [...out].sort((a, b) => b.cards.length - a.cards.length)
-    return out
-  }, [decks, search, filter, sort])
+  const rows = useMemo(
+    () => filterAndSortDecks(decks, { search, filter, sort }),
+    [decks, search, filter, sort],
+  )
 
   return (
     <div className="rise-in mx-auto flex max-w-[1080px] flex-col gap-[26px]">
