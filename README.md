@@ -23,40 +23,16 @@ npm run dev
 
 ## Importing material
 
-Dropping a PDF, PPTX, DOCX or TXT into **Import a file** sends it to Claude,
-which drafts the cards.
+**Import a file** keeps its dropzone, but drafting cards from a document needs
+an AI model and this version does not include one — there is no API key, no
+account and no external service.
 
-That needs an API key:
+Choosing files still works; the modal then says plainly that AI generation is
+unavailable, and nothing is uploaded or read. A deck started from that flow is
+created empty, and its cards are written by hand like any other.
 
-```bash
-cp .env.example .env   # then paste your key into .env
-```
-
-`.env` is gitignored. Without a key the import flow still runs and tells you
-what is missing — nothing else in the app depends on it.
-
-### Where the key lives
-
-The key is read by `server/generate-cards.js`, which runs **in Node, never in the
-browser**. `vite.config.js` loads it into the dev server's own process, and the
-browser only ever posts files to `/api/generate-cards`. A key bundled into
-client-side JavaScript is readable by anyone who opens devtools, so it stays on
-the server side.
-
-`server/vite-plugin.js` mounts that handler on the dev and preview servers. **A
-static production deploy needs the same `generateCards` function hosted as a
-serverless function at `/api/generate-cards`** — the client needs no changes.
-
-### How files are read
-
-- **PDF** goes to Claude as a document block, so the model reads the page layout
-  rather than a flattened text scrape.
-- **DOCX and PPTX** are unzipped and their XML stripped to text (both are ZIP
-  archives; Word keeps one body document, PowerPoint one file per slide).
-- **TXT** is read directly.
-
-Oversized material is refused with a message rather than silently truncated, so
-you never get cards drafted from only the first half of your notes.
+Decks and cards are otherwise fully editable: create, rename, delete, add cards,
+edit them, import nothing.
 
 ## How study works
 

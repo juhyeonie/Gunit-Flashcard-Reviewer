@@ -59,9 +59,9 @@ export default [
     },
   },
 
-  // Config files and the card-generation endpoint run in Node, not the browser.
+  // Config files are Node modules.
   {
-    files: ['*.config.js', 'eslint.config.js', 'server/**/*.js'],
+    files: ['*.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: { ...globals.node },
     },
