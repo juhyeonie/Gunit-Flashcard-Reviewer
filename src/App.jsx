@@ -160,10 +160,6 @@ function Shell() {
           deckId={modal.deck?.id}
           onClose={close}
           onCreateDeck={addDeck}
-          onAddCards={(deckId, cards) => {
-            addCards(deckId, cards)
-            say(`${cards.length} cards drafted`)
-          }}
           onOpenDeck={(deckId) => deckId && navigate(`/decks/${deckId}`)}
           say={say}
         />

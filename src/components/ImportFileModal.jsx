@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
-import { generateCards } from '../data/generate.js'
 
 const ACCEPT =
   '.pdf,.pptx,.docx,.txt,application/pdf,' +
@@ -18,13 +17,16 @@ const describe = (file) => ({
 })
 
 /**
- * Import lives in a modal, never a page. It runs in one of four phases:
- * empty (dropzone) → selected (file list) → loading (simulated drafting) →
- * done (summary). `pendingDeck` means no deck exists yet, so the deck fields
- * appear above the dropzone and the deck is created on confirm.
+ * Import lives in a modal, never a page.
  *
- * Mounted only while open, so every phase and draft field starts fresh from
- * useState rather than being reset by an effect.
+ * Drafting cards from a document needs an AI model, and this build ships
+ * without one — no API key, no account, no external service. Rather than
+ * pretend otherwise, the modal keeps its dropzone and says plainly that
+ * generation is unavailable. It never invents cards: a deck created here
+ * arrives empty, ready to be filled in by hand.
+ *
+ * Mounted only while open, so every field starts fresh from useState rather
+ * than being reset by an effect.
  */
 export default function ImportFileModal({
   pendingDeck = false,
@@ -32,87 +34,33 @@ export default function ImportFileModal({
   deckId,
   onClose,
   onCreateDeck,
-  onAddCards,
   onOpenDeck,
   say,
 }) {
-  const [phase, setPhase] = useState('empty')
   const [files, setFiles] = useState([])
-  const [picked, setPicked] = useState([])
-  const [pct, setPct] = useState(0)
   const [draft, setDraft] = useState(() => ({
     title: initialDraft?.title ?? '',
     subject: initialDraft?.subject ?? '',
     desc: initialDraft?.desc ?? '',
   }))
   const [dragging, setDragging] = useState(false)
-  const [result, setResult] = useState({ total: 0, title: '' })
-  const [error, setError] = useState(null)
   const inputRef = useRef(null)
-  const timer = useRef(null)
-  const targetDeck = useRef(deckId ?? null)
-  const progress = useRef(0)
 
-  useEffect(() => () => clearInterval(timer.current), [])
+  const hasFiles = files.length > 0
 
-  const addFiles = (picked) => {
-    const list = Array.from(picked || [])
+  // Only the display row is kept. Nothing reads the file, so the File object
+  // itself is not held on to.
+  const addFiles = (chosen) => {
+    const list = Array.from(chosen || [])
     if (!list.length) return
-    setError(null)
-    // The File objects themselves are kept for upload; `describe` is only the
-    // display row.
-    setPicked((p) => [...p, ...list])
     setFiles((f) => [...f, ...list.map(describe)])
-    setPhase('selected')
   }
 
   /**
-   * Sends the files to the server-side generator and adds what comes back.
-   *
-   * The bar creeps toward 90% while the request is in flight — the API returns
-   * one response rather than progress events, so this is an honest "working"
-   * indicator that only reaches 100% when cards actually arrive.
+   * Creates the deck when the flow started without one, then opens it so cards
+   * can be written by hand. No file is read and nothing is generated.
    */
-  const generate = async (deckId, title) => {
-    setPhase('loading')
-    setError(null)
-    progress.current = 6
-    setPct(6)
-    clearInterval(timer.current)
-    timer.current = setInterval(() => {
-      progress.current = Math.min(90, progress.current + 3)
-      setPct(progress.current)
-    }, 700)
-
-    try {
-      const cards = await generateCards(picked, {
-        count: Math.max(6, Math.min(30, picked.length * 12)),
-        deckTitle: title,
-      })
-      clearInterval(timer.current)
-      setPct(100)
-      onAddCards(deckId, cards)
-      setResult({ total: cards.length, title: title || 'this deck' })
-      setPhase('done')
-    } catch (err) {
-      clearInterval(timer.current)
-      setPct(0)
-      setError(err.message)
-      setPhase('selected')
-    }
-  }
-
   const confirm = () => {
-    if (phase === 'loading') return
-    if (phase === 'done') {
-      onClose()
-      onOpenDeck?.(targetDeck.current)
-      return
-    }
-    if (!files.length) {
-      say('Add at least one file')
-      return
-    }
     if (pendingDeck) {
       if (!draft.title.trim()) {
         say('Name the deck first')
@@ -121,40 +69,31 @@ export default function ImportFileModal({
       const deck = onCreateDeck({
         title: draft.title,
         subject: draft.subject || 'General',
-        desc: draft.desc || 'Drafted from uploaded material.',
+        desc: draft.desc,
       })
-      targetDeck.current = deck.id
-      setResult((r) => ({ ...r, title: deck.title }))
-      generate(deck.id, deck.title)
+      onClose()
+      say('Deck created — add your first card')
+      onOpenDeck?.(deck.id)
       return
     }
-    generate(targetDeck.current, draft.title)
+    onClose()
+    onOpenDeck?.(deckId)
   }
 
   const set = (key) => (e) => setDraft((d) => ({ ...d, [key]: e.target.value }))
-
-  const confirmLabel =
-    phase === 'loading' ? 'Generating…' : phase === 'done' ? 'Open deck' : 'Generate flashcards'
 
   return (
     <Modal
       open
       onClose={onClose}
       maxWidth={520}
-      kicker={pendingDeck ? 'New deck from a file' : 'Import material'}
-      title={phase === 'done' ? 'Cards drafted' : 'Import a file'}
-      body={
-        phase === 'done'
-          ? 'They are saved to the deck — open it to edit the wording.'
-          : phase === 'loading'
-            ? 'Reading your files and drafting cards.'
-            : 'Drop a reading, lecture slides or notes and Claude drafts the cards. Your file is sent to the Anthropic API to be read.'
-      }
-      confirmLabel={confirmLabel}
-      confirmDisabled={phase === 'loading'}
+      kicker={pendingDeck ? 'New deck' : 'Import material'}
+      title="Import a file"
+      body="Drafting cards from a document needs an AI model, which this version does not include. You can still name a deck here and write its cards yourself."
+      confirmLabel={pendingDeck ? 'Create empty deck' : 'Add cards by hand'}
       onConfirm={confirm}
     >
-      {pendingDeck && phase !== 'done' && (
+      {pendingDeck && (
         <div className="mb-5 flex flex-col gap-3.5 border-b border-line-soft pb-5">
           <Field
             id="import-title"
@@ -183,7 +122,7 @@ export default function ImportFileModal({
       )}
 
       <div className="mb-6 flex flex-col gap-[11px]">
-        {phase === 'empty' && (
+        {!hasFiles && (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -213,12 +152,12 @@ export default function ImportFileModal({
               or <span className="border-b border-accent-line text-accent">browse your device</span>
             </span>
             <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">
-              PDF · PPTX · DOCX · TXT — up to 25 MB
+              PDF · PPTX · DOCX · TXT
             </span>
           </button>
         )}
 
-        {(phase === 'selected' || phase === 'loading') && (
+        {hasFiles && (
           <>
             <div className="flex items-center justify-between gap-3">
               <span className="kicker !tracking-[0.12em]">Selected files</span>
@@ -230,6 +169,7 @@ export default function ImportFileModal({
                 + Add more
               </button>
             </div>
+
             {files.map((f, i) => (
               <div
                 key={`${f.name}-${i}`}
@@ -241,58 +181,35 @@ export default function ImportFileModal({
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm leading-[1.3] font-medium">{f.name}</span>
                   <span className="font-mono text-[11px] leading-[1.5] tracking-[0.04em] text-ink-3">
-                    {phase === 'loading' ? 'Reading and drafting…' : f.size}
+                    {f.size}
                   </span>
-                  {phase === 'loading' && (
-                    <span className="mt-[7px] block h-[3px] overflow-hidden rounded-sm bg-raised">
-                      <span
-                        className="block h-full bg-accent transition-transform duration-200 ease-linear"
-                        style={{ transform: `scaleX(${pct / 100})`, transformOrigin: 'left center' }}
-                      />
-                    </span>
-                  )}
                 </span>
-                {phase === 'selected' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = files.filter((_, j) => j !== i)
-                      setFiles(next)
-                      setPicked((p) => p.filter((_, j) => j !== i))
-                      setError(null)
-                      if (!next.length) setPhase('empty')
-                    }}
-                    aria-label={`Remove ${f.name}`}
-                    className="cursor-pointer rounded border-0 bg-transparent px-1.5 py-1 text-[16px] text-ink-3 transition-colors hover:bg-err-soft hover:text-err"
-                  >
-                    ×
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                  aria-label={`Remove ${f.name}`}
+                  className="cursor-pointer rounded border-0 bg-transparent px-1.5 py-1 text-[16px] text-ink-3 transition-colors hover:bg-err-soft hover:text-err"
+                >
+                  ×
+                </button>
               </div>
             ))}
+
+            {/*
+              Said once files are chosen — that is where the expectation of
+              something happening to them actually forms.
+            */}
+            <div
+              role="status"
+              className="rounded-lg border border-line bg-raised px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2"
+            >
+              <div className="mb-1 text-[13px] font-semibold text-ink">
+                AI generation is unavailable
+              </div>
+              No cards can be drafted from {files.length === 1 ? 'this file' : 'these files'}.
+              Nothing has been uploaded or read — add the cards yourself instead.
+            </div>
           </>
-        )}
-
-        {error && (
-          <div
-            role="alert"
-            className="rounded-lg border border-err bg-err-soft px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2"
-          >
-            <div className="mb-1 text-[13px] font-semibold text-err">Could not draft cards</div>
-            {error}
-          </div>
-        )}
-
-        {phase === 'done' && (
-          <div className="rounded-lg border border-accent-line bg-accent-soft px-4 py-3.5">
-            <div className="mb-1.5 text-[13px] leading-none font-semibold text-accent">
-              {result.total} cards drafted
-            </div>
-            <div className="text-[13px] leading-[1.5] text-ink-2">
-              Saved to <em className="font-serif text-sm">{result.title}</em>. Review the wording
-              before you study.
-            </div>
-          </div>
         )}
       </div>
 
