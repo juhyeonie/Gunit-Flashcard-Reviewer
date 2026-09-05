@@ -70,9 +70,6 @@ export default function DeckModal({ mode = 'create', deck, onClose, onSave, onDe
           value={draft.title}
           onChange={set('title')}
           placeholder="e.g. Roman Provinces"
-          // Moving focus into a dialog on open is the expected behaviour here.
-          // eslint-disable-next-line jsx-a11y/no-autofocus
-          autoFocus
         />
         <Field
           id="deck-subject"
