@@ -200,27 +200,34 @@ export default function Quiz() {
           })}
         </div>
 
-        {answered && (
-          <div
-            className={`rise-in flex flex-wrap items-center justify-between gap-4 rounded-lg border p-5 ${
-              correct ? 'border-ok-line bg-ok-soft' : 'border-err bg-err-soft'
-            }`}
-          >
-            <div className="min-w-[220px] flex-1">
-              <div
-                className={`mb-[7px] text-sm leading-none font-semibold ${
-                  correct ? 'text-ok' : 'text-err'
-                }`}
-              >
-                {correct ? 'Correct' : 'Not quite'}
+        {/*
+          Always mounted for the same reason as the toast: the verdict is the
+          point of a quiz, and a live region that appears along with its text is
+          announced unreliably.
+        */}
+        <div role="status" aria-live="polite">
+          {answered && (
+            <div
+              className={`rise-in flex flex-wrap items-center justify-between gap-4 rounded-lg border p-5 ${
+                correct ? 'border-ok-line bg-ok-soft' : 'border-err bg-err-soft'
+              }`}
+            >
+              <div className="min-w-[220px] flex-1">
+                <div
+                  className={`mb-[7px] text-sm leading-none font-semibold ${
+                    correct ? 'text-ok' : 'text-err'
+                  }`}
+                >
+                  {correct ? 'Correct' : 'Not quite'}
+                </div>
+                <div className="text-sm text-ink-2 text-pretty">{q.card.back}</div>
               </div>
-              <div className="text-sm text-ink-2 text-pretty">{q.card.back}</div>
+              <Button onClick={advance}>
+                {qIdx >= questions.length - 1 ? 'See results' : 'Next question'}
+              </Button>
             </div>
-            <Button onClick={advance}>
-              {qIdx >= questions.length - 1 ? 'See results' : 'Next question'}
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
