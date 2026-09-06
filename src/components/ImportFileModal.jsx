@@ -18,7 +18,7 @@ const describe = (file) => ({
 })
 
 /** Statuses that mean the file gave up no text, and so deserve muted styling. */
-const FAILED = ['empty', 'planned', 'unsupported', 'error']
+const FAILED = ['empty', 'unsupported', 'error']
 
 /**
  * Import lives in a modal, never a page.
@@ -202,7 +202,7 @@ export default function ImportFileModal({
             <span className="text-[13px] text-ink-3">
               or <span className="border-b border-accent-line text-accent">browse your device</span>
             </span>
-            <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">DOCX · PPTX · TXT</span>
+            <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">PDF · DOCX · PPTX · TXT</span>
           </button>
         )}
 

@@ -9,19 +9,16 @@
  * Only the plumbing is async. The parsing itself is pure functions over an
  * ArrayBuffer, so it can be tested without a DOM or a real file picker.
  *
- * PDF is deliberately absent. It needs a second engine and a web worker, and
- * a file that cannot be read yet is reported as such rather than silently
- * producing nothing.
+ * A PDF with no text layer is a picture of a page, and reading those needs
+ * OCR, which this step does not do. It is reported as scanned rather than
+ * quietly returning nothing.
  *
- * Both parsers are loaded on demand. They are far larger than the app itself,
- * and most sessions never import anything.
+ * Every parser is loaded on demand. Together they are several times the size
+ * of the app, and most sessions never import anything.
  */
 
 /** Extensions this step can actually read, in the order the UI lists them. */
-export const READABLE = ['docx', 'pptx', 'txt', 'md']
-
-/** Recognised but not readable yet, so it earns a specific message. */
-export const PLANNED = ['pdf']
+export const READABLE = ['pdf', 'docx', 'pptx', 'txt', 'md']
 
 /**
  * A ceiling on what is pulled into memory. Course material sits far below
@@ -102,7 +99,21 @@ export async function textFromPptx(buffer) {
   return parts.filter(Boolean).join('\n\n')
 }
 
-const KINDS = { docx: 'Document', pptx: 'Slides', txt: 'Plain text', md: 'Plain text' }
+const KINDS = {
+  pdf: 'PDF',
+  docx: 'Document',
+  pptx: 'Slides',
+  txt: 'Plain text',
+  md: 'Plain text',
+}
+
+/**
+ * A PDF that yields nothing almost always holds page images rather than text,
+ * so it gets its own wording: the file is fine, and it is OCR that is missing.
+ */
+const EMPTY_MESSAGE = {
+  pdf: 'No text layer — this looks like a scan, and OCR is not available yet',
+}
 
 /**
  * Reads one file and always resolves — never throws. A modal showing four
@@ -116,9 +127,6 @@ export async function extractText(file) {
   const ext = extensionOf(file.name)
   const base = { name: file.name, ext, kind: KINDS[ext] || '', text: '', words: 0 }
 
-  if (PLANNED.includes(ext)) {
-    return { ...base, status: 'planned', message: 'PDF reading is not available yet' }
-  }
   if (!READABLE.includes(ext)) {
     return { ...base, status: 'unsupported', message: `Cannot read .${ext || 'this'} files` }
   }
@@ -128,11 +136,16 @@ export async function extractText(file) {
 
   try {
     let text
-    if (ext === 'docx') text = await textFromDocx(await file.arrayBuffer())
+    if (ext === 'pdf') {
+      const { textFromPdf } = await import('./pdf.js')
+      text = await textFromPdf(await file.arrayBuffer())
+    } else if (ext === 'docx') text = await textFromDocx(await file.arrayBuffer())
     else if (ext === 'pptx') text = await textFromPptx(await file.arrayBuffer())
     else text = (await file.text()).trim()
 
-    if (!text) return { ...base, status: 'empty', message: 'No readable text found' }
+    if (!text) {
+      return { ...base, status: 'empty', message: EMPTY_MESSAGE[ext] || 'No readable text found' }
+    }
     return { ...base, status: 'ok', text, words: wordCount(text), message: '' }
   } catch (err) {
     // A corrupt archive, a renamed file, a .docx that is really a .doc.
