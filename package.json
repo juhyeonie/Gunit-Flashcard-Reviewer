@@ -13,7 +13,9 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "lucide-react": "^0.469.0",
+    "mammoth": "^1.12.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.1.1"

@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
+import { combineText, extractText } from '../data/extract.js'
 
 const ACCEPT =
-  '.pdf,.pptx,.docx,.txt,application/pdf,' +
+  '.pdf,.pptx,.docx,.txt,.md,application/pdf,' +
   'application/vnd.openxmlformats-officedocument.presentationml.presentation,' +
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain'
 
@@ -13,17 +14,23 @@ const formatSize = (n) =>
 const describe = (file) => ({
   name: file.name,
   size: formatSize(file.size),
-  ext: (file.name.split('.').pop() || 'file').toUpperCase().slice(0, 4),
+  badge: (file.name.split('.').pop() || 'file').toUpperCase().slice(0, 4),
 })
+
+/** Statuses that mean the file gave up no text, and so deserve muted styling. */
+const FAILED = ['empty', 'planned', 'unsupported', 'error']
 
 /**
  * Import lives in a modal, never a page.
  *
- * Drafting cards from a document needs an AI model, and this build ships
- * without one — no API key, no account, no external service. Rather than
- * pretend otherwise, the modal keeps its dropzone and says plainly that
- * generation is unavailable. It never invents cards: a deck created here
- * arrives empty, ready to be filled in by hand.
+ * Dropped files are read here, in the browser: a .docx or .pptx is unzipped
+ * and its XML stripped, a .txt read as-is. Nothing is uploaded — there is no
+ * server, and the material is the student's own coursework.
+ *
+ * Drafting cards from that text automatically would need an AI model, and this
+ * build ships without one. So the modal stops at the text: it shows what it
+ * read, and the cards are written by hand. It never invents cards, and a deck
+ * created here arrives empty.
  *
  * Mounted only while open, so every field starts fresh from useState rather
  * than being reset by an effect.
@@ -45,20 +52,64 @@ export default function ImportFileModal({
   }))
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
+  const nextKey = useRef(0)
+
+  // Reading is async and the modal can be closed mid-read. Nothing should be
+  // written back into a component that is on its way out.
+  const open = useRef(true)
+  useEffect(() => {
+    open.current = true
+    return () => {
+      open.current = false
+    }
+  }, [])
 
   const hasFiles = files.length > 0
+  const reading = files.some((f) => f.status === 'reading')
+  const read = files.filter((f) => f.status === 'ok')
+  const words = read.reduce((n, f) => n + f.words, 0)
+  const combined = useMemo(() => combineText(files), [files])
 
-  // Only the display row is kept. Nothing reads the file, so the File object
-  // itself is not held on to.
+  /**
+   * Each file is staged immediately so the list appears at once, then filled in
+   * as it is read. They are read independently: one corrupt archive among four
+   * must not hold up or discard the other three.
+   */
   const addFiles = (chosen) => {
     const list = Array.from(chosen || [])
     if (!list.length) return
-    setFiles((f) => [...f, ...list.map(describe)])
+
+    const staged = list.map((file) => ({
+      key: nextKey.current++,
+      ...describe(file),
+      status: 'reading',
+      message: '',
+      text: '',
+      words: 0,
+    }))
+    setFiles((f) => [...f, ...staged])
+
+    staged.forEach(async (row, i) => {
+      const result = await extractText(list[i])
+      if (!open.current) return
+      setFiles((f) => f.map((x) => (x.key === row.key ? { ...x, ...result } : x)))
+    })
+  }
+
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(combined)
+      say('Text copied')
+    } catch {
+      // Clipboard access is refused outside a secure context; the textarea is
+      // still there to select from by hand.
+      say('Could not copy — select the text instead')
+    }
   }
 
   /**
    * Creates the deck when the flow started without one, then opens it so cards
-   * can be written by hand. No file is read and nothing is generated.
+   * can be written from the text above. Nothing is generated.
    */
   const confirm = () => {
     if (pendingDeck) {
@@ -89,7 +140,7 @@ export default function ImportFileModal({
       maxWidth={520}
       kicker={pendingDeck ? 'New deck' : 'Import material'}
       title="Import a file"
-      body="Drafting cards from a document needs an AI model, which this version does not include. You can still name a deck here and write its cards yourself."
+      body="Your material is read here in the browser and never uploaded. Drafting cards from it automatically needs an AI model this version does not include, so the text is yours to work from."
       confirmLabel={pendingDeck ? 'Create empty deck' : 'Add cards by hand'}
       onConfirm={confirm}
     >
@@ -151,9 +202,7 @@ export default function ImportFileModal({
             <span className="text-[13px] text-ink-3">
               or <span className="border-b border-accent-line text-accent">browse your device</span>
             </span>
-            <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">
-              PDF · PPTX · DOCX · TXT
-            </span>
+            <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">DOCX · PPTX · TXT</span>
           </button>
         )}
 
@@ -170,23 +219,30 @@ export default function ImportFileModal({
               </button>
             </div>
 
-            {files.map((f, i) => (
+            {files.map((f) => (
               <div
-                key={`${f.name}-${i}`}
+                key={f.key}
                 className="flex items-center gap-3.5 rounded-lg border border-line bg-transparent px-[15px] py-[13px]"
               >
                 <span className="grid h-10 w-8 shrink-0 place-items-center rounded border border-line bg-surface font-mono text-[9px] leading-none font-medium tracking-[0.05em] text-ink-3">
-                  {f.ext}
+                  {f.badge}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm leading-[1.3] font-medium">{f.name}</span>
-                  <span className="font-mono text-[11px] leading-[1.5] tracking-[0.04em] text-ink-3">
+                  <span
+                    className={`font-mono text-[11px] leading-[1.5] tracking-[0.04em] ${
+                      f.status === 'error' ? 'text-err' : 'text-ink-3'
+                    }`}
+                  >
                     {f.size}
+                    {f.status === 'reading' && ' · Reading…'}
+                    {f.status === 'ok' && ` · ${f.words.toLocaleString()} words`}
+                    {FAILED.includes(f.status) && ` · ${f.message}`}
                   </span>
                 </span>
                 <button
                   type="button"
-                  onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                  onClick={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
                   aria-label={`Remove ${f.name}`}
                   className="cursor-pointer rounded border-0 bg-transparent px-1.5 py-1 text-[16px] text-ink-3 transition-colors hover:bg-err-soft hover:text-err"
                 >
@@ -196,18 +252,48 @@ export default function ImportFileModal({
             ))}
 
             {/*
-              Said once files are chosen — that is where the expectation of
-              something happening to them actually forms.
+              One announcement for the whole batch. Reading finishes out of
+              order, so per-file updates would interrupt a screen reader
+              repeatedly to say much the same thing.
             */}
-            <div
-              role="status"
-              className="rounded-lg border border-line bg-raised px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2"
-            >
-              <div className="mb-1 text-[13px] font-semibold text-ink">
-                AI generation is unavailable
+            <div role="status" className="sr-only">
+              {reading
+                ? 'Reading files'
+                : `Read ${read.length} of ${files.length} files, ${words} words`}
+            </div>
+
+            {read.length > 0 && (
+              <div className="mt-1 flex flex-col gap-2">
+                <Field
+                  id="import-text"
+                  label={`Extracted text · ${words.toLocaleString()} words`}
+                  as="textarea"
+                  rows={7}
+                  readOnly
+                  value={combined}
+                  className="!text-[13px] leading-[1.55]"
+                />
+                <button
+                  type="button"
+                  onClick={copyText}
+                  className="cursor-pointer self-end border-0 bg-transparent p-0 text-[13px] font-medium text-ink-2 transition-colors hover:text-accent"
+                >
+                  Copy text
+                </button>
               </div>
-              No cards can be drafted from {files.length === 1 ? 'this file' : 'these files'}.
-              Nothing has been uploaded or read — add the cards yourself instead.
+            )}
+
+            {/*
+              Said once files are chosen — that is where the expectation of
+              cards appearing actually forms.
+            */}
+            <div className="rounded-lg border border-line bg-raised px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2">
+              <div className="mb-1 text-[13px] font-semibold text-ink">
+                Cards are not drafted automatically
+              </div>
+              {read.length > 0
+                ? 'The text was read on this device and went nowhere else. Writing cards from it needs an AI model this version does not include — copy what you need and add the cards yourself.'
+                : 'Nothing readable came out of your selection, and no cards can be drafted from it. You can still add the cards yourself.'}
             </div>
           </>
         )}
