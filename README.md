@@ -80,3 +80,23 @@ streak, the weekly minutes chart and the daily goal come from.
 
 Everything persists to `localStorage` under `gunit.state.v2`; older saved shapes
 are migrated in place on load.
+
+## Tests
+
+`npm test` runs everything. Most of it is the pure modules under `src/data` —
+scheduling, activity, quizzes, the library filters, the readers and the card
+splitter — which run in Node and are where the logic lives.
+
+Three suites go through the DOM instead, with `// @vitest-environment jsdom` at
+the top of the file rather than a global switch, so the Node suites keep the
+environment they need:
+
+- `AppContext.test.jsx` — every mutator, what persists, what happens when
+  storage refuses to answer
+- `ImportFileModal.test.jsx` — choosing files through to cards in a deck
+- `Modal.test.jsx` — the focus trap, `inert`, and where focus goes afterwards
+
+The component tests use `.txt` files only. The other readers are dynamic
+imports of PDF.js, Mammoth and Tesseract, covered by their own tests, and
+loading megabytes of parser to check what a modal renders would be a poor
+trade.
