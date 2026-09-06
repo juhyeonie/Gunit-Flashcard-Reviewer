@@ -11,7 +11,9 @@ export default function Summary() {
   const navigate = useNavigate()
   const { decks, sessions } = useApp()
   const deck = decks.find((d) => d.id === id)
-  useDocumentTitle('Session complete')
+  // The route announcer reads this out on arrival, so it has to be true of the
+  // page that actually rendered.
+  useDocumentTitle(typeof state?.reviewed === 'number' ? 'Session complete' : 'Nothing to report')
 
   if (!deck) {
     return (
@@ -24,34 +26,52 @@ export default function Summary() {
     )
   }
 
-  // Real counts from the session that just ended, not a figure back-derived
-  // from deck progress. A direct visit with no session state shows zeroes
-  // rather than inventing a result.
-  const reviewed = state?.reviewed ?? 0
-  const known = state?.known ?? 0
-  const again = state?.again ?? 0
-  const pct = Math.round(deck.progress * 100)
-  // Real elapsed time from the session that just ended, not a guess scaled off
-  // the card count.
-  const minutes = Math.max(1, Math.round((state?.seconds ?? 0) / 60))
-  const days = streak(sessions)
+  /*
+   * The counts arrive with the navigation, not from the deck, because they
+   * describe one session rather than the deck's standing. A reload keeps them,
+   * since router state rides in the history entry — but arriving here any
+   * other way does not: a typed URL, a bookmark, a link, a new tab.
+   *
+   * When that happens it says so. Reporting zeroes would read as a session in
+   * which nothing was recalled, and the minute floor below would invent a
+   * minute spent on a session that never took place.
+   */
+  const session = typeof state?.reviewed === 'number' ? state : null
 
-  const stats = [
-    { label: 'Reviewed', value: String(reviewed), color: 'var(--color-ink)' },
-    { label: 'Known', value: String(known), color: 'var(--color-ok)' },
-    { label: 'Again', value: String(again), color: 'var(--color-err)' },
-    { label: 'Streak', value: String(days), color: 'var(--color-ink)' },
-  ]
+  const pct = Math.round(deck.progress * 100)
+  const days = streak(sessions)
+  // Real elapsed time from the session that just ended, not a guess scaled off
+  // the card count. Floored at a minute so a quick session is not "0 minutes".
+  const minutes = session ? Math.max(1, Math.round(session.seconds / 60)) : 0
+
+  const stats = session
+    ? [
+        { label: 'Reviewed', value: String(session.reviewed), color: 'var(--color-ink)' },
+        { label: 'Known', value: String(session.known), color: 'var(--color-ok)' },
+        { label: 'Again', value: String(session.again), color: 'var(--color-err)' },
+        { label: 'Streak', value: String(days), color: 'var(--color-ink)' },
+      ]
+    : // Both of these are the deck's standing, and true either way.
+      [
+        { label: 'Cards', value: String(deck.cards.length), color: 'var(--color-ink)' },
+        { label: 'Streak', value: String(days), color: 'var(--color-ink)' },
+      ]
 
   return (
     <div className="rise-in mx-auto flex max-w-[660px] flex-col gap-8">
       <div className="text-center">
-        <div className="kicker mb-4 text-accent">Session complete</div>
+        <div className="kicker mb-4 text-accent">
+          {session ? 'Session complete' : 'Nothing to report'}
+        </div>
         <h1 className="m-0 mb-3 font-serif text-[34px] leading-[1.06] tracking-[-0.02em] sm:text-[46px]">
-          {reviewed} {reviewed === 1 ? 'card' : 'cards'} reviewed
+          {session
+            ? `${session.reviewed} ${session.reviewed === 1 ? 'card' : 'cards'} reviewed`
+            : deck.title}
         </h1>
         <p className="m-0 text-[16px] text-ink-2 text-pretty">
-          Session on {deck.title} · {minutes} {minutes === 1 ? 'minute' : 'minutes'}
+          {session
+            ? `Session on ${deck.title} · ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+            : 'This page reports a session as it ends. Opened on its own — from a link, or a new tab — there is no session behind it. Whatever you have studied is already in the deck.'}
         </p>
       </div>
 

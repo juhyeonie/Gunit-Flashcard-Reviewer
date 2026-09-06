@@ -85,8 +85,12 @@ export default function Decks({ onNewDeck, onEditDeck }) {
           <div className="font-serif text-[24px] leading-[1.2]">
             Nothing matches {search ? `“${search}”` : 'that filter'}
           </div>
+          {/* Advice for what was actually done: telling someone to shorten a
+              search term they never typed is worse than saying nothing. */}
           <p className="m-0 max-w-[340px] text-sm text-ink-3 text-pretty">
-            Try a shorter search term, or clear the filter to see all {decks.length} decks.
+            {search
+              ? `Try a shorter search term, or clear the filter to see all ${decks.length} decks.`
+              : `Clear the filter to see all ${decks.length} decks.`}
           </p>
           <Button
             size="sm"
@@ -96,7 +100,7 @@ export default function Decks({ onNewDeck, onEditDeck }) {
               setFilter('All decks')
             }}
           >
-            Clear search
+            {search ? 'Clear search' : 'Clear filter'}
           </Button>
         </div>
       )}
