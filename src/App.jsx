@@ -160,6 +160,7 @@ function Shell() {
           deckId={modal.deck?.id}
           onClose={close}
           onCreateDeck={addDeck}
+          onAddCards={addCards}
           onOpenDeck={(deckId) => deckId && navigate(`/decks/${deckId}`)}
           say={say}
         />

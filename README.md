@@ -54,10 +54,18 @@ automatically by `npm run dev` and `npm run build`. That directory is about
 14 MB; a browser fetches roughly 6.8 MB of it the first time OCR is used, and
 never otherwise.
 
-Drafting cards from that text automatically would need an AI model, and this
-version does not include one — no API key, no account, no external service. So
-the flow stops at the text: copy what you need, and write the cards yourself. A
-deck started from this flow is created empty.
+### From text to cards
+
+`src/data/parse.js` splits the extracted text into cards. It recognises Q and A
+lines, and one card per line separated by a tab, pipe, dash, hyphen or colon —
+the shapes glossaries, handouts and Anki or Quizlet exports already come in.
+The text stays editable, the separator can be chosen by hand, and the cards are
+previewed with a count of the lines that would be skipped.
+
+It splits, it does not comprehend. Turning prose into questions needs an AI
+model this version does not include — no API key, no account, no external
+service — and nothing is guessed in its place. Lines that will not split are
+reported as skipped rather than becoming a card that says nothing.
 
 ## How study works
 
