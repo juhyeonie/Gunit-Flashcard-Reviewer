@@ -101,6 +101,14 @@ environment they need:
   storage refuses to answer
 - `ImportFileModal.test.jsx` — choosing files through to cards in a deck
 - `Modal.test.jsx` — the focus trap, `inert`, and where focus goes afterwards
+- `Review.test.jsx` — a session from the first card to the summary
+- `Quiz.test.jsx` — answering, scoring, and the deck too small to quiz
+- `DeckDetail.test.jsx` — the guards on the way into a session
+
+Pages are rendered through `test/render-app.jsx`, which puts them inside the
+store and a router at a real URL, seeds the library through `localStorage` —
+where `AppProvider` actually looks — and gives them somewhere to navigate to
+and a toast to speak through.
 
 The component tests use `.txt` files only. The other readers are dynamic
 imports of PDF.js, Mammoth and Tesseract, covered by their own tests, and

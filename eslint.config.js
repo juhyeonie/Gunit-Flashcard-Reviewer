@@ -61,6 +61,13 @@ export default [
     },
   },
 
+  // Fast refresh is a dev-server concern; test helpers are never hot-reloaded,
+  // so a file that exports both a component and a fixture is fine there.
+  {
+    files: ['test/**/*.{js,jsx}', '**/*.test.{js,jsx}'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
+
   // Config files and build scripts are Node modules.
   {
     files: ['*.config.js', 'eslint.config.js', 'scripts/**/*.js', 'test/**/*.js'],
