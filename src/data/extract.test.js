@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
+import { drawn, pdfWith, written } from '../../test/pdf-fixture.js'
 import {
   combineText,
   extensionOf,
@@ -139,10 +140,30 @@ describe('extractText', () => {
     expect((await extractText(fileOf('week-3.txt', 'x'))).name).toBe('week-3.txt')
   })
 
-  it('says a PDF is not readable yet, rather than failing vaguely', async () => {
-    const out = await extractText(fileOf('lecture.pdf', '%PDF-1.4'))
-    expect(out.status).toBe('planned')
-    expect(out.message).toMatch(/pdf/i)
+  it('reads a real PDF end to end', async () => {
+    const file = new File([pdfWith([written('Sulla marched on Rome.')])], 'lecture.pdf')
+    expect(await extractText(file)).toMatchObject({
+      status: 'ok',
+      kind: 'PDF',
+      text: '--- Page 1 ---\nSulla marched on Rome.',
+    })
+  })
+
+  it('tells a scanned PDF apart from an empty one', async () => {
+    // Pages of pictures are the ordinary case for a photographed handout, and
+    // "no readable text found" would send someone looking for a broken file.
+    const file = new File([pdfWith([drawn])], 'scan.pdf')
+    const out = await extractText(file)
+    expect(out.status).toBe('empty')
+    expect(out.message).toMatch(/scan/i)
+  })
+
+  it('reports a file that is not really a PDF', async () => {
+    const out = await extractText(fileOf('renamed.pdf', 'just some words in a file'))
+    expect(out).toMatchObject({
+      status: 'error',
+      message: 'Could not read that .pdf — it may be damaged',
+    })
   })
 
   it('names the type it cannot read', async () => {

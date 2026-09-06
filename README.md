@@ -24,17 +24,20 @@ npm run dev
 ## Importing material
 
 **Import a file** reads what you drop on it. `src/data/extract.js` handles
-`.docx` (Mammoth), `.pptx` (unzipped and stripped of its XML, one labelled
-block per slide) and `.txt`/`.md`. The modal lists each file with its word
-count, or with the reason it could not be read, and shows the extracted text
-for review.
+`.pdf` (PDF.js, in `src/data/pdf.js`), `.docx` (Mammoth), `.pptx` (unzipped and
+stripped of its XML) and `.txt`/`.md`. Slides and pages come back labelled, so
+a passage can be traced to where it came from. The modal lists each file with
+its word count, or with the reason it could not be read, and shows the
+extracted text for review.
 
 All of it happens in the browser. Nothing is uploaded, there is no server, and
-both parsers are loaded on demand — a session that imports nothing downloads
-neither.
+every parser is loaded on demand — a session that imports nothing downloads
+none of them. The PDF.js worker is served from this app's own origin rather
+than a CDN.
 
-PDF is accepted by the picker but not read yet; those files say so rather than
-failing silently. Scanned pages and OCR are a later step.
+A PDF with no text layer is a picture of a page. Reading those needs OCR, which
+this step does not do, so they are reported as scanned rather than as empty or
+broken.
 
 Drafting cards from that text automatically would need an AI model, and this
 version does not include one — no API key, no account, no external service. So

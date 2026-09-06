@@ -16,6 +16,13 @@ export default defineConfig({
        * exercise the code path the app actually ships.
        */
       mammoth: fileURLToPath(new URL('./node_modules/mammoth/mammoth.browser.js', import.meta.url)),
+      /*
+       * `?url` is a Vite idiom Vitest resolves to a served path, which Node
+       * then cannot import from disk. See the note in the stand-in itself.
+       */
+      'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url': fileURLToPath(
+        new URL('./test/pdf-worker-url.js', import.meta.url),
+      ),
     },
   },
 })
