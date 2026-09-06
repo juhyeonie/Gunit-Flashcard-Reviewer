@@ -23,16 +23,23 @@ npm run dev
 
 ## Importing material
 
-**Import a file** keeps its dropzone, but drafting cards from a document needs
-an AI model and this version does not include one — there is no API key, no
-account and no external service.
+**Import a file** reads what you drop on it. `src/data/extract.js` handles
+`.docx` (Mammoth), `.pptx` (unzipped and stripped of its XML, one labelled
+block per slide) and `.txt`/`.md`. The modal lists each file with its word
+count, or with the reason it could not be read, and shows the extracted text
+for review.
 
-Choosing files still works; the modal then says plainly that AI generation is
-unavailable, and nothing is uploaded or read. A deck started from that flow is
-created empty, and its cards are written by hand like any other.
+All of it happens in the browser. Nothing is uploaded, there is no server, and
+both parsers are loaded on demand — a session that imports nothing downloads
+neither.
 
-Decks and cards are otherwise fully editable: create, rename, delete, add cards,
-edit them, import nothing.
+PDF is accepted by the picker but not read yet; those files say so rather than
+failing silently. Scanned pages and OCR are a later step.
+
+Drafting cards from that text automatically would need an AI model, and this
+version does not include one — no API key, no account, no external service. So
+the flow stops at the text: copy what you need, and write the cards yourself. A
+deck started from this flow is created empty.
 
 ## How study works
 
