@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
-import { buildQueue, entryFor, formatInterval, preview } from '../data/scheduler.js'
+import { entryFor, formatInterval, preview } from '../data/scheduler.js'
+import { nextDueLabel, openingQueue, shuffle, summarise } from '../data/session.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 const NAV_HINTS = [
@@ -27,25 +28,6 @@ const RATINGS = [
 ]
 
 const AUTO_REVEAL_MS = 4000
-
-const shuffleOrder = (order) => {
-  const next = [...order]
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
-    const swap = next[i]
-    next[i] = next[j]
-    next[j] = swap
-  }
-  return next
-}
-
-const nextDueLabel = (deck, now) => {
-  const upcoming = deck.cards
-    .map((c) => entryFor(deck, c)?.due)
-    .filter((due) => typeof due === 'number' && due > now)
-  if (!upcoming.length) return null
-  return formatInterval((Math.min(...upcoming) - now) / 60_000)
-}
 
 export default function Review() {
   const { id } = useParams()
@@ -78,15 +60,21 @@ export default function Review() {
   useEffect(() => {
     if (!deck || built.current) return
     built.current = true
-    const queue = buildQueue(deck, { limit: settings.cardsPer, all: ahead })
-    setOrder(settings.shuffleFirst ? shuffleOrder(queue) : queue)
+    setOrder(
+      openingQueue(deck, { limit: settings.cardsPer, shuffleFirst: settings.shuffleFirst, ahead }),
+    )
   }, [deck, settings.cardsPer, settings.shuffleFirst, ahead])
 
   const startAhead = () => {
     if (!deck) return
-    const queue = buildQueue(deck, { limit: settings.cardsPer, all: true })
     setAhead(true)
-    setOrder(settings.shuffleFirst ? shuffleOrder(queue) : queue)
+    setOrder(
+      openingQueue(deck, {
+        limit: settings.cardsPer,
+        shuffleFirst: settings.shuffleFirst,
+        ahead: true,
+      }),
+    )
     setIdx(0)
     setFlipped(false)
   }
@@ -109,14 +97,8 @@ export default function Review() {
   /** Grades are already saved by the time we get here; this only reports. */
   const finish = useCallback(
     (tally) => {
-      const values = Object.values(tally)
       navigate(`/decks/${id}/summary`, {
-        state: {
-          reviewed: values.length,
-          known: values.filter((v) => v !== 'again').length,
-          again: values.filter((v) => v === 'again').length,
-          seconds: (Date.now() - mountedAt) / 1000,
-        },
+        state: summarise(tally, { startedAt: mountedAt }),
         replace: true,
       })
     },
@@ -259,7 +241,7 @@ export default function Review() {
             title="Shuffle"
             aria-label="Shuffle"
             onClick={() => {
-              const shuffledOrder = shuffleOrder(order)
+              const shuffledOrder = shuffle(order)
               setOrder(shuffledOrder)
               setIdx(0)
               setFlipped(false)

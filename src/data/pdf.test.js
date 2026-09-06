@@ -4,6 +4,14 @@ import { linesFromItems, textFromPdf } from './pdf.js'
 
 const item = (str, hasEOL = false) => ({ str, hasEOL })
 
+/*
+ * Starting a PDF.js worker in Node takes seconds, and more of them when the
+ * rest of the suite is competing for the machine. The 5s default passes alone
+ * and fails intermittently in a full run, so the tests that spin one up say
+ * how long they actually need.
+ */
+const WORKER = 20_000
+
 describe('linesFromItems', () => {
   it('joins the fragments a line arrives in', () => {
     // Kerning and font changes split a single line into several runs.
@@ -53,26 +61,26 @@ describe('textFromPdf', () => {
   it('reads the text off a page', async () => {
     const text = await textFromPdf(pdfWith([written('Hannibal crossed the Alps.')]))
     expect(text).toContain('Hannibal crossed the Alps.')
-  })
+  }, WORKER)
 
   it('labels each page, in order', async () => {
     const text = await textFromPdf(pdfWith([written('First page'), written('Second page')]))
     expect(text).toBe('--- Page 1 ---\nFirst page\n\n--- Page 2 ---\nSecond page')
-  })
+  }, WORKER)
 
   it('leaves out a page with no text on it', async () => {
     const text = await textFromPdf(pdfWith([written('Only this one'), drawn]))
     expect(text).toBe('--- Page 1 ---\nOnly this one')
-  })
+  }, WORKER)
 
   it('returns nothing for a PDF that is all pictures', async () => {
     // What a scan is: ink on the page, no text layer to read. The caller
     // reports that rather than treating it as a failure.
     expect(await textFromPdf(pdfWith([drawn, drawn]))).toBe('')
-  })
+  }, WORKER)
 
   it('rejects something that is not a PDF at all', async () => {
     const notPdf = new TextEncoder().encode('just some words in a file').buffer
     await expect(textFromPdf(notPdf)).rejects.toThrow()
-  })
+  }, WORKER)
 })
