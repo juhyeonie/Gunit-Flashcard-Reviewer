@@ -5,7 +5,7 @@ import Field from './Field.jsx'
 
 const SOURCES = [
   { key: 'write', label: 'Write my own', hint: 'Add cards by hand, one at a time.' },
-  { key: 'import', label: 'Import a file', hint: 'Draft cards from notes or slides.' },
+  { key: 'import', label: 'Import a file', hint: 'Read a document and split it into cards.' },
 ]
 
 /**

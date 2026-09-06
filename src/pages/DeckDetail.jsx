@@ -139,7 +139,7 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
               />
               <MenuItem
                 title="Import a file"
-                hint="Draft cards from notes or slides."
+                hint="Read a document and split it into cards."
                 onClick={() => {
                   setAddMenu(false)
                   onImport(deck)

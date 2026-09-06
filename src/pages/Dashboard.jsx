@@ -259,8 +259,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
           <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-6 py-[76px] text-center">
             <div className="font-serif text-[26px] leading-[1.2]">Nothing to study yet</div>
             <p className="m-0 max-w-[360px] text-sm text-ink-3 text-pretty">
-              Create your first deck by hand, or import lecture notes and let the cards be drafted
-              for you.
+              Write your first deck by hand, or import your notes and split them into cards.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button size="sm" onClick={onNewDeck}>
