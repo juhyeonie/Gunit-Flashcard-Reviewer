@@ -12,6 +12,14 @@ import {
   wordCount,
 } from './extract.js'
 
+/*
+ * Starting a PDF.js worker in Node takes seconds, and more of them when the
+ * rest of the suite is competing for the machine. The 5s default passes alone
+ * and fails intermittently in a full run, so the tests that spin one up say
+ * how long they actually need.
+ */
+const WORKER = 20_000
+
 /** A real File, so the code under test uses the same API the browser gives it. */
 const fileOf = (name, contents = '') => new File([contents], name)
 
@@ -148,7 +156,7 @@ describe('extractText', () => {
       kind: 'PDF',
       text: '--- Page 1 ---\nSulla marched on Rome.',
     })
-  })
+  }, WORKER)
 
   it('tells a scanned PDF apart from an empty one', async () => {
     // Pages of pictures are the ordinary case for a photographed handout, and
@@ -159,12 +167,12 @@ describe('extractText', () => {
     expect(out.message).toMatch(/scan/i)
     // And it is the one PDF case where recognising the pages is worth offering.
     expect(out.ocr).toBe(true)
-  })
+  }, WORKER)
 
   it('does not offer OCR for a PDF it could already read', async () => {
     const file = new File([pdfWith([written('Sulla marched on Rome.')])], 'lecture.pdf')
     expect((await extractText(file)).ocr).toBe(false)
-  })
+  }, WORKER)
 
   it('reports a file that is not really a PDF', async () => {
     const out = await extractText(fileOf('renamed.pdf', 'just some words in a file'))
@@ -172,7 +180,7 @@ describe('extractText', () => {
       status: 'error',
       message: 'Could not read that .pdf — it may be damaged',
     })
-  })
+  }, WORKER)
 
   it('names the type it cannot read', async () => {
     expect(await extractText(fileOf('lecture.mp4', 'x'))).toMatchObject({

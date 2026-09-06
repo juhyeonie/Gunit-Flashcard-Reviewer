@@ -75,6 +75,12 @@ the card back to a ten-minute step, and review sessions draw only from cards tha
 have come due. Deck progress is derived from those grades, never stored
 separately.
 
+The shape of a session itself — the order cards come in, what the summary
+counts, what to say to someone with nothing due — is in `src/data/session.js`,
+apart from the page that draws it. Neither the clock nor the random number
+generator is read there; both are arguments, so a shuffle can be replayed and a
+summary measured.
+
 Finished sessions are logged to `src/data/activity.js`, which is where the
 streak, the weekly minutes chart and the daily goal come from.
 
