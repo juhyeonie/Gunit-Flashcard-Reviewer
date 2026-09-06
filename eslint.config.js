@@ -6,7 +6,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 
 export default [
-  { ignores: ['dist', 'node_modules', 'design'] },
+  // public/tesseract is the OCR engine, copied verbatim out of node_modules
+  // by scripts/copy-ocr-assets.js. It is vendor code and not ours to lint.
+  { ignores: ['dist', 'node_modules', 'design', 'public/tesseract'] },
 
   {
     files: ['**/*.{js,jsx}'],
@@ -59,9 +61,9 @@ export default [
     },
   },
 
-  // Config files are Node modules.
+  // Config files and build scripts are Node modules.
   {
-    files: ['*.config.js', 'eslint.config.js'],
+    files: ['*.config.js', 'eslint.config.js', 'scripts/**/*.js', 'test/**/*.js'],
     languageOptions: {
       globals: { ...globals.node },
     },

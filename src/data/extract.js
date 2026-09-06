@@ -9,9 +9,10 @@
  * Only the plumbing is async. The parsing itself is pure functions over an
  * ArrayBuffer, so it can be tested without a DOM or a real file picker.
  *
- * A PDF with no text layer is a picture of a page, and reading those needs
- * OCR, which this step does not do. It is reported as scanned rather than
- * quietly returning nothing.
+ * A page with no text layer — a scan, a photograph of a handout — has to be
+ * recognised rather than read. That is `readWithOcr` below, and it is a
+ * separate call on purpose: it costs several megabytes and takes seconds per
+ * page, so it happens when someone asks for it, never as part of an import.
  *
  * Every parser is loaded on demand. Together they are several times the size
  * of the app, and most sessions never import anything.
@@ -19,6 +20,9 @@
 
 /** Extensions this step can actually read, in the order the UI lists them. */
 export const READABLE = ['pdf', 'docx', 'pptx', 'txt', 'md']
+
+/** Pictures. Nothing to read without OCR, but not a mistake to have chosen. */
+export const IMAGES = ['png', 'jpg', 'jpeg', 'webp', 'bmp']
 
 /**
  * A ceiling on what is pulled into memory. Course material sits far below
@@ -105,14 +109,36 @@ const KINDS = {
   pptx: 'Slides',
   txt: 'Plain text',
   md: 'Plain text',
+  png: 'Image',
+  jpg: 'Image',
+  jpeg: 'Image',
+  webp: 'Image',
+  bmp: 'Image',
 }
 
-/**
- * A PDF that yields nothing almost always holds page images rather than text,
- * so it gets its own wording: the file is fine, and it is OCR that is missing.
- */
+/** The blank case, worded for what actually happened. */
 const EMPTY_MESSAGE = {
-  pdf: 'No text layer — this looks like a scan, and OCR is not available yet',
+  // A PDF that yields nothing almost always holds page images rather than
+  // text. The file is fine; it is a picture, and pictures need OCR.
+  pdf: 'No text layer — this looks like a scan',
+}
+
+const emptyMessageFor = (ext) =>
+  IMAGES.includes(ext) ? 'A picture, with nothing to read out of it directly' : EMPTY_MESSAGE[ext]
+
+const shape = (file) => {
+  const ext = extensionOf(file.name)
+  return {
+    name: file.name,
+    ext,
+    kind: KINDS[ext] || '',
+    text: '',
+    words: 0,
+    note: '',
+    // Whether recognising the picture is worth offering. Only ever true where
+    // there is genuinely an image to look at.
+    ocr: false,
+  }
 }
 
 /**
@@ -120,13 +146,18 @@ const EMPTY_MESSAGE = {
  * files should report the one that failed and keep the other three, so a
  * failure is a value here rather than an exception.
  *
- * @returns {{ status: 'ok'|'empty'|'planned'|'unsupported'|'error',
- *             text: string, words: number, kind: string, message: string }}
+ * Never runs OCR. That is `readWithOcr`, and it waits to be asked.
+ *
+ * @returns {{ status: 'ok'|'empty'|'unsupported'|'error', text: string,
+ *             words: number, kind: string, message: string, ocr: boolean }}
  */
 export async function extractText(file) {
-  const ext = extensionOf(file.name)
-  const base = { name: file.name, ext, kind: KINDS[ext] || '', text: '', words: 0 }
+  const base = shape(file)
+  const { ext } = base
 
+  if (IMAGES.includes(ext)) {
+    return { ...base, status: 'empty', ocr: true, message: emptyMessageFor(ext) }
+  }
   if (!READABLE.includes(ext)) {
     return { ...base, status: 'unsupported', message: `Cannot read .${ext || 'this'} files` }
   }
@@ -144,11 +175,52 @@ export async function extractText(file) {
     else text = (await file.text()).trim()
 
     if (!text) {
-      return { ...base, status: 'empty', message: EMPTY_MESSAGE[ext] || 'No readable text found' }
+      return {
+        ...base,
+        status: 'empty',
+        ocr: ext === 'pdf',
+        message: emptyMessageFor(ext) || 'No readable text found',
+      }
     }
     return { ...base, status: 'ok', text, words: wordCount(text), message: '' }
   } catch (err) {
     // A corrupt archive, a renamed file, a .docx that is really a .doc.
+    return { ...base, status: 'error', message: messageFor(err, ext) }
+  }
+}
+
+/**
+ * Recognises the text in a picture — an image file, or every page of a scanned
+ * PDF drawn out as one.
+ *
+ * Separate from `extractText` because it is expensive in every sense: several
+ * megabytes of engine, seconds of work per page, and a result that is a good
+ * guess rather than a transcript. Nobody should pay that without choosing to.
+ *
+ * @param {File} file
+ * @param {(progress: number) => void} [onProgress] 0 to 1
+ */
+export async function readWithOcr(file, onProgress) {
+  const base = { ...shape(file), ocr: true, viaOcr: true }
+  const { ext } = base
+
+  try {
+    const { textFromImages } = await import('./ocr.js')
+    let images = [file]
+    let skipped = 0
+
+    if (ext === 'pdf') {
+      const { pagesToImages, OCR_PAGE_LIMIT } = await import('./pdf.js')
+      const rendered = await pagesToImages(await file.arrayBuffer())
+      images = rendered.images
+      skipped = rendered.skipped
+      if (skipped > 0) base.note = `first ${OCR_PAGE_LIMIT} pages, ${skipped} left unread`
+    }
+
+    const text = await textFromImages(images, onProgress)
+    if (!text) return { ...base, status: 'empty', message: 'Nothing legible on those pages' }
+    return { ...base, status: 'ok', text, words: wordCount(text), message: '' }
+  } catch (err) {
     return { ...base, status: 'error', message: messageFor(err, ext) }
   }
 }

@@ -78,3 +78,53 @@ export async function textFromPdf(buffer) {
     await task.destroy()
   }
 }
+
+/**
+ * How many pages of a scan are worth rendering. Recognition takes a second or
+ * two per page, so a whole scanned textbook would tie the tab up for an hour;
+ * the caller says so rather than starting one.
+ */
+export const OCR_PAGE_LIMIT = 20
+
+/**
+ * Draws each page as a bitmap, for OCR to read.
+ *
+ * Scale matters more than anything else here: recognition on a page rendered
+ * at its natural size is poor, and doubling it costs only memory.
+ *
+ * Unlike everything else in this file, this needs a DOM — a canvas is where a
+ * PDF page gets drawn — so it is verified in the browser rather than in tests.
+ */
+export async function pagesToImages(buffer, { scale = 2, limit = OCR_PAGE_LIMIT } = {}) {
+  const task = pdfjs.getDocument({ data: buffer, verbosity: 0 })
+  const doc = await task.promise
+
+  try {
+    const images = []
+    const count = Math.min(doc.numPages, limit)
+
+    for (let n = 1; n <= count; n++) {
+      const page = await doc.getPage(n)
+      const viewport = page.getViewport({ scale })
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.ceil(viewport.width)
+      canvas.height = Math.ceil(viewport.height)
+      /*
+       * `print` rather than `display`, though nothing is being printed.
+       *
+       * On the display path PDF.js paces itself with requestAnimationFrame,
+       * which a browser stops altogether for a hidden tab — so switching away
+       * mid-scan parks the job until you switch back. Nobody is looking at
+       * this canvas; it exists to be recognised. The print path schedules on
+       * microtasks and keeps going.
+       */
+      await page.render({ canvas, viewport, intent: 'print' }).promise
+      page.cleanup()
+      images.push(canvas)
+    }
+
+    return { images, skipped: doc.numPages - count }
+  } finally {
+    await task.destroy()
+  }
+}
