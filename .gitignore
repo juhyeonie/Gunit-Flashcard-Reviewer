@@ -4,3 +4,6 @@ node_modules
 design
 .env
 .env.local
+
+# Fetched out of node_modules by scripts/copy-ocr-assets.js
+public/tesseract

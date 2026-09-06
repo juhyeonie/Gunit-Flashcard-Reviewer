@@ -35,9 +35,24 @@ every parser is loaded on demand — a session that imports nothing downloads
 none of them. The PDF.js worker is served from this app's own origin rather
 than a CDN.
 
-A PDF with no text layer is a picture of a page. Reading those needs OCR, which
-this step does not do, so they are reported as scanned rather than as empty or
-broken.
+### Scans and photographs
+
+A PDF with no text layer is a picture of a page, and so is a `.png` or `.jpg`
+of a handout. Those rows offer **Read with OCR**, which recognises the letters
+with Tesseract.js in `src/data/ocr.js`. Scanned PDFs are drawn out page by page
+first, up to twenty of them.
+
+It is offered rather than automatic: the engine is several megabytes and
+recognition takes a second or two a page, so nothing pays that cost without
+being asked. Recognised text is marked as such in the file list and carries a
+short warning above the review box — OCR reads well, not perfectly.
+
+Its worker, engine and language model would otherwise come from a CDN, which
+would announce every scanned page to a third party. `scripts/copy-ocr-assets.js`
+copies them out of `node_modules` into `public/tesseract` — gitignored, and run
+automatically by `npm run dev` and `npm run build`. That directory is about
+14 MB; a browser fetches roughly 6.8 MB of it the first time OCR is used, and
+never otherwise.
 
 Drafting cards from that text automatically would need an AI model, and this
 version does not include one — no API key, no account, no external service. So

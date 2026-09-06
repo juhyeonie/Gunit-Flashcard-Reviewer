@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
-import { combineText, extractText } from '../data/extract.js'
+import { combineText, extractText, readWithOcr } from '../data/extract.js'
 
 const ACCEPT =
-  '.pdf,.pptx,.docx,.txt,.md,application/pdf,' +
+  '.pdf,.pptx,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,application/pdf,' +
   'application/vnd.openxmlformats-officedocument.presentationml.presentation,' +
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain'
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/*'
 
 const formatSize = (n) =>
   n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`
 
 const describe = (file) => ({
+  // Kept so a scan can be handed to OCR later, if it is asked for.
+  file,
   name: file.name,
   size: formatSize(file.size),
   badge: (file.name.split('.').pop() || 'file').toUpperCase().slice(0, 4),
@@ -23,9 +25,12 @@ const FAILED = ['empty', 'unsupported', 'error']
 /**
  * Import lives in a modal, never a page.
  *
- * Dropped files are read here, in the browser: a .docx or .pptx is unzipped
- * and its XML stripped, a .txt read as-is. Nothing is uploaded — there is no
- * server, and the material is the student's own coursework.
+ * Dropped files are read here, in the browser: a PDF through PDF.js, a .docx
+ * or .pptx unzipped and stripped of its XML, a .txt read as-is. A scan or a
+ * photograph holds no text to read, and is offered to OCR instead — on
+ * request, because that costs megabytes and seconds where reading costs
+ * neither. Nothing is uploaded: there is no server, and the material is the
+ * student's own coursework.
  *
  * Drafting cards from that text automatically would need an AI model, and this
  * build ships without one. So the modal stops at the text: it shows what it
@@ -68,6 +73,7 @@ export default function ImportFileModal({
   const reading = files.some((f) => f.status === 'reading')
   const read = files.filter((f) => f.status === 'ok')
   const words = read.reduce((n, f) => n + f.words, 0)
+  const recognised = read.some((f) => f.viaOcr)
   const combined = useMemo(() => combineText(files), [files])
 
   /**
@@ -94,6 +100,32 @@ export default function ImportFileModal({
       if (!open.current) return
       setFiles((f) => f.map((x) => (x.key === row.key ? { ...x, ...result } : x)))
     })
+  }
+
+  const update = (key, patch) =>
+    setFiles((f) => f.map((x) => (x.key === key ? { ...x, ...patch } : x)))
+
+  /**
+   * Recognition takes seconds per page, so it reports how far along it is.
+   * Tesseract's own progress arrives far faster than anything needs to be
+   * redrawn, so only a change in whole percent is written back.
+   */
+  const recognise = async (row) => {
+    update(row.key, { status: 'reading', pct: 0, message: '' })
+
+    const result = await readWithOcr(row.file, (progress) => {
+      if (!open.current) return
+      const pct = Math.round(progress * 100)
+      setFiles((f) => {
+        const current = f.find((x) => x.key === row.key)
+        if (!current || current.pct === pct) return f
+        return f.map((x) => (x.key === row.key ? { ...x, pct } : x))
+      })
+    })
+
+    if (!open.current) return
+    update(row.key, { ...result, pct: undefined })
+    say(result.status === 'ok' ? `Read ${result.words} words from ${row.name}` : result.message)
   }
 
   const copyText = async () => {
@@ -202,7 +234,9 @@ export default function ImportFileModal({
             <span className="text-[13px] text-ink-3">
               or <span className="border-b border-accent-line text-accent">browse your device</span>
             </span>
-            <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">PDF · DOCX · PPTX · TXT</span>
+            <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">
+              PDF · DOCX · PPTX · TXT · scans
+            </span>
           </button>
         )}
 
@@ -235,11 +269,29 @@ export default function ImportFileModal({
                     }`}
                   >
                     {f.size}
-                    {f.status === 'reading' && ' · Reading…'}
-                    {f.status === 'ok' && ` · ${f.words.toLocaleString()} words`}
+                    {f.status === 'reading' &&
+                      (f.pct === undefined ? ' · Reading…' : ` · Recognising… ${f.pct}%`)}
+                    {f.status === 'ok' &&
+                      ` · ${f.words.toLocaleString()} words${f.viaOcr ? ', read by OCR' : ''}`}
+                    {f.status === 'ok' && f.note && ` · ${f.note}`}
                     {FAILED.includes(f.status) && ` · ${f.message}`}
                   </span>
                 </span>
+
+                {/*
+                  Offered, never automatic: recognising a scan pulls down
+                  several megabytes of engine and takes seconds a page.
+                */}
+                {f.ocr && f.status !== 'ok' && f.status !== 'reading' && (
+                  <button
+                    type="button"
+                    onClick={() => recognise(f)}
+                    className="shrink-0 cursor-pointer rounded-[20px] border border-line bg-transparent px-3 py-1.5 text-xs leading-none font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent"
+                  >
+                    Read with OCR
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
@@ -273,6 +325,12 @@ export default function ImportFileModal({
                   value={combined}
                   className="!text-[13px] leading-[1.55]"
                 />
+                {recognised && (
+                  <p className="m-0 text-[13px] leading-[1.5] text-ink-3">
+                    Some of this was recognised from a picture. OCR reads well but not perfectly —
+                    worth a look before you build cards on it.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={copyText}
@@ -293,7 +351,9 @@ export default function ImportFileModal({
               </div>
               {read.length > 0
                 ? 'The text was read on this device and went nowhere else. Writing cards from it needs an AI model this version does not include — copy what you need and add the cards yourself.'
-                : 'Nothing readable came out of your selection, and no cards can be drafted from it. You can still add the cards yourself.'}
+                : files.some((f) => f.ocr)
+                  ? 'Nothing has been read yet. Those pages are pictures, so try Read with OCR above — or add the cards yourself.'
+                  : 'Nothing readable came out of your selection, and no cards can be drafted from it. You can still add the cards yourself.'}
             </div>
           </>
         )}

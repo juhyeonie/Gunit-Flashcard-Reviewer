@@ -5,6 +5,7 @@ import {
   combineText,
   extensionOf,
   extractText,
+  readWithOcr,
   stripXml,
   textFromDocx,
   textFromPptx,
@@ -156,6 +157,13 @@ describe('extractText', () => {
     const out = await extractText(file)
     expect(out.status).toBe('empty')
     expect(out.message).toMatch(/scan/i)
+    // And it is the one PDF case where recognising the pages is worth offering.
+    expect(out.ocr).toBe(true)
+  })
+
+  it('does not offer OCR for a PDF it could already read', async () => {
+    const file = new File([pdfWith([written('Sulla marched on Rome.')])], 'lecture.pdf')
+    expect((await extractText(file)).ocr).toBe(false)
   })
 
   it('reports a file that is not really a PDF', async () => {
@@ -167,10 +175,31 @@ describe('extractText', () => {
   })
 
   it('names the type it cannot read', async () => {
-    expect(await extractText(fileOf('scan.jpg', 'x'))).toMatchObject({
+    expect(await extractText(fileOf('lecture.mp4', 'x'))).toMatchObject({
       status: 'unsupported',
-      message: 'Cannot read .jpg files',
+      message: 'Cannot read .mp4 files',
+      ocr: false,
     })
+  })
+
+  it('offers OCR for a picture rather than calling it unsupported', async () => {
+    // A photographed page is a reasonable thing to import. It is just not
+    // something that can be read without recognising it first.
+    expect(await extractText(fileOf('page.jpg', 'x'))).toMatchObject({
+      status: 'empty',
+      kind: 'Image',
+      ocr: true,
+    })
+  })
+
+  it('does not offer OCR where there is no picture to recognise', async () => {
+    expect((await extractText(fileOf('blank.txt', '  '))).ocr).toBe(false)
+  })
+
+  it('never runs OCR by itself', async () => {
+    // Recognising costs megabytes and seconds. Importing must stay cheap, so
+    // a picture comes back empty and waits to be asked.
+    expect((await extractText(fileOf('page.png', 'x'))).text).toBe('')
   })
 
   it('reports an empty file instead of an empty success', async () => {
@@ -222,5 +251,21 @@ describe('combineText', () => {
   it('returns nothing when nothing was read', () => {
     expect(combineText([])).toBe('')
     expect(combineText()).toBe('')
+  })
+})
+
+describe('readWithOcr', () => {
+  it('returns a failure as a value, never a throw', async () => {
+    // Drawing PDF pages out needs a canvas, so this fails under Node — which
+    // is exactly the shape the modal has to survive: the row reports it and
+    // the other files carry on.
+    const out = await readWithOcr(new File([pdfWith([drawn])], 'scan.pdf'))
+    expect(out.status).toBe('error')
+    expect(out.message).toBeTruthy()
+  })
+
+  it('marks its result as recognised, so the reader can be told', async () => {
+    const out = await readWithOcr(new File([pdfWith([drawn])], 'scan.pdf'))
+    expect(out).toMatchObject({ viaOcr: true, ocr: true, name: 'scan.pdf' })
   })
 })
