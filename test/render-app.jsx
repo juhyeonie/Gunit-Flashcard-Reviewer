@@ -38,10 +38,13 @@ export const deck = ({ id = 'republic', title = 'Roman Republic', count = 4, sch
  * is what puts a card in the queue.
  */
 export const entry = (dueIn, now = Date.now()) => ({
-  last: now - 86_400_000,
+  // `last` holds the grade itself, not a timestamp — that is what the
+  // scheduler writes, and what progress is derived from.
+  last: 'good',
   due: now + dueIn * 60_000,
   interval: 1440,
   ease: 2.5,
+  reps: 1,
   lapses: 0,
 })
 

@@ -1,16 +1,41 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import DeckCard from '../components/DeckCard.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import { FILTERS, SORTS, filterAndSortDecks } from '../data/library.js'
+import { fromTransfer } from '../data/transfer.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
 export default function Decks({ onNewDeck, onEditDeck }) {
-  const { decks } = useApp()
+  const { decks, importDeck, say } = useApp()
+  const navigate = useNavigate()
+  const fileRef = useRef(null)
   useDocumentTitle('My decks')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All decks')
   const [sort, setSort] = useState('Recently studied')
+
+  /**
+   * Reads a deck back out of a file. A bad file says why rather than doing
+   * nothing, and a file that is almost right imports what it can and says how
+   * much it left behind.
+   */
+  const restore = async (file) => {
+    if (!file) return
+    const { deck, error, skipped } = fromTransfer(await file.text())
+    if (error) {
+      say(error)
+      return
+    }
+    const added = importDeck(deck)
+    say(
+      skipped
+        ? `Imported “${deck.title}” — ${skipped} unusable ${skipped === 1 ? 'card' : 'cards'} left out`
+        : `Imported “${deck.title}”`,
+    )
+    navigate(`/decks/${added.id}`)
+  }
 
   const rows = useMemo(
     () => filterAndSortDecks(decks, { search, filter, sort }),
@@ -26,8 +51,24 @@ export default function Decks({ onNewDeck, onEditDeck }) {
             My decks
           </h1>
         </div>
-        <Button onClick={onNewDeck}>New deck</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => fileRef.current?.click()}>
+            Import deck
+          </Button>
+          <Button onClick={onNewDeck}>New deck</Button>
+        </div>
       </header>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={(e) => {
+          restore(e.target.files?.[0])
+          e.target.value = ''
+        }}
+        className="absolute -left-[9999px] h-px w-px opacity-0"
+      />
 
       <div className="flex flex-wrap items-center gap-3 border-y border-line py-3.5">
         <div className="flex min-w-[200px] flex-1 items-center gap-[9px] rounded-[5px] border border-line bg-surface px-3 py-[9px]">

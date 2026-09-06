@@ -145,6 +145,65 @@ describe('cards', () => {
   })
 })
 
+describe('importing a deck', () => {
+  const arriving = () => ({
+    title: 'Late Antiquity',
+    subject: 'Rome',
+    desc: 'After Diocletian.',
+    cards: [
+      { front: 'Diocletian?', back: 'Split the empire.', scheduling: null },
+      {
+        front: 'Constantine?',
+        back: 'Founded a city.',
+        // `last` is what marks a card as seen; progress is derived from it.
+        scheduling: { last: 'good', due: 1, interval: 1440, ease: 2.5 },
+      },
+    ],
+  })
+
+  it('puts it at the top of the library and hands it back', () => {
+    const { result } = store()
+    let made
+    act(() => {
+      made = result.current.importDeck(arriving())
+    })
+    expect(result.current.decks[0].id).toBe(made.id)
+    expect(made.title).toBe('Late Antiquity')
+  })
+
+  it('issues ids here rather than trusting the file', () => {
+    // An id only means something inside the library that issued it.
+    const { result } = store()
+    act(() => result.current.importDeck(arriving()))
+    const added = result.current.decks[0]
+    expect(new Set(added.cards.map((c) => c.id)).size).toBe(2)
+    expect(added.cards.every((c) => c.id)).toBe(true)
+  })
+
+  it('keeps each card scheduling, re-keyed to its new id', () => {
+    const { result } = store()
+    act(() => result.current.importDeck(arriving()))
+    const added = result.current.decks[0]
+    expect(added.schedule[added.cards[1].id]).toMatchObject({ interval: 1440 })
+    expect(added.schedule[added.cards[0].id]).toBeUndefined()
+  })
+
+  it('derives progress rather than taking it on trust', () => {
+    // One of the two arrives with a grade behind it, so the deck lands at half
+    // rather than at whatever a file claimed.
+    const { result } = store()
+    act(() => result.current.importDeck(arriving()))
+    expect(result.current.decks[0].progress).toBe(0.5)
+  })
+
+  it('imports a deck with nothing in it', () => {
+    const { result } = store()
+    act(() => result.current.importDeck({ ...arriving(), cards: [] }))
+    expect(result.current.decks[0].cards).toEqual([])
+    expect(result.current.decks[0].progress).toBe(0)
+  })
+})
+
 describe('studying', () => {
   it('records a grade and moves progress with it', () => {
     const { result } = store()

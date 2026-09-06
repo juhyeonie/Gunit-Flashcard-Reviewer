@@ -87,6 +87,20 @@ streak, the weekly minutes chart and the daily goal come from.
 Everything persists to `localStorage` under `gunit.state.v2`; older saved shapes
 are migrated in place on load.
 
+## Taking a deck with you
+
+A library otherwise lives in one browser and nowhere else. **Export deck** on a
+deck's page writes it out as `<title>.gunit.json`, and **Import deck** on the
+library page reads one back — `src/data/transfer.js` handles both.
+
+Each card's review history rides on the card rather than in a table beside it.
+Ids only mean something inside the library that issued them, so importing
+reissues them and the scheduling comes along attached to the card it belongs
+to. Progress is re-derived rather than trusted from the file.
+
+A file that is not ours says so instead of failing quietly, and one that is
+ours but partly damaged imports what it can and reports what it left out.
+
 ## Tests
 
 `npm test` runs everything. Most of it is the pure modules under `src/data` —

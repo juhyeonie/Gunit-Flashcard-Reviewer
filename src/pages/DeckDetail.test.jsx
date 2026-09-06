@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DeckDetail from './DeckDetail.jsx'
 import { MIN_QUIZ_CARDS } from '../data/quiz.js'
 import { deck, entry, renderRoute, seed } from '../../test/render-app.jsx'
+import { FORMAT } from '../data/transfer.js'
 
 /**
  * The deck page, and the guards on the way out of it.
@@ -142,5 +143,70 @@ describe('adding cards', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit deck' }))
     expect(p.onEditDeck).toHaveBeenCalledWith(expect.objectContaining({ id: 'republic' }))
+  })
+})
+
+describe('exporting the deck', () => {
+  /** Catches what the anchor was pointed at, without a real download. */
+  const captureSave = () => {
+    const saved = {}
+    const blobs = []
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      blobs.push(blob)
+      return 'blob:deck'
+    })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click() {
+      saved.name = this.download
+      saved.href = this.href
+    })
+    return { saved, blobs }
+  }
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('saves a file named after the deck', async () => {
+    seed({ decks: [deck({ count: 2 })] })
+    const { saved } = captureSave()
+    open(props())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export deck' }))
+
+    expect(saved.name).toBe('roman-republic.gunit.json')
+    expect(saved.href).toBe('blob:deck')
+  })
+
+  it('writes the deck and its cards into it', async () => {
+    seed({ decks: [deck({ count: 2, schedule: { c0: entry(60) } })] })
+    const { blobs } = captureSave()
+    open(props())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export deck' }))
+
+    const written = JSON.parse(await blobs[0].text())
+    expect(written.format).toBe(FORMAT)
+    expect(written.title).toBe('Roman Republic')
+    expect(written.cards).toHaveLength(2)
+    // The review history rides on the card that earned it.
+    expect(written.cards[0].scheduling).toMatchObject({ interval: 1440 })
+    expect(written.cards[1].scheduling).toBe(null)
+  })
+
+  it('says what it saved', async () => {
+    seed({ decks: [deck({ count: 1 })] })
+    captureSave()
+    open(props())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export deck' }))
+    expect(await screen.findByText('Saved roman-republic.gunit.json')).toBeTruthy()
+  })
+
+  it('exports an empty deck rather than refusing', async () => {
+    seed({ decks: [deck({ count: 0 })] })
+    const { blobs } = captureSave()
+    open(props())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export deck' }))
+    expect(JSON.parse(await blobs[0].text()).cards).toEqual([])
   })
 })
