@@ -83,6 +83,36 @@ export function AppProvider({ children }) {
     return deck
   }, [])
 
+  /**
+   * Takes a deck read out of a file and gives it a place in this library.
+   *
+   * Ids are issued here rather than carried in, because they only mean
+   * anything inside the library that issued them. Each card's scheduling comes
+   * across with the card, so a restored deck is due when it was due.
+   */
+  const importDeck = useCallback(({ title, subject, desc, cards }) => {
+    const schedule = {}
+    const withIds = cards.map((c) => {
+      const id = uid()
+      if (c.scheduling) schedule[id] = c.scheduling
+      return { id, front: c.front, back: c.back }
+    })
+
+    const deck = {
+      id: uid(),
+      title,
+      subject,
+      desc,
+      studiedAt: null,
+      cards: withIds,
+      schedule,
+    }
+    const placed = { ...deck, progress: progressOf(deck) }
+
+    setState((s) => ({ ...s, decks: [placed, ...s.decks] }))
+    return placed
+  }, [])
+
   const updateDeck = useCallback((id, patch) => {
     setState((s) => ({
       ...s,
@@ -177,6 +207,7 @@ export function AppProvider({ children }) {
       toggleTheme,
       updateSettings,
       addDeck,
+      importDeck,
       updateDeck,
       removeDeck,
       addCards,
@@ -195,6 +226,7 @@ export function AppProvider({ children }) {
       toggleTheme,
       updateSettings,
       addDeck,
+      importDeck,
       updateDeck,
       removeDeck,
       addCards,

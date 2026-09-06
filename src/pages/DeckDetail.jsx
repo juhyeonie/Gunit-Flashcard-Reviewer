@@ -8,6 +8,7 @@ import { dueCount } from '../data/scheduler.js'
 import { MIN_QUIZ_CARDS, canQuiz } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { formatRelative } from '../data/activity.js'
+import { fileNameFor, toTransfer } from '../data/transfer.js'
 
 export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDeleteCard, onImport }) {
   const { id } = useParams()
@@ -49,6 +50,26 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
     go()
   }
 
+  /**
+   * Writes the deck out as a file. A library otherwise lives in one browser's
+   * localStorage and nowhere else: clearing site data takes it, a second
+   * machine cannot see it, and there is no way to hand a deck to anyone.
+   */
+  const exportDeck = () => {
+    const name = fileNameFor(deck)
+    const blob = new Blob([JSON.stringify(toTransfer(deck), null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+    // Revoking in the same tick can cancel the save before it starts.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+    say(`Saved ${name}`)
+  }
+
   // Quiz has a higher bar than flashcards: without other cards to draw wrong
   // answers from, every question would show only the right one.
   const quizGuard = () => {
@@ -84,6 +105,15 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
               className="mt-2 grid h-[30px] w-[30px] shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-transparent p-0 text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
             >
               <PencilIcon />
+            </button>
+            <button
+              type="button"
+              onClick={exportDeck}
+              title="Export deck"
+              aria-label="Export deck"
+              className="mt-2 grid h-[30px] w-[30px] shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-transparent p-0 text-[15px] text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
+            >
+              ↓
             </button>
           </div>
           <p className="m-0 text-[15px] text-ink-2 text-pretty">{deck.desc}</p>
