@@ -23,12 +23,18 @@ export const card = (n) => ({
 })
 
 /** A deck of `count` cards, with whatever schedule the test needs. */
-export const deck = ({ id = 'republic', title = 'Roman Republic', count = 4, schedule = {} } = {}) => ({
+export const deck = ({
+  id = 'republic',
+  title = 'Roman Republic',
+  count = 4,
+  schedule = {},
+  cards,
+} = {}) => ({
   id,
   title,
   subject: 'Ancient Rome',
   desc: 'Magistracies and assemblies.',
-  cards: Array.from({ length: count }, (_, i) => card(i)),
+  cards: cards ?? Array.from({ length: count }, (_, i) => card(i)),
   schedule,
   studiedAt: null,
 })
