@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AppProvider } from './data/AppContext.jsx'
 import { AuthProvider } from './data/AuthProvider.jsx'
+import LibrarySync from './data/LibrarySync.jsx'
 import { useApp } from './data/useApp.js'
 import { BottomNav, TopNav } from './components/Navbar.jsx'
 import Toast from './components/Toast.jsx'
@@ -224,6 +225,8 @@ export default function App() {
       */}
       <AuthProvider>
         <AppProvider>
+          {/* Renders nothing; carries the library to and from the account. */}
+          <LibrarySync />
           <Shell />
         </AppProvider>
       </AuthProvider>

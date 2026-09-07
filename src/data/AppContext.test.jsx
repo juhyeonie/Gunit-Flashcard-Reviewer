@@ -277,6 +277,66 @@ describe('restoring a backup', () => {
   })
 })
 
+describe('adopting an account’s library', () => {
+  const arriving = {
+    decks: [
+      {
+        id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        title: 'From the account',
+        subject: 'Rome',
+        desc: '',
+        studiedAt: null,
+        cards: [{ id: 'ffffffff-1111-4222-8333-444444444444', front: 'Q', back: 'A' }],
+        schedule: {},
+      },
+    ],
+    sessions: [{ at: 1000, deckId: null, reviewed: 3, seconds: 60 }],
+  }
+
+  it('swaps the library for the one signing in brought', () => {
+    const { result } = store()
+    act(() => result.current.replaceLibrary(arriving))
+
+    expect(result.current.decks).toHaveLength(1)
+    expect(result.current.decks[0].title).toBe('From the account')
+    expect(result.current.sessions).toHaveLength(1)
+  })
+
+  it('keeps what this browser had rather than dropping it', () => {
+    // "You signed in and your decks went" is not a sentence this app should
+    // ever cause. The same reasoning as the salvage key for a bad payload.
+    const { result } = store()
+    const had = result.current.decks.map((d) => d.title)
+
+    act(() => result.current.replaceLibrary(arriving))
+
+    const kept = JSON.parse(localStorage.getItem('gunit.state.presync'))
+    expect(kept.decks.map((d) => d.title)).toEqual(had)
+  })
+
+  it('takes the account’s settings and theme when they come with it', () => {
+    const { result } = store()
+    act(() =>
+      result.current.replaceLibrary({ ...arriving, settings: { goalMinutes: 45 }, theme: 'dark' }),
+    )
+    expect(result.current.settings.goalMinutes).toBe(45)
+    expect(result.current.theme).toBe('dark')
+  })
+
+  it('leaves settings alone when they do not', () => {
+    const { result } = store()
+    const before = result.current.settings.goalMinutes
+    act(() => result.current.replaceLibrary(arriving))
+    expect(result.current.settings.goalMinutes).toBe(before)
+  })
+
+  it('adopts an empty library without complaint', () => {
+    const { result } = store()
+    act(() => result.current.replaceLibrary({ decks: [], sessions: [] }))
+    expect(result.current.decks).toEqual([])
+  })
+})
+
 describe('studying', () => {
   it('records a grade and moves progress with it', () => {
     const { result } = store()

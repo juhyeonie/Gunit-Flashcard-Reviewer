@@ -127,6 +127,26 @@ hour and only delivers to your own project team, so password reset does not
 work for real users without it. [Resend](https://resend.com)'s free tier is
 3,000 a month, capped at 100 a day, which is ample for a class.
 
+### How syncing works
+
+`localStorage` stays the copy the app reads. Every page still gets its decks
+synchronously, studying still works with no network, and a paused free project
+is a sync that retries rather than an app that is gone. Supabase is the durable
+copy alongside it, kept in step by `src/data/LibrarySync.jsx`.
+
+Signing in reads the account's library and decides which one wins. **An account
+with nothing in it adopts whatever this browser was holding** — that is the
+migration, and it is the only case where local wins. Once the account has
+decks, the account is the library, because it is the copy your other machines
+see. Whatever was here first is written to `gunit.state.presync` rather than
+dropped.
+
+Changes go up as a diff, not as the whole library: `src/data/sync.js` works out
+what actually changed between the last confirmed push and now, so grading one
+card sends that card rather than the deck it is in. A push that fails leaves
+the last-confirmed snapshot where it was, so the next change retries everything
+since instead of skipping past it.
+
 ### What it costs
 
 Nothing, within the free plan: 500 MB of database, 50,000 monthly active users,
