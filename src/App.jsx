@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AppProvider } from './data/AppContext.jsx'
+import { AuthProvider } from './data/AuthProvider.jsx'
 import { useApp } from './data/useApp.js'
 import { BottomNav, TopNav } from './components/Navbar.jsx'
 import Toast from './components/Toast.jsx'
@@ -16,6 +17,8 @@ import Review from './pages/Review.jsx'
 import Quiz from './pages/Quiz.jsx'
 import Summary from './pages/Summary.jsx'
 import Settings from './pages/Settings.jsx'
+import SignIn from './pages/SignIn.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 
 const CLOSED = { kind: null }
 
@@ -103,6 +106,13 @@ function Shell() {
           <Route path="/decks/:id/quiz" element={<Quiz />} />
           <Route path="/decks/:id/summary" element={<Summary />} />
           <Route path="/settings" element={<Settings />} />
+          {/*
+            Both are reachable whether or not a project is configured: each
+            says plainly that this copy is local-only rather than 404ing on a
+            link someone was sent.
+          */}
+          <Route path="/sign-in" element={<SignIn />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </ErrorBoundary>
       </main>
@@ -208,9 +218,15 @@ export default function App() {
     // Outer net for anything the per-route boundary sits below — the provider
     // itself, or the shell around the routes.
     <ErrorBoundary>
-      <AppProvider>
-        <Shell />
-      </AppProvider>
+      {/*
+        Auth wraps the store rather than the other way round: who is signed in
+        decides which library the store should be holding, not the reverse.
+      */}
+      <AuthProvider>
+        <AppProvider>
+          <Shell />
+        </AppProvider>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }

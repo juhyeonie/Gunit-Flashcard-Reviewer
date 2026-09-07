@@ -95,6 +95,51 @@ streak, the weekly minutes chart and the daily goal come from.
 Everything persists to `localStorage` under `gunit.state.v2`; older saved shapes
 are migrated in place on load.
 
+## Accounts, optionally
+
+Gunit works with no account at all, and that is not a fallback — it is the
+default. Decks live in `localStorage`, every page reads them synchronously, and
+a clone with no `.env` is a working flashcard app rather than a sign-in wall.
+
+Point it at a [Supabase](https://supabase.com) project and it additionally
+offers sign-up, sign-in, sign-out and password reset:
+
+```bash
+cp .env.example .env      # then fill in from Project Settings → API
+```
+
+Only the **anon key** belongs there. It is meant to be public — row level
+security is what protects the data, not the secrecy of that key. The
+`service_role` key bypasses row level security entirely and must never be named
+`VITE_*`, because anything so named is compiled into the JavaScript every
+visitor downloads.
+
+`supabase/migrations/0001_init.sql` creates the tables and the policies. Run it
+once in the dashboard's SQL editor; it is written to be safe to re-run.
+
+### Two things to set in the dashboard
+
+**Turn email confirmation off** (Authentication → Providers → Email). Signing up
+then returns a session immediately and a new reader is studying seconds later.
+
+**Configure custom SMTP.** Supabase's built-in sender allows two messages an
+hour and only delivers to your own project team, so password reset does not
+work for real users without it. [Resend](https://resend.com)'s free tier is
+3,000 a month, capped at 100 a day, which is ample for a class.
+
+### What it costs
+
+Nothing, within the free plan: 500 MB of database, 50,000 monthly active users,
+5 GB of egress. Measured against this app's own data — 164 bytes of text per
+card — two hundred students with five hundred cards each comes to roughly
+50 MB.
+
+Two free-plan facts worth knowing rather than discovering. Projects **pause
+after seven days of inactivity** and need restoring by hand, which is part of
+why the app keeps working from `localStorage` rather than depending on the
+network. And the free plan has **no automatic backups**, which is why the
+export below matters more, not less.
+
 ## Taking a deck with you
 
 A library otherwise lives in one browser and nowhere else. **Export deck** on a

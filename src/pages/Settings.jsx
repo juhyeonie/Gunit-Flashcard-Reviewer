@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/useApp.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import { useAuth } from '../data/useAuth.js'
 import { fromLibraryTransfer, libraryFileName, toLibraryTransfer } from '../data/transfer.js'
 
 function Row({ label, hint, children }) {
@@ -77,6 +78,7 @@ export default function Settings() {
 
   const fileRef = useRef(null)
   const deckCount = decks.length
+  const { available, user, signOut } = useAuth()
 
   /**
    * A deck at a time is a way to share; this is the file you want before
@@ -220,6 +222,39 @@ export default function Settings() {
         Below the save row on purpose: these act at once and have nothing to do
         with the draft above them.
       */}
+      {/*
+        Only shown where there is a project to sign in to. A local-only copy of
+        Gunit should not advertise an account it cannot make.
+      */}
+      {available && (
+        <section>
+          <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Signing in</h2>
+          {user ? (
+            <Row label="Signed in" hint={user.email}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const { error } = await signOut()
+                  say(error ?? 'Signed out')
+                }}
+              >
+                Sign out
+              </Button>
+            </Row>
+          ) : (
+            <Row
+              label="Not signed in"
+              hint="Your decks are in this browser only. An account carries them between machines."
+            >
+              <Button as={Link} variant="outline" size="sm" to="/sign-in">
+                Sign in
+              </Button>
+            </Row>
+          )}
+        </section>
+      )}
+
       <section>
         <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Your library</h2>
         <Row
