@@ -118,6 +118,19 @@ describe('starting a session', () => {
   })
 })
 
+describe('what the menus announce', () => {
+  beforeEach(() => seed({ decks: [deck({ count: 4 })] }))
+
+  it('says the button opens a menu, not just that it expands', () => {
+    open(props())
+    for (const name of ['Study this deck', 'Add cards']) {
+      const button = screen.getByRole('button', { name: new RegExp(name) })
+      expect(button.getAttribute('aria-haspopup')).toBe('true')
+      expect(button.getAttribute('aria-expanded')).toBe('false')
+    }
+  })
+})
+
 describe('adding cards', () => {
   beforeEach(() => seed({ decks: [deck({ count: 4 })] }))
 

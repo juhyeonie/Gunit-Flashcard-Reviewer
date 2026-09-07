@@ -52,6 +52,7 @@ export default function Review() {
   // render makes output depend on when React happens to re-run the component.
   const [mountedAt] = useState(() => Date.now())
   const revealTimer = useRef(null)
+  const ratingsRef = useRef(null)
   const built = useRef(false)
   // Mirrors `grades` for the unmount handler, which cannot read state set after
   // its own effect was created.
@@ -169,6 +170,21 @@ export default function Review() {
     return () => window.removeEventListener('keydown', onKey)
   }, [next, prev, exit, rate, flipped])
 
+  /**
+   * Revealing replaces the button that was just pressed with the three
+   * ratings, so the element holding focus stops existing and focus falls to
+   * <body> — leaving a keyboard reader to tab from the top of the page to
+   * reach the very buttons they asked for.
+   *
+   * The group takes focus rather than any one rating, so nothing is preselected
+   * and a second Enter cannot grade a card by accident.
+   */
+  useEffect(() => {
+    if (!flipped) return
+    if (document.activeElement && document.activeElement !== document.body) return
+    ratingsRef.current?.focus()
+  }, [flipped, idx])
+
   // "Reveal answer automatically": flip the face-up card after four seconds.
   useEffect(() => {
     clearTimeout(revealTimer.current)
@@ -241,7 +257,14 @@ export default function Review() {
           ← Exit
         </Button>
         <div className="min-w-0 text-center">
-          <div className="truncate font-serif text-[18px] leading-[1.2]">{deck.title}</div>
+          {/*
+            The deck name is the heading of this page. It was a plain div, so a
+            session was the one screen in the app with no heading on it at all
+            — nothing to jump to, and nothing to say where you had landed.
+          */}
+          <h1 className="m-0 truncate font-serif text-[18px] leading-[1.2] font-normal">
+            {deck.title}
+          </h1>
           {ahead && <div className="kicker mt-1">Reviewing ahead</div>}
         </div>
         <div className="flex items-center gap-2">
@@ -331,13 +354,21 @@ export default function Review() {
         </div>
 
         {flipped ? (
-          <div className="flex flex-col items-center gap-2.5">
+          <div
+            ref={ratingsRef}
+            tabIndex={-1}
+            aria-label="How well did you know it?"
+            className="flex flex-col items-center gap-2.5 outline-none"
+          >
             <span className="kicker">How well did you know it?</span>
             <div className="flex flex-wrap justify-center gap-2">
               {RATINGS.map((r) => (
                 <button
                   key={r.key}
                   type="button"
+                  // The visible text is two lines; read together they run into
+                  // one another as "Again10 minutes".
+                  aria-label={`${r.label} — next due in ${formatInterval(previews[r.key])}`}
                   onClick={() => rate(r.key)}
                   className={`flex min-w-[104px] cursor-pointer flex-col items-center gap-1.5 rounded-lg border bg-transparent px-[22px] py-2.5 transition-colors active:scale-[0.975] ${r.className}`}
                 >

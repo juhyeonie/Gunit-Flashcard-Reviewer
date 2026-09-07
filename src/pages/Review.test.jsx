@@ -129,6 +129,42 @@ describe('a card whose text does not fit', () => {
   })
 })
 
+describe('finding your way around it', () => {
+  beforeEach(() => seed({ decks: [deck({ count: 3 })] }))
+
+  it('has a heading, like every other page', () => {
+    // A session was the one screen in the app with none: nothing to jump to by
+    // heading, and nothing saying where you had landed.
+    open()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Roman Republic')
+  })
+
+  it('keeps focus in the page when the answer replaces the button', async () => {
+    // Revealing unmounts the button that was just pressed. Focus fell to
+    // <body>, so reaching the ratings meant tabbing from the top of the page.
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'Reveal answer' }))
+
+    expect(document.activeElement).not.toBe(document.body)
+    expect(document.activeElement.getAttribute('aria-label')).toBe('How well did you know it?')
+  })
+
+  it('lands on the group rather than on a rating', async () => {
+    // Nothing preselected, so a second Enter cannot grade a card by accident.
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'Reveal answer' }))
+    expect(document.activeElement.tagName).toBe('DIV')
+  })
+
+  it('separates a rating from its interval', async () => {
+    // Read together the two lines run into one another as "Again10 minutes".
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'Reveal answer' }))
+    expect(screen.getByRole('button', { name: /^Again — next due in/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Easy — next due in/ })).toBeTruthy()
+  })
+})
+
 describe('grading', () => {
   beforeEach(() => seed({ decks: [deck({ count: 3 })] }))
 
