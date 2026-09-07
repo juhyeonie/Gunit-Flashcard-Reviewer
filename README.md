@@ -14,9 +14,9 @@ npm run dev
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Dev server, including the card-generation endpoint |
+| `npm run dev` | Dev server; copies the OCR assets first |
 | `npm run build` | Production bundle into `dist/` |
-| `npm run preview` | Serves the build, endpoint included |
+| `npm run preview` | Serves the built bundle |
 | `npm test` | Vitest, watch mode |
 | `npm run test:run` | Vitest, single pass |
 | `npm run lint` | ESLint |
@@ -129,17 +129,21 @@ rejected as a stranger.
 scheduling, activity, quizzes, the library filters, the readers and the card
 splitter — which run in Node and are where the logic lives.
 
-Three suites go through the DOM instead, with `// @vitest-environment jsdom` at
-the top of the file rather than a global switch, so the Node suites keep the
-environment they need:
+The rest go through the DOM, with `// @vitest-environment jsdom` at the top of
+each file rather than a global switch, so the Node suites keep the environment
+they need:
 
 - `AppContext.test.jsx` — every mutator, what persists, what happens when
   storage refuses to answer
-- `ImportFileModal.test.jsx` — choosing files through to cards in a deck
 - `Modal.test.jsx` — the focus trap, `inert`, and where focus goes afterwards
-- `Review.test.jsx` — a session from the first card to the summary
-- `Quiz.test.jsx` — answering, scoring, and the deck too small to quiz
+- `ImportFileModal.test.jsx` — choosing files through to cards in a deck
+- `Dashboard.test.jsx` — the claims it makes about a library
+- `Decks.test.jsx` — searching, filtering, and importing a deck file
 - `DeckDetail.test.jsx` — the guards on the way into a session
+- `Review.test.jsx` — a session from the first card to the summary, and undo
+- `Quiz.test.jsx` — answering, scoring, and the deck too small to quiz
+- `Summary.test.jsx` — both of its states
+- `Settings.test.jsx` — backing the library up and restoring it
 
 Pages are rendered through `test/render-app.jsx`, which puts them inside the
 store and a router at a real URL, seeds the library through `localStorage` —
