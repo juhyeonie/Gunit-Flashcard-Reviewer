@@ -103,6 +103,22 @@ describe('answering', () => {
   })
 })
 
+describe('a card made of one long word', () => {
+  it('lets the question and its options break rather than widening the page', () => {
+    // Measured at 375px: an option holding a single 60-character term pushed
+    // the page 47px sideways.
+    seed({ decks: [deck({ count: 4 })] })
+    open()
+    expect(screen.getByRole('heading', { level: 1 }).className).toMatch(/overflow-wrap:anywhere/)
+    for (const option of options()) {
+      const text = [...option.querySelectorAll('span')].at(-2)
+      expect(text.className).toMatch(/overflow-wrap:anywhere/)
+      // A flex item will not shrink below its content without this.
+      expect(text.className).toMatch(/min-w-0/)
+    }
+  })
+})
+
 describe('finishing', () => {
   beforeEach(() => seed({ decks: [deck({ count: 4 })] }))
 

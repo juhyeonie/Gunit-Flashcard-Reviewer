@@ -112,7 +112,14 @@ export default function Modal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.()
       }}
-      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-6 backdrop-blur-[3px]"
+      /*
+       * The column is minmax(0, 1fr) rather than the auto track a bare grid
+       * would give it. An auto track is sized by its content, so a dialog
+       * holding one long unbroken string — a filename, a URL — grew the track
+       * and took the dialog out past the edge of a narrow screen, and nothing
+       * inside it could truncate because nothing was ever constrained.
+       */
+      className="fixed inset-0 z-50 grid grid-cols-[minmax(0,1fr)] place-items-center overflow-y-auto p-6 backdrop-blur-[3px]"
       style={{ background: 'oklch(0.245 0.012 60 / .38)' }}
     >
       {/*

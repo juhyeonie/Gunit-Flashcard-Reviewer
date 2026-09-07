@@ -66,6 +66,20 @@ describe('while it is open', () => {
   })
 })
 
+describe('on a narrow screen', () => {
+  /*
+   * jsdom computes no layout, so this asserts the structure that decides it.
+   * Measured in a browser at 375px: a dialog holding one long unbroken
+   * filename rendered 484px wide — 109px wider than the screen.
+   */
+  it('pins its column so a long word cannot widen the dialog', () => {
+    open()
+    const backdrop = screen.getByRole('dialog').parentElement
+    // An auto track is sized by its content; this one is sized by the screen.
+    expect(backdrop.className).toMatch(/grid-cols-\[minmax\(0,1fr\)\]/)
+  })
+})
+
 describe('closing', () => {
   it('closes on Escape', async () => {
     const onClose = vi.fn()

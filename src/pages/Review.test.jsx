@@ -101,6 +101,22 @@ describe('a card whose text does not fit', () => {
     expect(scroller.className).toMatch(/min-h-0/)
   })
 
+  it('lets a word with no spaces in it break', () => {
+    // A pasted URL has no break opportunity of its own. `break-word` alone is
+    // not enough where the box shrinks to fit its content: it wraps the word
+    // without reducing the width the box asks for. Measured at 375px, the
+    // question ran 113px past the side of the card.
+    open()
+    expect(faceOf('false').querySelector('p').className).toMatch(/overflow-wrap:anywhere/)
+    expect(faceOf('true').querySelector('p').className).toMatch(/overflow-wrap:anywhere/)
+  })
+
+  it('pins the text column, so centring cannot widen it', () => {
+    open()
+    const scroller = faceOf('false').querySelector('p').parentElement
+    expect(scroller.className).toMatch(/grid-cols-\[minmax\(0,1fr\)\]/)
+  })
+
   it('sizes the row from the card rather than from the text', () => {
     // An auto track grows to its content and takes the card past its own
     // max-height, which is the same overflow one level down.

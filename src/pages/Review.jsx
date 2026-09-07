@@ -305,8 +305,8 @@ export default function Review() {
                 centring it and putting the first line out of reach above the
                 scroll.
               */}
-              <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
-                <p className="m-0 text-center font-serif text-[24px] leading-[1.28] tracking-[-0.01em] text-pretty sm:text-[34px]">
+              <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
+                <p className="m-0 text-center font-serif text-[24px] leading-[1.28] tracking-[-0.01em] text-pretty [overflow-wrap:anywhere] sm:text-[34px]">
                   {card.front}
                 </p>
               </div>
@@ -318,8 +318,8 @@ export default function Review() {
               aria-hidden={!flipped}
             >
               <div className="kicker text-accent">Answer</div>
-              <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
-                <p className="m-0 text-center font-serif text-[18px] leading-[1.42] text-pretty sm:text-[22px]">
+              <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
+                <p className="m-0 text-center font-serif text-[18px] leading-[1.42] text-pretty [overflow-wrap:anywhere] sm:text-[22px]">
                   {card.back}
                 </p>
               </div>

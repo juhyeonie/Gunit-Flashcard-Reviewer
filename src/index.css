@@ -82,6 +82,20 @@ body {
   font: 400 15px/1.55 Archivo, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+
+  /*
+    Nearly every string on screen is something a reader typed or pasted: deck
+    titles, card fronts, a URL to next week's reading. A word with no space in
+    it is otherwise unbreakable, and it walked straight out of whatever was
+    holding it — a deck card, the heading on a deck page, the flashcard itself,
+    in one case scrolling the whole page sideways on a phone.
+
+    Inherited rather than applied per component, because the alternative is
+    remembering it at every place user text is rendered, and the one that gets
+    forgotten is the one someone finds. It only ever acts on a word that would
+    have overflowed anyway.
+  */
+  overflow-wrap: break-word;
 }
 
 button,

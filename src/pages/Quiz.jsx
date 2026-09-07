@@ -152,7 +152,7 @@ export default function Quiz() {
           </div>
         </header>
 
-        <h1 className="m-0 font-serif text-[26px] leading-[1.24] tracking-[-0.01em] text-pretty sm:text-[34px]">
+        <h1 className="m-0 font-serif text-[26px] leading-[1.24] tracking-[-0.01em] text-pretty [overflow-wrap:anywhere] sm:text-[34px]">
           {q.card.front}
         </h1>
 
@@ -195,7 +195,9 @@ export default function Quiz() {
                 >
                   {'ABCD'[i]}
                 </span>
-                <span className="flex-1 text-[16px] text-pretty">{option.back}</span>
+                <span className="min-w-0 flex-1 text-[16px] text-pretty [overflow-wrap:anywhere]">
+                  {option.back}
+                </span>
                 <span className={`text-[13px] leading-none font-semibold ${markTone}`}>{mark}</span>
               </button>
             )
@@ -222,7 +224,7 @@ export default function Quiz() {
                 >
                   {correct ? 'Correct' : 'Not quite'}
                 </div>
-                <div className="text-sm text-ink-2 text-pretty">{q.card.back}</div>
+                <div className="text-sm text-ink-2 text-pretty [overflow-wrap:anywhere]">{q.card.back}</div>
               </div>
               <Button onClick={advance}>
                 {qIdx >= questions.length - 1 ? 'See results' : 'Next question'}
