@@ -114,8 +114,15 @@ security is what protects the data, not the secrecy of that key. The
 `VITE_*`, because anything so named is compiled into the JavaScript every
 visitor downloads.
 
-`supabase/migrations/0001_init.sql` creates the tables and the policies. Run it
-once in the dashboard's SQL editor; it is written to be safe to re-run.
+The files in `supabase/migrations/` create the tables, the policies and the
+function that applies a change set. Run them in order in the dashboard's SQL
+editor; both are written to be safe to re-run.
+
+`0002` matters more than it looks. A change set goes up as one call to
+`sync_library`, which is one statement to Postgres and therefore one
+transaction — so a push either lands completely or not at all. Sent as separate
+requests it could fail part way and leave the account holding decks whose cards
+never arrived, which the next sign-in would read back as the truth.
 
 ### Two things to set in the dashboard
 

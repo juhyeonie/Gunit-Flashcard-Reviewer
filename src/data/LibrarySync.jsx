@@ -8,6 +8,7 @@ import {
   isEmptyChange,
   profileToSettings,
   settingsToProfile,
+  toPayload,
   toRows,
 } from './sync.js'
 
@@ -27,6 +28,19 @@ const QUIET_MS = 1200
 
 export default function LibrarySync() {
   const { user, available } = useAuth()
+  /*
+   * The account, not the session object it arrived in.
+   *
+   * Supabase publishes a fresh session — and so a fresh `user` — on every
+   * token refresh, roughly hourly. Keyed on that object, the effects below
+   * re-ran on a timer: the library was re-fetched for no reason, and worse,
+   * `replaceLibrary` stashed the state again each time, overwriting the
+   * pre-sign-in library that signing out is supposed to hand back. An hour in,
+   * signing out returned the account's decks instead of your own.
+   *
+   * The id only changes when the account does.
+   */
+  const userId = user?.id ?? null
   const { decks, sessions, settings, theme, replaceLibrary, releaseSyncedLibrary, say } =
     useApp()
 
@@ -72,7 +86,7 @@ export default function LibrarySync() {
    * reader's other machines also see.
    */
   useEffect(() => {
-    if (!available || !user) {
+    if (!available || !userId) {
       synced.current = null
       complained.current = false
 
@@ -86,7 +100,7 @@ export default function LibrarySync() {
       return
     }
 
-    wasSignedInAs.current = user.id
+    wasSignedInAs.current = userId
 
     let cancelled = false
 
@@ -98,7 +112,7 @@ export default function LibrarySync() {
         supabase.from('decks').select('*'),
         supabase.from('cards').select('*'),
         supabase.from('sessions').select('*'),
-        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       ])
 
       const failure = deckRes.error || cardRes.error || sessionRes.error
@@ -110,7 +124,7 @@ export default function LibrarySync() {
 
       if (deckRes.data.length === 0 && decks.length > 0) {
         // Nothing up there yet: this browser's library becomes the account's.
-        const rows = toRows({ decks, sessions }, user.id)
+        const rows = toRows({ decks, sessions }, userId)
         const { error } = await write(supabase, {
           decks: { upsert: rows.decks, remove: [] },
           cards: { upsert: rows.cards, remove: [] },
@@ -130,7 +144,7 @@ export default function LibrarySync() {
       }
 
       const rows = { decks: deckRes.data, cards: cardRes.data, sessions: sessionRes.data }
-      synced.current = toRows(fromRows(rows), user.id)
+      synced.current = toRows(fromRows(rows), userId)
 
       const profile = profileRes.data ? profileToSettings(profileRes.data) : {}
       replaceLibrary({ ...fromRows(rows), ...profile })
@@ -144,17 +158,17 @@ export default function LibrarySync() {
     // Deliberately keyed on the account alone. Including the library would
     // re-pull on every edit, and pulling is what the push below is for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [available, user, replaceLibrary, releaseSyncedLibrary, say, trouble])
+  }, [available, userId, replaceLibrary, releaseSyncedLibrary, say, trouble])
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {
-    if (!available || !user || !synced.current) return undefined
+    if (!available || !userId || !synced.current) return undefined
 
     clearTimeout(pushTimer.current)
     pushTimer.current = setTimeout(async () => {
       if (busy.current || !alive.current) return
 
-      const next = toRows({ decks, sessions }, user.id)
+      const next = toRows({ decks, sessions }, userId)
       const change = changesBetween(synced.current, next)
       if (isEmptyChange(change)) return
 
@@ -175,38 +189,29 @@ export default function LibrarySync() {
     }, QUIET_MS)
 
     return () => clearTimeout(pushTimer.current)
-  }, [available, user, decks, sessions, trouble])
+  }, [available, userId, decks, sessions, trouble])
 
   /** Preferences are small and change rarely; no diffing earns its keep. */
   useEffect(() => {
-    if (!available || !user || !synced.current) return
+    if (!available || !userId || !synced.current) return
     getSupabase().then((supabase) => {
-      supabase?.from('profiles').update(settingsToProfile(settings, theme)).eq('id', user.id)
+      supabase?.from('profiles').update(settingsToProfile(settings, theme)).eq('id', userId)
     })
-  }, [available, user, settings, theme])
+  }, [available, userId, settings, theme])
 
   return null
 }
 
 /**
- * Applies one change set, in an order the foreign keys allow: decks before the
- * cards that point at them, and removals last so nothing is deleted before its
- * replacement exists.
+ * Applies one change set.
+ *
+ * A single call, because `sync_library` is one statement to Postgres and
+ * therefore one transaction. Sent as five separate requests it could fail part
+ * way and leave the account holding decks whose cards never arrived — which
+ * the next sign-in would then read back as the truth.
  */
 async function write(supabase, change) {
   if (!supabase) return { error: new Error('No project configured') }
-
-  const steps = [
-    change.decks.upsert.length && supabase.from('decks').upsert(change.decks.upsert),
-    change.cards.upsert.length && supabase.from('cards').upsert(change.cards.upsert),
-    change.sessions.insert.length && supabase.from('sessions').insert(change.sessions.insert),
-    change.cards.remove.length && supabase.from('cards').delete().in('id', change.cards.remove),
-    change.decks.remove.length && supabase.from('decks').delete().in('id', change.decks.remove),
-  ].filter(Boolean)
-
-  for (const step of steps) {
-    const { error } = await step
-    if (error) return { error }
-  }
-  return { error: null }
+  const { error } = await supabase.rpc('sync_library', { payload: toPayload(change) })
+  return { error }
 }
