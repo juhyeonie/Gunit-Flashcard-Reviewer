@@ -145,3 +145,12 @@ describe('restoring a backup', () => {
     await waitFor(() => expect(stored().decks).toHaveLength(3))
   })
 })
+
+describe('reaching the picker from a keyboard', () => {
+  it('keeps it out of the tab order, since a button drives it', () => {
+    // Off the side of the page and unnamed: focus landed on nothing visible.
+    open()
+    expect(filePicker().tabIndex).toBe(-1)
+    expect(filePicker().getAttribute('aria-hidden')).toBe('true')
+  })
+})

@@ -314,13 +314,27 @@ export default function ImportFileModal({
                   Offered, never automatic: recognising a scan pulls down
                   several megabytes of engine and takes seconds a page.
                 */}
-                {f.ocr && f.status !== 'ok' && f.status !== 'reading' && (
+                {f.ocr && f.status !== 'ok' && (
                   <button
                     type="button"
-                    onClick={() => recognise(f)}
-                    className="shrink-0 cursor-pointer rounded-[20px] border border-line bg-transparent px-3 py-1.5 text-xs leading-none font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent"
+                    onClick={() => f.status !== 'reading' && recognise(f)}
+                    /*
+                     * Stays mounted and stays focusable while it works.
+                     * Unmounting it took the element holding focus with it and
+                     * dropped a keyboard reader back to the top of the page;
+                     * `disabled` did the same, because a disabled control
+                     * cannot hold focus either. `aria-disabled` says the same
+                     * thing to a reader without blurring anyone.
+                     */
+                    aria-disabled={f.status === 'reading'}
+                    aria-label={
+                      f.status === 'reading'
+                        ? `Recognising ${f.name}`
+                        : `Read ${f.name} with OCR`
+                    }
+                    className="shrink-0 cursor-pointer rounded-[20px] border border-line bg-transparent px-3 py-1.5 text-xs leading-none font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:border-line aria-disabled:hover:text-ink-2"
                   >
-                    Read with OCR
+                    {f.status === 'reading' ? 'Reading…' : 'Read with OCR'}
                   </button>
                 )}
 
@@ -468,10 +482,17 @@ export default function ImportFileModal({
         )}
       </div>
 
+      {/*
+        Driven by the visible button above, so it is taken out of the tab order
+        and hidden from the reader. Left in, focus lands on an invisible
+        control off the side of the page with nothing to announce.
+      */}
       <input
         ref={inputRef}
         type="file"
         multiple
+        tabIndex={-1}
+        aria-hidden="true"
         accept={ACCEPT}
         onChange={(e) => {
           addFiles(e.target.files)

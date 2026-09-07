@@ -59,9 +59,16 @@ export default function Decks({ onNewDeck, onEditDeck }) {
         </div>
       </header>
 
+      {/*
+        Driven by the visible button above, so it is taken out of the tab order
+        and hidden from the reader. Left in, focus lands on an invisible
+        control off the side of the page with nothing to announce.
+      */}
       <input
         ref={fileRef}
         type="file"
+        tabIndex={-1}
+        aria-hidden="true"
         accept=".json,application/json"
         onChange={(e) => {
           restore(e.target.files?.[0])

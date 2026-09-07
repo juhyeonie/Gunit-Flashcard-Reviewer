@@ -125,6 +125,7 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
               variant={hasCards ? 'primary' : 'outline'}
               onClick={() => setStudyMenu((v) => !v)}
               aria-expanded={studyMenu}
+              aria-haspopup="true"
             >
               <span>Study this deck</span>
               <span
@@ -149,7 +150,12 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
           </div>
 
           <div className="relative">
-            <Button variant="quiet" onClick={() => setAddMenu((v) => !v)} aria-expanded={addMenu}>
+            <Button
+              variant="quiet"
+              onClick={() => setAddMenu((v) => !v)}
+              aria-expanded={addMenu}
+              aria-haspopup="true"
+            >
               <span>Add cards</span>
               <span
                 className="text-[10px] opacity-70 transition-transform duration-150"

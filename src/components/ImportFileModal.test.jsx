@@ -83,6 +83,46 @@ describe('choosing files', () => {
   })
 })
 
+describe('reaching it from a keyboard', () => {
+  const tabbables = (root) =>
+    [...root.querySelectorAll('a[href],button,input,textarea,select,[tabindex]')].filter(
+      (el) => el.tabIndex >= 0,
+    )
+
+  it('keeps the picker out of the tab order', async () => {
+    // It is driven by the visible buttons, and it sits off the side of the
+    // page. Left tabbable, focus lands on an invisible control with nothing to
+    // announce — between "Copy text" and "Cancel", in the middle of the modal.
+    render(<ImportFileModal {...props()} />)
+    expect(filePicker().tabIndex).toBe(-1)
+    expect(filePicker().getAttribute('aria-hidden')).toBe('true')
+    expect(tabbables(document.body)).not.toContain(filePicker())
+  })
+
+  it('offers OCR by the name of the file it would read', async () => {
+    render(<ImportFileModal {...props()} />)
+    await userEvent.upload(filePicker(), txt('page.png', 'not really a png'))
+
+    expect(await screen.findByRole('button', { name: 'Read page.png with OCR' })).toBeTruthy()
+  })
+
+  it('does not take the button away while it is working', async () => {
+    // Unmounting it took the element holding focus with it; so did `disabled`,
+    // since a disabled control cannot hold focus either.
+    render(<ImportFileModal {...props()} />)
+    await userEvent.upload(filePicker(), txt('page.png', 'not really a png'))
+
+    const button = await screen.findByRole('button', { name: 'Read page.png with OCR' })
+    button.focus()
+    await userEvent.click(button)
+
+    const working = screen.getByRole('button', { name: /Recognising page.png|Read page.png/ })
+    expect(working.getAttribute('aria-disabled')).toBe('true')
+    expect(working.disabled).toBe(false)
+    expect(document.activeElement).toBe(working)
+  })
+})
+
 describe('building cards', () => {
   it('previews the cards the text splits into', async () => {
     render(<ImportFileModal {...props()} />)
