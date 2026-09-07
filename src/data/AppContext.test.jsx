@@ -2,6 +2,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from './AppContext.jsx'
+import { AuthProvider } from './AuthProvider.jsx'
 import { useApp } from './useApp.js'
 
 /**
@@ -15,7 +16,14 @@ import { useApp } from './useApp.js'
 
 const KEY = 'gunit.state.v2'
 
-const store = () => renderHook(() => useApp(), { wrapper: AppProvider })
+/** The store, inside the auth provider the app always puts it in. */
+const wrapper = ({ children }) => (
+  <AuthProvider>
+    <AppProvider>{children}</AppProvider>
+  </AuthProvider>
+)
+
+const store = () => renderHook(() => useApp(), { wrapper })
 
 /** The one seeded deck these tests work against. */
 const first = (result) => result.current.decks[0]

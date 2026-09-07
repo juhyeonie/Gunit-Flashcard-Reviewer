@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AppProvider } from '../src/data/AppContext.jsx'
+import { AuthProvider } from '../src/data/AuthProvider.jsx'
 import { useApp } from '../src/data/useApp.js'
 import Toast from '../src/components/Toast.jsx'
 import { DEFAULT_SETTINGS } from '../src/data/normalize.js'
@@ -103,15 +104,23 @@ function Elsewhere() {
  */
 export function renderRoute(path, pattern, element) {
   return render(
-    <AppProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path={pattern} element={element} />
-          {/* Anywhere the page navigates to lands here and says so. */}
-          <Route path="*" element={<Elsewhere />} />
-        </Routes>
-        <Feedback />
-      </MemoryRouter>
-    </AppProvider>,
+    /*
+     * Auth wraps the store here as it does in the app. With no Supabase
+     * credentials in the test environment it settles immediately into
+     * "unavailable", which is the local-only path every one of these tests is
+     * about — and exactly the path a clone with no `.env` takes.
+     */
+    <AuthProvider>
+      <AppProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path={pattern} element={element} />
+            {/* Anywhere the page navigates to lands here and says so. */}
+            <Route path="*" element={<Elsewhere />} />
+          </Routes>
+          <Feedback />
+        </MemoryRouter>
+      </AppProvider>
+    </AuthProvider>,
   )
 }
