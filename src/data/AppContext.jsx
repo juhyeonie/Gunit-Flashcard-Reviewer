@@ -220,6 +220,31 @@ export function AppProvider({ children }) {
   }, [])
 
   /**
+   * Puts one card's scheduling back the way it was.
+   *
+   * Grading is otherwise one-way: `grade` folds the new rating into whatever
+   * was there and the previous state is gone. Rate a card "easy" by mistake
+   * and it disappears for ten days, with nothing to do about it but delete the
+   * card and lose its whole history.
+   *
+   * `entry` of null means the card had never been graded, so its scheduling is
+   * taken out of the map rather than set to something empty — a card that has
+   * never been seen is not the same as one seen and forgotten.
+   */
+  const restoreSchedule = useCallback((deckId, cardId, entry) => {
+    setState((s) => ({
+      ...s,
+      decks: s.decks.map((d) => {
+        if (d.id !== deckId) return d
+        const { [cardId]: _replaced, ...rest } = d.schedule ?? {}
+        const schedule = entry ? { ...rest, [cardId]: entry } : rest
+        const next = { ...d, schedule }
+        return { ...next, progress: progressOf(next) }
+      }),
+    }))
+  }, [])
+
+  /**
    * Logs a finished study session. `seconds` is real elapsed time, measured by
    * the page that ran the session, not estimated from the card count.
    */
@@ -255,6 +280,7 @@ export function AppProvider({ children }) {
       updateCard,
       removeCard,
       recordGrades,
+      restoreSchedule,
       recordSession,
     }),
     [
@@ -275,6 +301,7 @@ export function AppProvider({ children }) {
       updateCard,
       removeCard,
       recordGrades,
+      restoreSchedule,
       recordSession,
     ],
   )
