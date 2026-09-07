@@ -27,7 +27,8 @@ const QUIET_MS = 1200
 
 export default function LibrarySync() {
   const { user, available } = useAuth()
-  const { decks, sessions, settings, theme, replaceLibrary, say } = useApp()
+  const { decks, sessions, settings, theme, replaceLibrary, releaseSyncedLibrary, say } =
+    useApp()
 
   /*
    * The rows as the database last confirmed them. Every push is the difference
@@ -40,6 +41,9 @@ export default function LibrarySync() {
   const busy = useRef(false)
   const complained = useRef(false)
   const alive = useRef(true)
+  // Who was signed in last time this ran, so signing out is distinguishable
+  // from having never signed in.
+  const wasSignedInAs = useRef(null)
 
   useEffect(() => {
     alive.current = true
@@ -71,8 +75,18 @@ export default function LibrarySync() {
     if (!available || !user) {
       synced.current = null
       complained.current = false
+
+      // Signing out, rather than never having signed in. The account's decks
+      // do not stay behind on the machine.
+      if (wasSignedInAs.current) {
+        wasSignedInAs.current = null
+        releaseSyncedLibrary()
+        say('Signed out — your own decks are back')
+      }
       return
     }
+
+    wasSignedInAs.current = user.id
 
     let cancelled = false
 
@@ -130,7 +144,7 @@ export default function LibrarySync() {
     // Deliberately keyed on the account alone. Including the library would
     // re-pull on every edit, and pulling is what the push below is for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [available, user, replaceLibrary, say, trouble])
+  }, [available, user, replaceLibrary, releaseSyncedLibrary, say, trouble])
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {

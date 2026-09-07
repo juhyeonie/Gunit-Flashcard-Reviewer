@@ -337,6 +337,75 @@ describe('adopting an account’s library', () => {
   })
 })
 
+describe('handing the account’s library back', () => {
+  const account = {
+    decks: [
+      {
+        id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        title: 'From the account',
+        subject: 'Rome',
+        desc: '',
+        studiedAt: null,
+        cards: [{ id: 'ffffffff-1111-4222-8333-444444444444', front: 'Q', back: 'A' }],
+        schedule: {},
+      },
+    ],
+    sessions: [{ at: 1000, deckId: null, reviewed: 3, seconds: 60 }],
+  }
+
+  it('gives back what this browser had before it signed in', () => {
+    // Signing out on a shared laptop must not leave someone else's revision
+    // sitting there for the next person.
+    const { result } = store()
+    const mine = result.current.decks.map((d) => d.title)
+
+    act(() => result.current.replaceLibrary(account))
+    expect(result.current.decks[0].title).toBe('From the account')
+
+    act(() => result.current.releaseSyncedLibrary())
+    expect(result.current.decks.map((d) => d.title)).toEqual(mine)
+  })
+
+  it('keeps the account’s library rather than dropping it on the way out', () => {
+    // It is in Postgres too, but the two simply swap places here — neither
+    // copy is destroyed by the other arriving or leaving.
+    const { result } = store()
+    act(() => result.current.replaceLibrary(account))
+    act(() => result.current.releaseSyncedLibrary())
+
+    const kept = JSON.parse(localStorage.getItem('gunit.state.presync'))
+    expect(kept.decks[0].title).toBe('From the account')
+  })
+
+  it('leaves an empty library rather than someone else’s when there is nothing to give back', () => {
+    const { result } = store()
+    act(() => result.current.replaceLibrary(account))
+    localStorage.removeItem('gunit.state.presync')
+
+    act(() => result.current.releaseSyncedLibrary())
+    expect(result.current.decks).toEqual([])
+  })
+
+  it('survives an unreadable stash the same way', () => {
+    const { result } = store()
+    act(() => result.current.replaceLibrary(account))
+    localStorage.setItem('gunit.state.presync', '{ not json')
+
+    act(() => result.current.releaseSyncedLibrary())
+    expect(result.current.decks).toEqual([])
+  })
+
+  it('brings back the settings that came with it', () => {
+    const { result } = store()
+    act(() => result.current.updateSettings({ goalMinutes: 35 }))
+    act(() => result.current.replaceLibrary({ ...account, settings: { goalMinutes: 5 } }))
+    expect(result.current.settings.goalMinutes).toBe(5)
+
+    act(() => result.current.releaseSyncedLibrary())
+    expect(result.current.settings.goalMinutes).toBe(35)
+  })
+})
+
 describe('studying', () => {
   it('records a grade and moves progress with it', () => {
     const { result } = store()

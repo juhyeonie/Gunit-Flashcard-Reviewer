@@ -182,6 +182,44 @@ export function AppProvider({ children }) {
     })
   }, [])
 
+  /**
+   * Hands this browser back the library it had before an account's arrived.
+   *
+   * Signing out used to leave the account's decks sitting in localStorage. On
+   * a shared laptop or a library machine the next person opened Gunit and
+   * found somebody else's revision, which is the wrong default for an app
+   * students use on borrowed computers.
+   *
+   * Nothing is lost by it: the account's library is in Postgres, and what
+   * comes back is what this browser was holding before it signed in — kept by
+   * `replaceLibrary` for exactly this. The two swap places rather than one
+   * overwriting the other.
+   */
+  const releaseSyncedLibrary = useCallback(() => {
+    let before = null
+    try {
+      const raw = localStorage.getItem(PRESYNC_KEY)
+      if (raw) before = normalizeState(JSON.parse(raw))
+    } catch {
+      // Unreadable or refused: an empty library is still better than someone
+      // else's, and theirs is safe in their account either way.
+    }
+
+    setState((s) => {
+      try {
+        localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
+      } catch {
+        // As above.
+      }
+      return {
+        ...s,
+        decks: before?.decks ?? [],
+        sessions: before?.sessions ?? [],
+        settings: before?.settings ?? s.settings,
+      }
+    })
+  }, [])
+
   const updateDeck = useCallback((id, patch) => {
     setState((s) => ({
       ...s,
@@ -304,6 +342,7 @@ export function AppProvider({ children }) {
       importDeck,
       restoreLibrary,
       replaceLibrary,
+      releaseSyncedLibrary,
       updateDeck,
       removeDeck,
       addCards,
@@ -326,6 +365,7 @@ export function AppProvider({ children }) {
       importDeck,
       restoreLibrary,
       replaceLibrary,
+      releaseSyncedLibrary,
       updateDeck,
       removeDeck,
       addCards,
