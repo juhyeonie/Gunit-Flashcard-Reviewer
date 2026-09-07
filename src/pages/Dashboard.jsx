@@ -7,7 +7,13 @@ import { accentOf } from '../data/seed.js'
 import { dueCount } from '../data/scheduler.js'
 import { canQuiz } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
-import { formatRelative, lastSevenDays, minutesToday, streak } from '../data/activity.js'
+import {
+  estimateFor,
+  formatRelative,
+  lastSevenDays,
+  minutesToday,
+  streak,
+} from '../data/activity.js'
 
 /** Copy for the streak panel, which has to read sensibly at 0, 1 and many. */
 const streakNote = (days, minutesDone, goal) => {
@@ -61,6 +67,8 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
   const goalPct = goal ? Math.min(100, Math.round((doneToday / goal) * 100)) : 0
   const peak = Math.max(1, ...week.map((d) => d.minutes))
   const firstName = settings.name.split(' ')[0]
+  // Null until this reader has finished a session to estimate from.
+  const estimate = estimateFor(resumeDue, sessions)
 
   const stats = [
     { label: 'Decks', value: String(decks.length), unit: 'in library' },
@@ -78,8 +86,20 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
           </h1>
           {resume && (
             <p className="m-0 text-[16px] leading-[1.6] text-ink-2 text-pretty">
-              You last left off in <em className="font-serif text-[17px]">{resume.title}</em>.
-              Twelve minutes should finish the deck.
+              {/*
+                Both halves of this used to be untrue on a fresh library: it
+                claimed you had left off in a deck you had never opened, and
+                that twelve minutes would finish it — a fixed number, whatever
+                the deck held. The panel directly below it was reporting the
+                real figures the whole time.
+              */}
+              {resume.studiedAt ? 'You last left off in ' : 'Ready when you are: '}
+              <em className="font-serif text-[17px]">{resume.title}</em>.{' '}
+              {resumeDue > 0
+                ? `${resumeDue} ${resumeDue === 1 ? 'card is' : 'cards are'} due${
+                    estimate ? `, about ${estimate}` : ''
+                  }.`
+                : 'Nothing is due, but you can review ahead.'}
             </p>
           )}
         </div>

@@ -29,6 +29,7 @@ export const deck = ({
   count = 4,
   schedule = {},
   cards,
+  studiedAt = null,
 } = {}) => ({
   id,
   title,
@@ -36,7 +37,7 @@ export const deck = ({
   desc: 'Magistracies and assemblies.',
   cards: cards ?? Array.from({ length: count }, (_, i) => card(i)),
   schedule,
-  studiedAt: null,
+  studiedAt,
 })
 
 /**
