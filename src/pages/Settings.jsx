@@ -189,20 +189,12 @@ export default function Settings() {
       </section>
 
       <section>
-        <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Account</h2>
+        <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">About you</h2>
         <Row label="Name" hint="Shown on the dashboard greeting.">
           <input
             value={draft.name}
             aria-label="Name"
             onChange={(e) => set({ name: e.target.value })}
-            className={textInput}
-          />
-        </Row>
-        <Row label="Email" hint="Used for the weekly study summary.">
-          <input
-            value={draft.email}
-            aria-label="Email"
-            onChange={(e) => set({ email: e.target.value })}
             className={textInput}
           />
         </Row>

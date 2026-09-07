@@ -154,3 +154,18 @@ describe('reaching the picker from a keyboard', () => {
     expect(filePicker().getAttribute('aria-hidden')).toBe('true')
   })
 })
+
+describe('what it claims about you', () => {
+  it('does not offer an email for a summary it never sends', () => {
+    // The field was written by one input and read by nothing, and it sat
+    // directly above the real address of a signed-in account.
+    open()
+    expect(screen.queryByLabelText('Email')).toBe(null)
+    expect(screen.queryByText(/weekly study summary/i)).toBe(null)
+  })
+
+  it('still asks for the name the dashboard greets you by', () => {
+    open()
+    expect(screen.getByLabelText('Name')).toBeTruthy()
+  })
+})

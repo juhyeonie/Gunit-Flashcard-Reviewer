@@ -11,12 +11,21 @@ import { parseLegacyStudied } from './activity.js'
  * but one unusable deck never costs someone the rest of their library.
  */
 
+/*
+ * No `email` here any more. It was a preference nothing read, offered as
+ * "used for the weekly study summary" — a summary this app has never sent. It
+ * now also sat directly above the real address of a signed-in account, which
+ * made two of them, one of which was fiction.
+ *
+ * A value someone typed into it is left alone: stored settings are spread over
+ * these defaults, so the key survives in their storage even though nothing
+ * seeds or shows it.
+ */
 export const DEFAULT_SETTINGS = {
   cardsPer: 20,
   autoReveal: false,
   shuffleFirst: false,
   name: 'Mara Kessler',
-  email: 'mara.kessler@university.edu',
   goalMinutes: 20,
 }
 
