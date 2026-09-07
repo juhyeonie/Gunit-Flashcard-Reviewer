@@ -11,6 +11,9 @@ const STORAGE_KEY = 'gunit.state.v2'
 // destroy the only copy of whatever the reader had.
 const SALVAGE_KEY = 'gunit.state.unreadable'
 
+// What this browser held before an account's library replaced it.
+const PRESYNC_KEY = 'gunit.state.presync'
+
 const load = () => {
   let raw = null
   try {
@@ -153,6 +156,32 @@ export function AppProvider({ children }) {
     return { decks: placed.length, sessions: added }
   }, [])
 
+  /**
+   * Swaps the whole library for another one. Used only by the sync layer, when
+   * signing in hands this browser the account's library.
+   *
+   * Whatever was here first is written to its own key rather than dropped. It
+   * is somebody's revision, and "you signed in and your decks went" is not a
+   * sentence this app should ever cause — the same reasoning as the salvage
+   * key for an unreadable payload.
+   */
+  const replaceLibrary = useCallback(({ decks, sessions, settings, theme }) => {
+    setState((s) => {
+      try {
+        localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
+      } catch {
+        // Storage full or refused; the swap still happens.
+      }
+      return {
+        ...s,
+        decks,
+        sessions: sessions ?? s.sessions,
+        settings: settings ? { ...s.settings, ...settings } : s.settings,
+        theme: theme ?? s.theme,
+      }
+    })
+  }, [])
+
   const updateDeck = useCallback((id, patch) => {
     setState((s) => ({
       ...s,
@@ -274,6 +303,7 @@ export function AppProvider({ children }) {
       addDeck,
       importDeck,
       restoreLibrary,
+      replaceLibrary,
       updateDeck,
       removeDeck,
       addCards,
@@ -295,6 +325,7 @@ export function AppProvider({ children }) {
       addDeck,
       importDeck,
       restoreLibrary,
+      replaceLibrary,
       updateDeck,
       removeDeck,
       addCards,
