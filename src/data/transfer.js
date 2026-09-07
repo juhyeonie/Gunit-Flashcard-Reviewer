@@ -118,3 +118,112 @@ export function fromTransfer(source) {
     skipped: data.cards.length - usable.length,
   }
 }
+
+/**
+ * The whole library, rather than one deck. This is the file you want before
+ * clearing site data or moving to another machine — a deck at a time is a way
+ * to share, not a way to keep.
+ */
+export const LIBRARY_FORMAT = 'gunit.library'
+
+/**
+ * Settings are deliberately absent. They are preferences for this device — a
+ * theme, a nightly goal — rather than anything a reader would be sorry to
+ * retype, and restoring them would silently overwrite whatever is set here.
+ */
+export function toLibraryTransfer(state, { now = Date.now() } = {}) {
+  return {
+    format: LIBRARY_FORMAT,
+    version: VERSION,
+    exportedAt: new Date(now).toISOString(),
+    decks: state.decks.map((deck) => {
+      const { format: _f, version: _v, exportedAt: _e, ...rest } = toTransfer(deck, { now })
+      return rest
+    }),
+    sessions: state.sessions ?? [],
+  }
+}
+
+export function libraryFileName(now = Date.now()) {
+  return `gunit-library-${new Date(now).toISOString().slice(0, 10)}.json`
+}
+
+/** One logged study session, with only the fields the activity log reads. */
+const sessionOf = (entry) => {
+  if (!entry || typeof entry !== 'object') return null
+  const at = numberOr(entry.at, null)
+  const reviewed = numberOr(entry.reviewed, 0)
+  if (at === null || reviewed <= 0) return null
+  return {
+    at,
+    deckId: typeof entry.deckId === 'string' ? entry.deckId : null,
+    reviewed,
+    seconds: Math.max(0, Math.round(numberOr(entry.seconds, 0))),
+  }
+}
+
+/**
+ * Reads a whole-library backup.
+ *
+ * Every deck goes through the same reader a single deck does, so a backup with
+ * one damaged deck in it loses that deck and says so rather than failing
+ * outright — the other nineteen are still worth having.
+ *
+ * @returns {{ library: {decks: object[], sessions: object[]}|null,
+ *             error: string|null, skippedDecks: number, skippedCards: number }}
+ */
+export function fromLibraryTransfer(source) {
+  let data
+  try {
+    data = typeof source === 'string' ? JSON.parse(source) : source
+  } catch {
+    return { library: null, error: 'That file is not readable JSON', skippedDecks: 0, skippedCards: 0 }
+  }
+
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return { library: null, error: 'That file does not hold a library', skippedDecks: 0, skippedCards: 0 }
+  }
+  if (data.format !== LIBRARY_FORMAT) {
+    const single = data.format === FORMAT
+    return {
+      library: null,
+      // Worth naming: the two files look alike, and one is easy to reach for.
+      error: single
+        ? 'That is a single deck — import it from the library page'
+        : 'That file was not exported from Gunit',
+      skippedDecks: 0,
+      skippedCards: 0,
+    }
+  }
+  if (numberOr(data.version, 0) > VERSION) {
+    return {
+      library: null,
+      error: 'That backup was exported by a newer version of Gunit',
+      skippedDecks: 0,
+      skippedCards: 0,
+    }
+  }
+  if (!Array.isArray(data.decks)) {
+    return { library: null, error: 'That backup has no decks in it', skippedDecks: 0, skippedCards: 0 }
+  }
+
+  let skippedDecks = 0
+  let skippedCards = 0
+  const decks = []
+
+  for (const entry of data.decks) {
+    const { deck, error, skipped } = fromTransfer({ ...entry, format: FORMAT, version: VERSION })
+    if (error) {
+      skippedDecks += 1
+      continue
+    }
+    skippedCards += skipped
+    decks.push(deck)
+  }
+
+  const sessions = (Array.isArray(data.sessions) ? data.sessions : [])
+    .map(sessionOf)
+    .filter(Boolean)
+
+  return { library: { decks, sessions }, error: null, skippedDecks, skippedCards }
+}

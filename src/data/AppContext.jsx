@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { uid } from './seed.js'
 import { grade } from './scheduler.js'
-import { appendSession } from './activity.js'
+import { MAX_SESSIONS, appendSession } from './activity.js'
 import { DEFAULT_STATE, normalizeState, parseStoredState, progressOf } from './normalize.js'
 
 const STORAGE_KEY = 'gunit.state.v2'
@@ -113,6 +113,49 @@ export function AppProvider({ children }) {
     return placed
   }, [])
 
+  /**
+   * Restores a backup by adding to the library rather than replacing it.
+   *
+   * A restore that wiped what was already here would be one misclick from
+   * losing everything, and merging costs only duplicates — which a reader can
+   * see and delete. Sessions are merged on their timestamp, so restoring the
+   * same backup twice does not double a streak.
+   */
+  const restoreLibrary = useCallback(({ decks, sessions = [] }) => {
+    const placed = decks.map((incoming) => {
+      const schedule = {}
+      const cards = incoming.cards.map((c) => {
+        const id = uid()
+        if (c.scheduling) schedule[id] = c.scheduling
+        return { id, front: c.front, back: c.back }
+      })
+      const deck = {
+        id: uid(),
+        title: incoming.title,
+        subject: incoming.subject,
+        desc: incoming.desc,
+        studiedAt: null,
+        cards,
+        schedule,
+      }
+      return { ...deck, progress: progressOf(deck) }
+    })
+
+    let added = 0
+    setState((s) => {
+      const seen = new Set(s.sessions.map((x) => `${x.at}`))
+      const fresh = sessions.filter((x) => !seen.has(`${x.at}`))
+      added = fresh.length
+      return {
+        ...s,
+        decks: [...placed, ...s.decks],
+        sessions: [...s.sessions, ...fresh].sort((a, b) => a.at - b.at).slice(-MAX_SESSIONS),
+      }
+    })
+
+    return { decks: placed.length, sessions: added }
+  }, [])
+
   const updateDeck = useCallback((id, patch) => {
     setState((s) => ({
       ...s,
@@ -208,6 +251,7 @@ export function AppProvider({ children }) {
       updateSettings,
       addDeck,
       importDeck,
+      restoreLibrary,
       updateDeck,
       removeDeck,
       addCards,
@@ -227,6 +271,7 @@ export function AppProvider({ children }) {
       updateSettings,
       addDeck,
       importDeck,
+      restoreLibrary,
       updateDeck,
       removeDeck,
       addCards,

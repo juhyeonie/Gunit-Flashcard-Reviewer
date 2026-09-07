@@ -98,8 +98,22 @@ Ids only mean something inside the library that issued them, so importing
 reissues them and the scheduling comes along attached to the card it belongs
 to. Progress is re-derived rather than trusted from the file.
 
-A file that is not ours says so instead of failing quietly, and one that is
-ours but partly damaged imports what it can and reports what it left out.
+**Back up everything** and **Restore a backup**, on the settings page, do the
+same for the whole library at once — every deck plus the activity log the
+streak is derived from. That is the file to take before clearing site data or
+moving to another machine; a deck at a time is a way to share, not a way to
+keep.
+
+Restoring adds to the library rather than replacing it. A restore that wiped
+what was already there would be one misclick from losing everything, and
+merging costs only duplicates, which are visible and deletable. Sessions merge
+on their timestamp, so restoring the same backup twice does not double a
+streak.
+
+A file that is not ours says so instead of failing quietly, one that is ours
+but partly damaged imports what it can and reports what it left out, and a
+single deck offered to the restore button is named as such rather than
+rejected as a stranger.
 
 ## Tests
 

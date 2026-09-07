@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { useApp } from '../data/AppContext.jsx'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import { fromLibraryTransfer, libraryFileName, toLibraryTransfer } from '../data/transfer.js'
 
 function Row({ label, hint, children }) {
   return (
@@ -48,7 +49,8 @@ const textInput =
  * without seeing it is no choice at all. Cancel puts it back.
  */
 export default function Settings() {
-  const { theme, toggleTheme, settings, updateSettings, say } = useApp()
+  const { theme, toggleTheme, settings, updateSettings, say, decks, sessions, restoreLibrary } =
+    useApp()
   useDocumentTitle('Preferences')
   const navigate = useNavigate()
 
@@ -71,6 +73,45 @@ export default function Settings() {
   const cancel = () => {
     if (theme !== themeOnEntry) toggleTheme()
     navigate('/')
+  }
+
+  const fileRef = useRef(null)
+  const deckCount = decks.length
+
+  /**
+   * A deck at a time is a way to share; this is the file you want before
+   * clearing site data or moving to another machine.
+   */
+  const backUp = () => {
+    const name = libraryFileName()
+    const blob = new Blob([JSON.stringify(toLibraryTransfer({ decks, sessions }), null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+    // Revoking in the same tick can cancel the save before it starts.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+    say(`Backed up ${deckCount} ${deckCount === 1 ? 'deck' : 'decks'}`)
+  }
+
+  const restore = async (file) => {
+    if (!file) return
+    const { library, error, skippedDecks } = fromLibraryTransfer(await file.text())
+    if (error) {
+      say(error)
+      return
+    }
+    const { decks: added, sessions: logged } = restoreLibrary(library)
+    const lost = skippedDecks
+      ? ` — ${skippedDecks} unreadable ${skippedDecks === 1 ? 'deck' : 'decks'} left out`
+      : ''
+    say(
+      `Restored ${added} ${added === 1 ? 'deck' : 'decks'} and ` +
+        `${logged} ${logged === 1 ? 'session' : 'sessions'}${lost}`,
+    )
   }
 
   return (
@@ -174,6 +215,43 @@ export default function Settings() {
         </Button>
         {dirty && <span className="kicker">Unsaved changes</span>}
       </div>
+
+      {/*
+        Below the save row on purpose: these act at once and have nothing to do
+        with the draft above them.
+      */}
+      <section>
+        <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Your library</h2>
+        <Row
+          label="Back it up"
+          hint={`Writes every deck and its review history to a file. ${deckCount} ${
+            deckCount === 1 ? 'deck' : 'decks'
+          } right now.`}
+        >
+          <Button variant="outline" size="sm" onClick={backUp}>
+            Back up everything
+          </Button>
+        </Row>
+        <Row
+          label="Restore a backup"
+          hint="Adds the decks in the file to this library rather than replacing what is here."
+        >
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            Restore a backup
+          </Button>
+        </Row>
+      </section>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={(e) => {
+          restore(e.target.files?.[0])
+          e.target.value = ''
+        }}
+        className="absolute -left-[9999px] h-px w-px opacity-0"
+      />
     </div>
   )
 }

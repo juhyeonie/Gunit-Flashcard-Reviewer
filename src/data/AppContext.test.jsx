@@ -204,6 +204,70 @@ describe('importing a deck', () => {
   })
 })
 
+describe('restoring a backup', () => {
+  const backup = () => ({
+    decks: [
+      { title: 'Late Antiquity', subject: 'Rome', desc: '', cards: [
+        { front: 'Diocletian?', back: 'Split the empire.', scheduling: null },
+      ] },
+      { title: 'Latin Verbs', subject: 'Latin', desc: '', cards: [
+        { front: 'amo?', back: 'I love.', scheduling: { last: 'good', due: 1, interval: 1440, ease: 2.5, reps: 1 } },
+      ] },
+    ],
+    sessions: [{ at: 1000, deckId: 'x', reviewed: 4, seconds: 60 }],
+  })
+
+  it('adds to the library rather than replacing it', () => {
+    // A restore that wiped what was here would be one misclick from losing
+    // everything, and merging costs only duplicates a reader can see.
+    const { result } = store()
+    const before = result.current.decks.length
+    act(() => result.current.restoreLibrary(backup()))
+    expect(result.current.decks).toHaveLength(before + 2)
+  })
+
+  it('reports what it took in', () => {
+    const { result } = store()
+    let report
+    act(() => {
+      report = result.current.restoreLibrary(backup())
+    })
+    expect(report).toEqual({ decks: 2, sessions: 1 })
+  })
+
+  it('brings the review history with each card', () => {
+    const { result } = store()
+    act(() => result.current.restoreLibrary(backup()))
+    const latin = result.current.decks.find((d) => d.title === 'Latin Verbs')
+    expect(latin.schedule[latin.cards[0].id]).toMatchObject({ reps: 1 })
+    expect(latin.progress).toBe(1)
+  })
+
+  it('does not double a streak when the same backup lands twice', () => {
+    // Sessions are merged on their timestamp, so restoring twice is safe.
+    const { result } = store()
+    act(() => result.current.restoreLibrary(backup()))
+    const after = result.current.sessions.length
+    act(() => result.current.restoreLibrary(backup()))
+    expect(result.current.sessions).toHaveLength(after)
+  })
+
+  it('keeps the log in order', () => {
+    const { result } = store()
+    act(() => result.current.recordSession({ deckId: 'republic', reviewed: 2, seconds: 30 }))
+    act(() => result.current.restoreLibrary(backup()))
+    const at = result.current.sessions.map((s) => s.at)
+    expect([...at].sort((a, b) => a - b)).toEqual(at)
+  })
+
+  it('restores a backup with nothing in it', () => {
+    const { result } = store()
+    const before = result.current.decks.length
+    act(() => result.current.restoreLibrary({ decks: [], sessions: [] }))
+    expect(result.current.decks).toHaveLength(before)
+  })
+})
+
 describe('studying', () => {
   it('records a grade and moves progress with it', () => {
     const { result } = store()
