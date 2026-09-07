@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { AppProvider, useApp } from './data/AppContext.jsx'
+import { AppProvider } from './data/AppContext.jsx'
+import { useApp } from './data/useApp.js'
 import { BottomNav, TopNav } from './components/Navbar.jsx'
 import Toast from './components/Toast.jsx'
 import DeckModal from './components/DeckModal.jsx'

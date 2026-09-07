@@ -1,18 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { uid } from './seed.js'
 import { grade } from './scheduler.js'
 import { MAX_SESSIONS, appendSession } from './activity.js'
 import { DEFAULT_STATE, normalizeState, parseStoredState, progressOf } from './normalize.js'
+import { AppContext } from './appContext.js'
 
 const STORAGE_KEY = 'gunit.state.v2'
 
 // Where an unreadable payload is parked. Overwriting it on the next save would
 // destroy the only copy of whatever the reader had.
 const SALVAGE_KEY = 'gunit.state.unreadable'
-
-const AppContext = createContext(null)
-
-export { progressOf }
 
 const load = () => {
   let raw = null
@@ -283,15 +280,4 @@ export function AppProvider({ children }) {
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
-}
-
-export function useApp() {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useApp must be used inside <AppProvider>')
-  return ctx
-}
-
-export function useDeck(id) {
-  const { decks } = useApp()
-  return decks.find((d) => d.id === id)
 }

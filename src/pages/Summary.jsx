@@ -1,7 +1,7 @@
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
-import { useApp } from '../data/AppContext.jsx'
+import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
