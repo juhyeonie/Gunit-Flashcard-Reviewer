@@ -141,6 +141,12 @@ decks, the account is the library, because it is the copy your other machines
 see. Whatever was here first is written to `gunit.state.presync` rather than
 dropped.
 
+Signing out hands the browser back what it was holding before, and the
+account's decks do not stay behind. Students borrow machines, and finding
+somebody else's revision on a library PC is the wrong default. Nothing is lost
+by it — the account's library is in Postgres, and the two copies simply swap
+places.
+
 Changes go up as a diff, not as the whole library: `src/data/sync.js` works out
 what actually changed between the last confirmed push and now, so grading one
 card sends that card rather than the deck it is in. A push that fails leaves
