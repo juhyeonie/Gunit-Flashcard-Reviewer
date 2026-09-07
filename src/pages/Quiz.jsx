@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
-import { useApp } from '../data/AppContext.jsx'
+import { useApp } from '../data/useApp.js'
 import { MIN_QUIZ_CARDS, buildQuestions, verdictFor } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 

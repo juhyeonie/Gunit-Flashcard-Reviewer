@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
-import { useApp } from '../data/AppContext.jsx'
+import { useApp } from '../data/useApp.js'
 import { entryFor, formatInterval, preview } from '../data/scheduler.js'
 import { nextDueLabel, openingQueue, shuffle, summarise } from '../data/session.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'

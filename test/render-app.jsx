@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { AppProvider, useApp } from '../src/data/AppContext.jsx'
+import { AppProvider } from '../src/data/AppContext.jsx'
+import { useApp } from '../src/data/useApp.js'
 import Toast from '../src/components/Toast.jsx'
 import { DEFAULT_SETTINGS } from '../src/data/normalize.js'
 

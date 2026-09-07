@@ -1,12 +1,7 @@
 import { Link, NavLink } from 'react-router-dom'
-import { useApp } from '../data/AppContext.jsx'
+import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
-
-export const NAV = [
-  { to: '/', label: 'Home', short: 'Home', end: true },
-  { to: '/decks', label: 'My decks', short: 'Decks' },
-  { to: '/settings', label: 'Settings', short: 'Settings' },
-]
+import { NAV } from './navItems.js'
 
 const initialsOf = (name) =>
   name

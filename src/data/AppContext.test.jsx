@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AppProvider, useApp } from './AppContext.jsx'
+import { AppProvider } from './AppContext.jsx'
+import { useApp } from './useApp.js'
 
 /**
  * The store: what every mutator leaves behind, and what survives a reload.
