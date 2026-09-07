@@ -218,8 +218,21 @@ export default function Review() {
   const scale = ((idx + (flipped ? 1 : 0)) / order.length).toFixed(3)
   const hints = flipped ? RATE_HINTS : NAV_HINTS
 
+  /*
+   * The two faces share one grid cell rather than being absolutely positioned.
+   * Out of flow they contributed no height, so the card stayed exactly its
+   * min-height and a long question ran out through the bottom border — text
+   * outside the card it belonged to. Stacked in a cell they are still on top
+   * of each other for the flip, but the card now grows to whichever face is
+   * taller, and it is the same height before and after the flip rather than
+   * resizing under the reader.
+   *
+   * The row is minmax(0, 1fr) rather than auto: an auto track sizes itself to
+   * its content and would grow straight past the card's own max-height, which
+   * is the same overflow again one level down.
+   */
   const face =
-    'absolute inset-0 flex flex-col rounded-[14px] bg-surface p-[22px] shadow-sh2 sm:p-[34px] [backface-visibility:hidden]'
+    '[grid-area:1/1] flex min-w-0 flex-col rounded-[14px] bg-surface p-[22px] shadow-sh2 sm:p-[34px] [backface-visibility:hidden]'
 
   return (
     <div className="rise-in flex min-h-[calc(100vh-160px)] flex-col gap-[18px] sm:gap-[26px]">
@@ -275,7 +288,7 @@ export default function Review() {
           <div
             onClick={() => setFlipped((f) => !f)}
             aria-live="polite"
-            className="relative min-h-[320px] w-full cursor-pointer transition-transform duration-[340ms] ease-[cubic-bezier(0.77,0,0.175,1)] [transform-style:preserve-3d] sm:min-h-[380px]"
+            className="grid max-h-[62vh] min-h-[320px] w-full cursor-pointer grid-cols-1 grid-rows-[minmax(0,1fr)] transition-transform duration-[340ms] ease-[cubic-bezier(0.77,0,0.175,1)] [transform-style:preserve-3d] sm:min-h-[380px]"
             style={{ transform: flipped ? 'rotateY(180deg)' : 'none' }}
           >
             {/*
@@ -285,7 +298,14 @@ export default function Review() {
             */}
             <div className={`${face} border border-line`} aria-hidden={flipped}>
               <div className="kicker">Question</div>
-              <div className="grid flex-1 place-items-center py-[22px]">
+              {/*
+                min-h-0 lets this shrink below its content so the overflow has
+                somewhere to go; `safe center` centres the text when it fits
+                and falls back to the top when it does not, rather than
+                centring it and putting the first line out of reach above the
+                scroll.
+              */}
+              <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
                 <p className="m-0 text-center font-serif text-[24px] leading-[1.28] tracking-[-0.01em] text-pretty sm:text-[34px]">
                   {card.front}
                 </p>
@@ -298,7 +318,7 @@ export default function Review() {
               aria-hidden={!flipped}
             >
               <div className="kicker text-accent">Answer</div>
-              <div className="grid flex-1 place-items-center py-[22px]">
+              <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
                 <p className="m-0 text-center font-serif text-[18px] leading-[1.42] text-pretty sm:text-[22px]">
                   {card.back}
                 </p>

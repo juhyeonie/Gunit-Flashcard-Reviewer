@@ -61,6 +61,58 @@ describe('the card', () => {
   })
 })
 
+describe('a card whose text does not fit', () => {
+  const wordy =
+    'Explain in full how the tribunician power, the imperium proconsulare maius, and control ' +
+    'of the aerarium militare combined to give the princeps an authority that was ' +
+    'constitutionally deniable yet practically absolute, and why the Senate kept ratifying it.'
+
+  /*
+   * jsdom computes no layout, so these assert the structure that decides it
+   * rather than the geometry itself. The geometry was measured in a browser:
+   * at 375px the question used to run 42px past the bottom border of its own
+   * card, carrying the "Click card or press space" hint out with it.
+   */
+  const faceOf = (side) =>
+    [...document.querySelectorAll('div')].find(
+      (d) => d.className.includes('backface-visibility') && d.getAttribute('aria-hidden') === side,
+    )
+
+  beforeEach(() =>
+    seed({ decks: [deck({ count: 1, cards: [{ id: 'c0', front: wordy, back: 'Because.' }] })] }),
+  )
+
+  it('keeps both faces in the flow, so the card grows to fit them', () => {
+    // Absolutely positioned, they contributed no height and the card stayed
+    // exactly its min-height however long the question was.
+    open()
+    for (const side of ['false', 'true']) {
+      expect(faceOf(side).className).toMatch(/grid-area:1\/1/)
+      expect(faceOf(side).className).not.toMatch(/absolute/)
+    }
+  })
+
+  it('caps the card and lets the text scroll rather than growing off-screen', () => {
+    open()
+    const scroller = faceOf('false').querySelector('p').parentElement
+    expect(scroller.className).toMatch(/overflow-y-auto/)
+    // Without min-h-0 a flex child refuses to shrink below its content, and
+    // the overflow has nowhere to go.
+    expect(scroller.className).toMatch(/min-h-0/)
+  })
+
+  it('sizes the row from the card rather than from the text', () => {
+    // An auto track grows to its content and takes the card past its own
+    // max-height, which is the same overflow one level down.
+    open()
+    const flip = [...document.querySelectorAll('div')].find((d) =>
+      d.className.includes('preserve-3d'),
+    )
+    expect(flip.className).toMatch(/grid-rows-\[minmax\(0,1fr\)\]/)
+    expect(flip.className).toMatch(/max-h-/)
+  })
+})
+
 describe('grading', () => {
   beforeEach(() => seed({ decks: [deck({ count: 3 })] }))
 
