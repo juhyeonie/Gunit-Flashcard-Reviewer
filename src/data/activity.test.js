@@ -4,13 +4,15 @@ import {
   MAX_SESSIONS,
   appendSession,
   dayKey,
+  estimateFor,
+  formatRelative,
   lastSevenDays,
   minutesThisWeek,
   minutesToday,
   parseLegacyStudied,
+  secondsPerCard,
   startOfDay,
   streak,
-  formatRelative,
 } from './activity.js'
 
 // Local noon on a fixed date, so day bucketing can't be pushed across a
@@ -225,5 +227,67 @@ describe('parseLegacyStudied', () => {
     expect(parseLegacyStudied('', NOW)).toBeNull()
     expect(parseLegacyStudied(undefined, NOW)).toBeNull()
     expect(parseLegacyStudied(12345, NOW)).toBeNull()
+  })
+})
+
+describe('secondsPerCard', () => {
+  const session = (reviewed, seconds) => ({ at: 1, deckId: 'd', reviewed, seconds })
+
+  it('reports the rate a single session was worked at', () => {
+    expect(secondsPerCard([session(10, 300)])).toBe(30)
+  })
+
+  it('takes the median rather than the mean', () => {
+    // One session left open on a coffee break would drag a mean out with it,
+    // and every estimate after it.
+    expect(secondsPerCard([session(10, 300), session(10, 350), session(10, 9000)])).toBe(35)
+  })
+
+  it('averages the middle two when there is no single middle', () => {
+    expect(secondsPerCard([session(10, 300), session(10, 350)])).toBe(32.5)
+  })
+
+  it('ignores a session of one card', () => {
+    // The seconds spent finding the page swamp the seconds spent on the card.
+    expect(secondsPerCard([session(1, 600), session(10, 300)])).toBe(30)
+  })
+
+  it('ignores a session with no time on it', () => {
+    expect(secondsPerCard([session(10, 0), session(10, 300)])).toBe(30)
+  })
+
+  it('has nothing to say without a history', () => {
+    expect(secondsPerCard([])).toBe(null)
+    expect(secondsPerCard()).toBe(null)
+    expect(secondsPerCard([session(1, 60)])).toBe(null)
+  })
+})
+
+describe('estimateFor', () => {
+  const session = (reviewed, seconds) => ({ at: 1, deckId: 'd', reviewed, seconds })
+  const history = [session(10, 300)]
+
+  it('estimates from this reader’s own pace', () => {
+    // 30s a card, twelve cards: six minutes.
+    expect(estimateFor(12, history)).toBe('6 minutes')
+  })
+
+  it('says minute, singular, for one', () => {
+    expect(estimateFor(2, history)).toBe('1 minute')
+  })
+
+  it('never rounds a real stack of cards down to nothing', () => {
+    expect(estimateFor(1, history)).toBe('1 minute')
+  })
+
+  it('declines to guess without a history', () => {
+    // Better to say nothing than to invent a figure, which is what the
+    // dashboard did for months: "Twelve minutes should finish the deck",
+    // whatever the deck held and whether or not you had ever opened it.
+    expect(estimateFor(12, [])).toBe(null)
+  })
+
+  it('has nothing to estimate when nothing is due', () => {
+    expect(estimateFor(0, history)).toBe(null)
   })
 })

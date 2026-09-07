@@ -161,3 +161,37 @@ export function parseLegacyStudied(value, now = Date.now()) {
   ]
   return now - count * unit
 }
+
+/**
+ * How long this reader actually spends on a card, in seconds, or null when
+ * there is nothing to go on.
+ *
+ * The median rather than the mean: one session left open on a coffee break
+ * would otherwise drag every estimate out with it. Sessions of a single card
+ * are ignored for the same reason — the seconds spent finding the page swamp
+ * the seconds spent on the card.
+ */
+export function secondsPerCard(sessions = []) {
+  const rates = sessions
+    .filter((s) => s && s.reviewed > 1 && s.seconds > 0)
+    .map((s) => s.seconds / s.reviewed)
+    .sort((a, b) => a - b)
+
+  if (!rates.length) return null
+  const middle = Math.floor(rates.length / 2)
+  return rates.length % 2 ? rates[middle] : (rates[middle - 1] + rates[middle]) / 2
+}
+
+/**
+ * What a stack of `count` cards is likely to take, worded, or null when this
+ * reader has no history to estimate from.
+ *
+ * Rounded to whole minutes and floored at one, because "0 minutes" reads as
+ * nothing to do and half a minute is still a sit-down.
+ */
+export function estimateFor(count, sessions = []) {
+  const rate = secondsPerCard(sessions)
+  if (!rate || count <= 0) return null
+  const minutes = Math.max(1, Math.round((count * rate) / 60))
+  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+}
