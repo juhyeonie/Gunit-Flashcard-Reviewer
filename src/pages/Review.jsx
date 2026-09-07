@@ -10,6 +10,7 @@ const NAV_HINTS = [
   { key: 'Space', label: 'flip', w: 'auto' },
   { key: '←', label: 'back', w: 22 },
   { key: '→', label: 'next', w: 22 },
+  { key: 'U', label: 'undo', w: 22 },
   { key: 'Esc', label: 'exit', w: 'auto' },
 ]
 
@@ -17,6 +18,7 @@ const RATE_HINTS = [
   { key: '1', label: 'again', w: 22 },
   { key: '2', label: 'good', w: 22 },
   { key: '3', label: 'easy', w: 22 },
+  { key: 'U', label: 'undo', w: 22 },
   { key: 'Esc', label: 'exit', w: 'auto' },
 ]
 
@@ -32,7 +34,7 @@ const AUTO_REVEAL_MS = 4000
 export default function Review() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, settings, say, recordGrades, recordSession } = useApp()
+  const { decks, settings, say, recordGrades, restoreSchedule, recordSession } = useApp()
   const deck = decks.find((d) => d.id === id)
   useDocumentTitle(deck ? `Reviewing ${deck.title}` : 'Review')
 
@@ -53,6 +55,12 @@ export default function Review() {
   const [mountedAt] = useState(() => Date.now())
   const revealTimer = useRef(null)
   const ratingsRef = useRef(null)
+  /*
+   * What each rating replaced, newest last. Grading is one-way in the
+   * scheduler — the previous entry is folded in and gone — so the only place
+   * it still exists is here, captured before the grade is applied.
+   */
+  const [undoable, setUndoable] = useState([])
   const built = useRef(false)
   // Mirrors `grades` for the unmount handler, which cannot read state set after
   // its own effect was created.
@@ -139,6 +147,7 @@ export default function Review() {
   const rate = useCallback(
     (level) => {
       if (!card) return
+      setUndoable((stack) => [...stack, { at: idx, cardId: card.id, before: entryFor(deck, card) ?? null }])
       recordGrades(id, { [card.id]: level })
       const merged = { ...grades, [card.id]: level }
       gradesRef.current = merged
@@ -151,8 +160,29 @@ export default function Review() {
       setIdx((i) => i + 1)
       setFlipped(false)
     },
-    [card, recordGrades, id, grades, say, previews, idx, order.length, finish],
+    [card, deck, recordGrades, id, grades, say, previews, idx, order.length, finish],
   )
+
+  /**
+   * Takes back the last rating: the card's scheduling goes back to whatever it
+   * replaced, the session's tally forgets it, and the queue returns to that
+   * card face down so it can be answered again.
+   */
+  const undo = useCallback(() => {
+    if (!undoable.length) return
+    const last = undoable[undoable.length - 1]
+
+    restoreSchedule(id, last.cardId, last.before)
+    setUndoable((stack) => stack.slice(0, -1))
+
+    const { [last.cardId]: _ungraded, ...rest } = grades
+    gradesRef.current = rest
+    setGrades(rest)
+
+    setIdx(last.at)
+    setFlipped(false)
+    say('Rating undone')
+  }, [undoable, restoreSchedule, id, grades, say])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -162,13 +192,14 @@ export default function Review() {
       } else if (e.key === 'ArrowRight') next()
       else if (e.key === 'ArrowLeft') prev()
       else if (e.key === 'Escape') exit()
+      else if (e.key === 'u' || e.key === 'U') undo()
       else if (flipped && ['1', '2', '3'].includes(e.key)) {
         rate(RATINGS[Number(e.key) - 1].key)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [next, prev, exit, rate, flipped])
+  }, [next, prev, exit, rate, undo, flipped])
 
   /**
    * Revealing replaces the button that was just pressed with the three
@@ -389,9 +420,20 @@ export default function Review() {
       </div>
 
       <footer className="flex items-center justify-between gap-3 border-t border-line-soft pt-4">
-        <Button variant="outline" size="sm" onClick={prev} disabled={idx === 0}>
-          ← Previous
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={prev} disabled={idx === 0}>
+            ← Previous
+          </Button>
+          {/*
+            Only offered once there is something to take back. A keyboard-only
+            undo would be an undo nobody knows about.
+          */}
+          {undoable.length > 0 && (
+            <Button variant="quiet" size="sm" onClick={undo}>
+              Undo rating
+            </Button>
+          )}
+        </div>
         <div className="hidden flex-wrap items-center justify-center gap-3.5 sm:flex">
           {hints.map((k) => (
             <div key={k.key} className="flex items-center gap-[7px]">

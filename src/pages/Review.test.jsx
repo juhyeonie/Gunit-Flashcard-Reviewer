@@ -212,6 +212,80 @@ describe('grading', () => {
   })
 })
 
+describe('taking a rating back', () => {
+  beforeEach(() => seed({ decks: [deck({ count: 3 })] }))
+
+  const gradeFirst = async (level) => {
+    await userEvent.click(screen.getByRole('button', { name: 'Reveal answer' }))
+    await userEvent.click(rate(level))
+  }
+
+  it('offers nothing to undo until something has been rated', () => {
+    open()
+    expect(screen.queryByRole('button', { name: 'Undo rating' })).toBe(null)
+  })
+
+  it('puts the card’s scheduling back', async () => {
+    // Rate "easy" by mistake and the card is gone for ten days. Without this
+    // the only way out is deleting it, which loses its history too.
+    open()
+    await gradeFirst('easy')
+    await waitFor(() => expect(stored().decks[0].schedule.c0).toBeTruthy())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo rating' }))
+    await waitFor(() => expect('c0' in stored().decks[0].schedule).toBe(false))
+  })
+
+  it('goes back to the card, face down', async () => {
+    open()
+    await gradeFirst('good')
+    expect(await screen.findByText('2 / 3')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo rating' }))
+
+    expect(await screen.findByText('1 / 3')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reveal answer' })).toBeTruthy()
+  })
+
+  it('forgets the rating in the session tally too', async () => {
+    // Otherwise the summary counts a card that was un-rated.
+    open()
+    await gradeFirst('again')
+    await userEvent.click(screen.getByRole('button', { name: 'Undo rating' }))
+
+    await gradeFirst('good')
+    for (const level of ['good', 'good']) {
+      await userEvent.click(screen.getByRole('button', { name: 'Reveal answer' }))
+      await userEvent.click(rate(level))
+    }
+
+    await waitFor(() => expect(at()).toBe('/decks/republic/summary'))
+    const state = JSON.parse(screen.getByTestId('nav-state').textContent)
+    expect(state).toMatchObject({ reviewed: 3, known: 3, again: 0 })
+  })
+
+  it('walks back more than one', async () => {
+    open()
+    await gradeFirst('good')
+    await gradeFirst('good')
+    expect(await screen.findByText('3 / 3')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo rating' }))
+    expect(await screen.findByText('2 / 3')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Undo rating' }))
+    expect(await screen.findByText('1 / 3')).toBeTruthy()
+
+    expect(screen.queryByRole('button', { name: 'Undo rating' })).toBe(null)
+  })
+
+  it('answers to the keyboard as well as the button', async () => {
+    open()
+    await gradeFirst('good')
+    await userEvent.keyboard('u')
+    expect(await screen.findByText('1 / 3')).toBeTruthy()
+  })
+})
+
 describe('finishing', () => {
   beforeEach(() => seed({ decks: [deck({ count: 2 })] }))
 

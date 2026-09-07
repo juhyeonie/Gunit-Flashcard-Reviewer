@@ -301,6 +301,68 @@ describe('studying', () => {
   })
 })
 
+describe('taking a grade back', () => {
+  it('puts a card’s scheduling back the way it was', () => {
+    const { result } = store()
+    const deck = first(result)
+    const cardId = deck.cards[0].id
+
+    act(() => result.current.recordGrades(deck.id, { [cardId]: 'good' }))
+    const wasGood = result.current.decks.find((d) => d.id === deck.id).schedule[cardId]
+
+    act(() => result.current.recordGrades(deck.id, { [cardId]: 'easy' }))
+    expect(result.current.decks.find((d) => d.id === deck.id).schedule[cardId]).not.toEqual(wasGood)
+
+    act(() => result.current.restoreSchedule(deck.id, cardId, wasGood))
+    expect(result.current.decks.find((d) => d.id === deck.id).schedule[cardId]).toEqual(wasGood)
+  })
+
+  it('takes the entry out entirely for a card that had never been graded', () => {
+    // A card never seen is not the same as one seen and forgotten: leaving a
+    // hollow entry behind would make it count as reviewed.
+    const { result } = store()
+    const deck = first(result)
+    const cardId = deck.cards[0].id
+
+    act(() => result.current.restoreSchedule(deck.id, cardId, null))
+    const after = result.current.decks.find((d) => d.id === deck.id)
+    expect(cardId in after.schedule).toBe(false)
+  })
+
+  it('re-derives progress rather than leaving it where the grade put it', () => {
+    const { result } = store()
+    const deck = first(result)
+    const cardId = deck.cards[0].id
+    const before = deck.progress
+
+    act(() => result.current.recordGrades(deck.id, { [cardId]: 'good' }))
+    act(() => result.current.restoreSchedule(deck.id, cardId, null))
+
+    expect(result.current.decks.find((d) => d.id === deck.id).progress).toBeLessThanOrEqual(before)
+  })
+
+  it('leaves every other card alone', () => {
+    const { result } = store()
+    const deck = first(result)
+    const [one, two] = deck.cards
+
+    act(() => result.current.recordGrades(deck.id, { [one.id]: 'good', [two.id]: 'good' }))
+    const kept = result.current.decks.find((d) => d.id === deck.id).schedule[two.id]
+
+    act(() => result.current.restoreSchedule(deck.id, one.id, null))
+    expect(result.current.decks.find((d) => d.id === deck.id).schedule[two.id]).toEqual(kept)
+  })
+
+  it('leaves other decks alone', () => {
+    const { result } = store()
+    const [deck, other] = result.current.decks
+    const snapshot = JSON.stringify(other)
+
+    act(() => result.current.restoreSchedule(deck.id, deck.cards[0].id, null))
+    expect(JSON.stringify(result.current.decks.find((d) => d.id === other.id))).toBe(snapshot)
+  })
+})
+
 describe('the toast', () => {
   it('says something and then stops saying it', () => {
     vi.useFakeTimers()

@@ -81,6 +81,14 @@ apart from the page that draws it. Neither the clock nor the random number
 generator is read there; both are arguments, so a shuffle can be replayed and a
 summary measured.
 
+A rating can be taken back. Grading is otherwise one-way — `grade` folds the
+new rating into whatever was there and the previous state is gone — so rating a
+card "easy" by mistake put it out of reach for ten days with nothing to do
+about it but delete the card and lose its history. **Undo rating**, or the `u`
+key, restores the card's previous scheduling, drops it from the session's
+tally, and returns to it face down. It walks back through the whole session,
+not just the last card.
+
 Finished sessions are logged to `src/data/activity.js`, which is where the
 streak, the weekly minutes chart and the daily goal come from.
 
