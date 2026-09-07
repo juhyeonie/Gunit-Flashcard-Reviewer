@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_SETTINGS,
   DEFAULT_STATE,
   normalizeDeck,
   normalizeState,
@@ -163,5 +164,22 @@ describe('parseStoredState', () => {
     const { state, ok } = parseStoredState(raw, NOW)
     expect(ok).toBe(true)
     expect(state.decks.map((d) => d.title)).toEqual(['Kept'])
+  })
+})
+
+describe('a settings key that is no longer ours', () => {
+  it('leaves a stored value alone rather than dropping it', () => {
+    // `email` was removed from the defaults, not from anyone's storage. Stored
+    // settings are spread over the defaults, so whatever someone typed is
+    // still there if it is ever wanted back.
+    const { state } = parseStoredState(
+      JSON.stringify({ ...DEFAULT_STATE, settings: { ...DEFAULT_SETTINGS, email: 'mine@uni.edu' } }),
+    )
+    expect(state.settings.email).toBe('mine@uni.edu')
+  })
+
+  it('does not invent one for a library that never had it', () => {
+    const { state } = parseStoredState(JSON.stringify(DEFAULT_STATE))
+    expect('email' in state.settings).toBe(false)
   })
 })
