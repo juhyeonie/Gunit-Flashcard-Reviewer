@@ -215,3 +215,17 @@ export const isEmptyChange = (change) =>
   !change.cards.upsert.length &&
   !change.cards.remove.length &&
   !change.sessions.insert.length
+
+/**
+ * A change set as the `sync_library` function wants it.
+ *
+ * Flat arrays under fixed keys rather than the nested shape above, because
+ * `jsonb_to_recordset` reads one array per table and nothing else.
+ */
+export const toPayload = (change) => ({
+  decks_upsert: change.decks.upsert,
+  cards_upsert: change.cards.upsert,
+  sessions_insert: change.sessions.insert,
+  cards_remove: change.cards.remove,
+  decks_remove: change.decks.remove,
+})

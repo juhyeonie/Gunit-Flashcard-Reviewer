@@ -7,6 +7,7 @@ import {
   newId,
   profileToSettings,
   settingsToProfile,
+  toPayload,
   toRows,
 } from './sync.js'
 
@@ -254,5 +255,47 @@ describe('changesBetween', () => {
     const change = changesBetween(before, after)
     expect(change.decks.upsert).toHaveLength(1)
     expect(change.cards.upsert).toHaveLength(0)
+  })
+})
+
+describe('toPayload', () => {
+  const rows = () => toRows(library(), USER)
+
+  it('flattens to the keys the function reads', () => {
+    // jsonb_to_recordset takes one array per table and nothing nested.
+    const payload = toPayload(changesBetween({ decks: [], cards: [], sessions: [] }, rows()))
+    expect(Object.keys(payload).sort()).toEqual([
+      'cards_remove',
+      'cards_upsert',
+      'decks_remove',
+      'decks_upsert',
+      'sessions_insert',
+    ])
+  })
+
+  it('carries every row through unchanged', () => {
+    const before = { decks: [], cards: [], sessions: [] }
+    const after = rows()
+    const payload = toPayload(changesBetween(before, after))
+
+    expect(payload.decks_upsert).toEqual(after.decks)
+    expect(payload.cards_upsert).toEqual(after.cards)
+    expect(payload.sessions_insert).toEqual(after.sessions)
+  })
+
+  it('sends empty arrays rather than nothing at all', () => {
+    // The function coalesces a missing key, but an array it can read without
+    // guessing is one less thing depending on that.
+    const before = rows()
+    const payload = toPayload(changesBetween(before, before))
+    for (const key of Object.keys(payload)) expect(Array.isArray(payload[key])).toBe(true)
+  })
+
+  it('names removals as bare ids, which is what the delete expects', () => {
+    const before = rows()
+    const after = { ...before, cards: [before.cards[0]] }
+    const payload = toPayload(changesBetween(before, after))
+    expect(payload.cards_remove).toEqual([before.cards[1].id])
+    expect(typeof payload.cards_remove[0]).toBe('string')
   })
 })
