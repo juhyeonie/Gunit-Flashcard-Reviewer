@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { FORMAT, VERSION, fileNameFor, fromTransfer, toTransfer } from './transfer.js'
+import {
+  FORMAT,
+  LIBRARY_FORMAT,
+  VERSION,
+  fileNameFor,
+  fromLibraryTransfer,
+  fromTransfer,
+  libraryFileName,
+  toLibraryTransfer,
+  toTransfer,
+} from './transfer.js'
 
 const NOW = 1_700_000_000_000
 
@@ -186,5 +196,123 @@ describe('fromTransfer', () => {
     const out = fromTransfer(JSON.stringify(toTransfer(deck({ cards: [], schedule: {} }))))
     expect(out.error).toBe(null)
     expect(out.deck.cards).toEqual([])
+  })
+})
+
+describe('toLibraryTransfer', () => {
+  const state = () => ({ decks: [deck(), deck({ id: 'punic', title: 'Punic Wars' })], sessions: [
+    { at: NOW, deckId: 'republic', reviewed: 6, seconds: 91 },
+  ] })
+
+  it('stamps itself as a library, not as a deck', () => {
+    // The two files look alike and one is easy to reach for by mistake.
+    const out = toLibraryTransfer(state(), { now: NOW })
+    expect(out.format).toBe(LIBRARY_FORMAT)
+    expect(out.format).not.toBe(FORMAT)
+  })
+
+  it('carries every deck', () => {
+    const out = toLibraryTransfer(state(), { now: NOW })
+    expect(out.decks.map((d) => d.title)).toEqual(['Roman Republic', 'Punic Wars'])
+    expect(out.decks[0].cards[0].scheduling).toMatchObject({ reps: 3 })
+  })
+
+  it('does not stamp each deck as a file of its own', () => {
+    const out = toLibraryTransfer(state(), { now: NOW })
+    expect(out.decks[0].format).toBeUndefined()
+    expect(out.decks[0].version).toBeUndefined()
+  })
+
+  it('carries the activity log, which is where the streak comes from', () => {
+    expect(toLibraryTransfer(state(), { now: NOW }).sessions).toHaveLength(1)
+  })
+
+  it('leaves settings out', () => {
+    // Preferences for this device, not anything a reader would be sorry to
+    // retype — and restoring them would overwrite whatever is set here.
+    const out = toLibraryTransfer({ ...state(), settings: { name: 'Mara' } }, { now: NOW })
+    expect(out.settings).toBeUndefined()
+  })
+
+  it('backs up an empty library rather than refusing', () => {
+    const out = toLibraryTransfer({ decks: [], sessions: [] }, { now: NOW })
+    expect(out.decks).toEqual([])
+  })
+})
+
+describe('libraryFileName', () => {
+  it('is dated, so two backups do not overwrite each other', () => {
+    expect(libraryFileName(NOW)).toBe('gunit-library-2023-11-14.json')
+  })
+})
+
+describe('fromLibraryTransfer', () => {
+  const backup = (over = {}) =>
+    JSON.stringify({
+      ...toLibraryTransfer(
+        { decks: [deck(), deck({ id: 'punic', title: 'Punic Wars' })], sessions: [
+          { at: NOW, deckId: 'republic', reviewed: 6, seconds: 91 },
+        ] },
+        { now: NOW },
+      ),
+      ...over,
+    })
+
+  it('reads back every deck and the log', () => {
+    const { library, error } = fromLibraryTransfer(backup())
+    expect(error).toBe(null)
+    expect(library.decks.map((d) => d.title)).toEqual(['Roman Republic', 'Punic Wars'])
+    expect(library.sessions).toHaveLength(1)
+  })
+
+  it('names the mistake when a single deck is offered instead', () => {
+    const single = JSON.stringify(toTransfer(deck(), { now: NOW }))
+    expect(fromLibraryTransfer(single).error).toMatch(/single deck/)
+  })
+
+  it('refuses a file from somewhere else', () => {
+    expect(fromLibraryTransfer('{"notes": []}').error).toMatch(/not exported from Gunit/)
+  })
+
+  it('refuses a newer version rather than guessing', () => {
+    expect(fromLibraryTransfer(backup({ version: VERSION + 1 })).error).toMatch(/newer version/)
+  })
+
+  it('loses one damaged deck rather than the other nineteen', () => {
+    const out = fromLibraryTransfer(backup({ decks: [{ title: 'Fine', cards: [] }, { title: 'Broken' }] }))
+    expect(out.error).toBe(null)
+    expect(out.library.decks.map((d) => d.title)).toEqual(['Fine'])
+    expect(out.skippedDecks).toBe(1)
+  })
+
+  it('counts the cards lost inside the decks it did read', () => {
+    const out = fromLibraryTransfer(
+      backup({ decks: [{ title: 'Fine', cards: [{ front: 'a', back: 'b' }, { front: 'c' }] }] }),
+    )
+    expect(out.library.decks[0].cards).toHaveLength(1)
+    expect(out.skippedCards).toBe(1)
+  })
+
+  it('drops log entries it cannot use', () => {
+    // A session with no timestamp cannot be placed on a day, and one with
+    // nothing reviewed was never logged in the first place.
+    const out = fromLibraryTransfer(
+      backup({ sessions: [{ at: NOW, reviewed: 3, seconds: 60 }, { reviewed: 3 }, { at: NOW, reviewed: 0 }] }),
+    )
+    expect(out.library.sessions).toHaveLength(1)
+  })
+
+  it('copes with a backup that has no log at all', () => {
+    expect(fromLibraryTransfer(backup({ sessions: undefined })).library.sessions).toEqual([])
+  })
+
+  it('refuses ours-but-deckless', () => {
+    expect(fromLibraryTransfer(backup({ decks: undefined })).error).toMatch(/no decks/)
+  })
+
+  it('restores an empty library without complaint', () => {
+    const out = fromLibraryTransfer(backup({ decks: [], sessions: [] }))
+    expect(out.error).toBe(null)
+    expect(out.library.decks).toEqual([])
   })
 })
