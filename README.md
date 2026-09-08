@@ -213,6 +213,8 @@ they need:
 
 - `AppContext.test.jsx` — every mutator, what persists, what happens when
   storage refuses to answer
+- `ErrorBoundary.test.jsx` — the fallback, and the reset that copies the
+  library aside before clearing it
 - `Modal.test.jsx` — the focus trap, `inert`, and where focus goes afterwards
 - `ImportFileModal.test.jsx` — choosing files through to cards in a deck
 - `Dashboard.test.jsx` — the claims it makes about a library
