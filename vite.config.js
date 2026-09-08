@@ -5,6 +5,19 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+
+  server: {
+    /*
+     * 5174 rather than Vite's own 5173, which is taken here by another app.
+     *
+     * A fixed default matters for more than tidiness: Supabase checks the
+     * password-reset redirect against an allow list of exact origins, and its
+     * wildcards cannot span a port. A dev server that lands somewhere new each
+     * morning means a reset link that stops working. PORT still wins when a
+     * caller assigns one.
+     */
+    port: Number(process.env.PORT) || 5174,
+  },
   test: {
     alias: {
       /*

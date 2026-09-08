@@ -14,12 +14,17 @@ npm run dev
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Dev server; copies the OCR assets first |
+| `npm run dev` | Dev server on **5174**; copies the OCR assets first |
 | `npm run build` | Production bundle into `dist/` |
 | `npm run preview` | Serves the built bundle |
 | `npm test` | Vitest, watch mode |
 | `npm run test:run` | Vitest, single pass |
 | `npm run lint` | ESLint |
+
+5174 rather than Vite's usual 5173, and fixed rather than whatever is free:
+Supabase checks the password-reset link against an allow list of exact origins,
+and a dev server that moves between ports is a reset link that stops working.
+`PORT` overrides it.
 
 ## Importing material
 
@@ -124,7 +129,7 @@ transaction — so a push either lands completely or not at all. Sent as separat
 requests it could fail part way and leave the account holding decks whose cards
 never arrived, which the next sign-in would read back as the truth.
 
-### Two things to set in the dashboard
+### Three things to set in the dashboard
 
 **Turn email confirmation off** (Authentication → Providers → Email). Signing up
 then returns a session immediately and a new reader is studying seconds later.
@@ -132,7 +137,15 @@ then returns a session immediately and a new reader is studying seconds later.
 **Configure custom SMTP.** Supabase's built-in sender allows two messages an
 hour and only delivers to your own project team, so password reset does not
 work for real users without it. [Resend](https://resend.com)'s free tier is
-3,000 a month, capped at 100 a day, which is ample for a class.
+3,000 a month, capped at 100 a day, which is ample for a class. Verify the
+sender domain with Resend first or the mail bounces silently.
+
+**Allow the reset link back in.** Authentication → URL Configuration → Redirect
+URLs, add `http://localhost:5174/reset-password` and the deployed equivalent.
+The link is built from `window.location.origin`, and Supabase rejects any
+origin not on that list — quietly, after the email has already been sent. Its
+wildcards match paths but not ports, so each port needs its own entry, which is
+why the dev server has a fixed one.
 
 ### How syncing works
 
