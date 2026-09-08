@@ -79,6 +79,7 @@ export function toRows(state, userId) {
         reps: entry?.reps ?? 0,
         lapses: entry?.lapses ?? 0,
         last_grade: entry?.last ?? null,
+        suspended: entry?.suspended === true,
       })
     })
   }
@@ -117,14 +118,19 @@ export function fromRows({ decks = [], cards = [], sessions = [] }) {
       for (const row of rows) {
         // `last_grade` is what marks a card as seen; a row with none has never
         // been graded and gets no entry at all, exactly as a new card locally.
-        if (row.last_grade) {
+        //
+        // A suspended card is the exception. One suspended before it was ever
+        // graded has nothing else to record, and without an entry to hang the
+        // flag on it would come back from the account unsuspended.
+        if (row.last_grade || row.suspended) {
           schedule[row.id] = {
             due: asMillis(row.due),
             interval: row.interval ?? 0,
             ease: row.ease ?? 2.5,
             reps: row.reps ?? 0,
             lapses: row.lapses ?? 0,
-            last: row.last_grade,
+            last: row.last_grade ?? null,
+            ...(row.suspended ? { suspended: true } : {}),
           }
         }
       }

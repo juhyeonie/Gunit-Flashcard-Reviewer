@@ -4,21 +4,29 @@ import Button from '../components/Button.jsx'
 import Menu, { MenuItem } from '../components/Menu.jsx'
 import { PencilIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/useApp.js'
-import { dueCount } from '../data/scheduler.js'
+import { dueCount, entryFor, isSuspended, suspendedCount } from '../data/scheduler.js'
 import { MIN_QUIZ_CARDS, canQuiz } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { formatRelative } from '../data/activity.js'
 import { fileNameFor, toTransfer } from '../data/transfer.js'
 
-export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDeleteCard, onImport }) {
+export default function DeckDetail({
+  onEditDeck,
+  onNewCard,
+  onEditCard,
+  onDeleteCard,
+  onResetDeck,
+  onImport,
+}) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, say } = useApp()
+  const { decks, say, setCardSuspended } = useApp()
   const deck = decks.find((d) => d.id === id)
   useDocumentTitle(deck?.title)
 
   const [studyMenu, setStudyMenu] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
+  const [deckMenu, setDeckMenu] = useState(false)
   const [cardMenu, setCardMenu] = useState(null)
 
   if (!deck) {
@@ -34,12 +42,23 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
 
   const hasCards = deck.cards.length > 0
   const due = dueCount(deck)
+  const suspended = suspendedCount(deck)
   const stats = [
     { label: 'Cards', value: String(deck.cards.length) },
     { label: 'Due now', value: String(due), accent: due > 0 },
     { label: 'Known', value: `${Math.round(deck.progress * 100)}%` },
     { label: 'Last studied', value: formatRelative(deck.studiedAt) },
+    // Shown only when it applies. A deck whose cards are all suspended reads
+    // "0 due" otherwise, which looks like the scheduler has stopped working.
+    ...(suspended ? [{ label: 'Suspended', value: String(suspended) }] : []),
   ]
+
+  const toggleSuspend = (card, index) => {
+    setCardMenu(null)
+    const off = isSuspended(entryFor(deck, card))
+    setCardSuspended(deck.id, card.id, !off)
+    say(off ? `Card ${index + 1} is back in the rotation` : `Card ${index + 1} suspended`)
+  }
 
   const guard = (go) => () => {
     setStudyMenu(false)
@@ -115,6 +134,38 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
             >
               ↓
             </button>
+            <div className="relative mt-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setDeckMenu((v) => !v)}
+                title="Deck options"
+                aria-label="Deck options"
+                aria-expanded={deckMenu}
+                aria-haspopup="true"
+                className={`grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-lg border bg-transparent p-0 text-[15px] leading-none text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink ${
+                  deckMenu ? 'border-ink-3 bg-raised' : 'border-line'
+                }`}
+              >
+                ⋮
+              </button>
+              {/*
+                Right-anchored on wide screens so the panel opens back under the
+                title rather than across the study and add buttons, and
+                left-anchored on narrow ones where anchoring right would run it
+                off the left edge — the same reasoning as the two menus opposite.
+              */}
+              <Menu open={deckMenu} onClose={() => setDeckMenu(false)} align="responsive" width={250}>
+                <MenuItem
+                  title="Reset progress"
+                  hint="Every card new again. The cards themselves stay."
+                  danger
+                  onClick={() => {
+                    setDeckMenu(false)
+                    onResetDeck(deck)
+                  }}
+                />
+              </Menu>
+            </div>
           </div>
           <p className="m-0 text-[15px] text-ink-2 text-pretty">{deck.desc}</p>
         </div>
@@ -202,17 +253,30 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
 
       {hasCards ? (
         <ul className="flex flex-col gap-2.5">
-          {deck.cards.map((card, i) => (
+          {deck.cards.map((card, i) => {
+            const off = isSuspended(entryFor(deck, card))
+            return (
             <li
               key={i}
-              className="relative flex flex-col gap-3.5 rounded-xl border border-line bg-surface px-[22px] py-5 shadow-sh1 transition-[border-color,box-shadow] duration-200 hover:border-ink-3 hover:shadow-sh2"
+              className={`relative flex flex-col gap-3.5 rounded-xl border bg-surface px-[22px] py-5 shadow-sh1 transition-[border-color,box-shadow] duration-200 hover:border-ink-3 hover:shadow-sh2 ${
+                off ? 'border-dashed border-line-soft' : 'border-line'
+              }`}
             >
               <div className="flex items-start gap-[18px]">
                 <span className="w-[26px] shrink-0 pt-1 font-mono text-[11px] leading-[1.5] font-medium tracking-[0.06em] text-ink-3">
                   {String(i + 1).padStart(2, '0')}
                 </span>
-                <div className="min-w-0 flex-1 font-serif text-[19px] leading-[1.32] text-pretty">
+                <div
+                  className={`min-w-0 flex-1 font-serif text-[19px] leading-[1.32] text-pretty ${
+                    off ? 'text-ink-3' : ''
+                  }`}
+                >
                   {card.front}
+                  {off && (
+                    <span className="ml-2.5 rounded-[5px] border border-line px-1.5 py-[3px] align-middle font-mono text-[10px] leading-none font-medium tracking-[0.06em] whitespace-nowrap text-ink-3 uppercase">
+                      Suspended
+                    </span>
+                  )}
                 </div>
                 <div className="relative shrink-0">
                   <button
@@ -226,13 +290,22 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
                   >
                     ⋮
                   </button>
-                  <Menu open={cardMenu === i} onClose={() => setCardMenu(null)} width={150}>
+                  <Menu open={cardMenu === i} onClose={() => setCardMenu(null)} width={210}>
                     <MenuItem
                       title="Edit card"
                       onClick={() => {
                         setCardMenu(null)
                         onEditCard(deck, i, card)
                       }}
+                    />
+                    <MenuItem
+                      title={off ? 'Unsuspend card' : 'Suspend card'}
+                      hint={
+                        off
+                          ? 'Study it again from where it left off.'
+                          : 'Keep it and its history, but stop being asked.'
+                      }
+                      onClick={() => toggleSuspend(card, i)}
                     />
                     <MenuItem
                       title="Delete card"
@@ -245,11 +318,16 @@ export default function DeckDetail({ onEditDeck, onNewCard, onEditCard, onDelete
                   </Menu>
                 </div>
               </div>
-              <div className="border-t border-line-soft pt-3.5 text-sm leading-[1.55] text-ink-2 text-pretty sm:pl-11">
+              <div
+                className={`border-t border-line-soft pt-3.5 text-sm leading-[1.55] text-pretty sm:pl-11 ${
+                  off ? 'text-ink-3' : 'text-ink-2'
+                }`}
+              >
                 {card.back}
               </div>
             </li>
-          ))}
+            )
+          })}
         </ul>
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">

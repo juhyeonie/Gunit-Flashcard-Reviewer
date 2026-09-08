@@ -1,5 +1,5 @@
 import { DECKS, uid } from './seed.js'
-import { grade } from './scheduler.js'
+import { grade, isSuspended } from './scheduler.js'
 import { parseLegacyStudied } from './activity.js'
 
 /**
@@ -42,14 +42,19 @@ export const DEFAULT_STATE = {
  * A card counts as known once its last grade was anything other than "again".
  * Cards never reviewed are not known, so a deck's progress reflects real
  * coverage rather than the fact that a session happened to finish.
+ *
+ * Suspended cards are left out of both halves of the fraction. They are the
+ * cards a reader has decided not to study, and counting them as unknown would
+ * put 100% permanently out of reach for anyone who ever used the feature.
  */
 export const progressOf = (deck) => {
-  if (!deck.cards.length) return 0
-  const known = deck.cards.filter((c) => {
+  const counted = deck.cards.filter((c) => !isSuspended(deck.schedule?.[c.id]))
+  if (!counted.length) return 0
+  const known = counted.filter((c) => {
     const last = deck.schedule?.[c.id]?.last
     return last && last !== 'again'
   }).length
-  return known / deck.cards.length
+  return known / counted.length
 }
 
 /**

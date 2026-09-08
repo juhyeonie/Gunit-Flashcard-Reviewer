@@ -9,8 +9,10 @@ import {
   grade,
   isDue,
   isNew,
+  isSuspended,
   newEntry,
   preview,
+  suspendedCount,
 } from './scheduler.js'
 
 // Fixed clock so nothing here depends on when the suite runs.
@@ -206,5 +208,82 @@ describe('buildQueue', () => {
     const untouched = { cards: [{ id: 'a' }, { id: 'b' }] }
     expect(dueCount(untouched, NOW)).toBe(2)
     expect(buildQueue(untouched, { now: NOW })).toEqual([0, 1])
+  })
+})
+
+describe('suspension', () => {
+  /** A card graded "good" and then taken out of the rotation. */
+  const held = () => ({ ...grade(undefined, 'good', NOW), suspended: true })
+
+  it('recognises the flag, and nothing else as it', () => {
+    expect(isSuspended(held())).toBe(true)
+    expect(isSuspended(grade(undefined, 'good', NOW))).toBe(false)
+    expect(isSuspended(undefined)).toBe(false)
+    // Not a loose truthiness check: a stray string would otherwise silence a
+    // card and nothing would say why.
+    expect(isSuspended({ suspended: 'yes' })).toBe(false)
+  })
+
+  it('is never due, however long ago its date passed', () => {
+    const overdue = { ...grade(undefined, 'good', NOW), due: NOW - DAY, suspended: true }
+    expect(isDue(overdue, NOW)).toBe(false)
+    // Unsuspended, that same entry is due — so it is the flag doing the work.
+    const { suspended: _off, ...back } = overdue
+    expect(isDue(back, NOW)).toBe(true)
+  })
+
+  it('holds back a new card too, which is otherwise always due', () => {
+    expect(isDue({ ...newEntry(), suspended: true }, NOW)).toBe(false)
+  })
+
+  it('is still new if it was suspended before it was ever graded', () => {
+    // "New" is about whether it has been seen; suspension is about whether it
+    // will be offered. Conflating them would make an unsuspended card resume a
+    // schedule it never had.
+    expect(isNew({ ...newEntry(), suspended: true })).toBe(true)
+  })
+
+  it('says so rather than quoting a date that will never arrive', () => {
+    expect(formatDue(held(), NOW)).toBe('Suspended')
+  })
+
+  it('survives grading, so nothing can quietly put it back', () => {
+    expect(grade(held(), 'good', NOW).suspended).toBe(true)
+    // And an ordinary entry does not gain the key at all.
+    expect('suspended' in grade(undefined, 'good', NOW)).toBe(false)
+  })
+
+  describe('in a deck', () => {
+    const deck = () => ({
+      cards: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      schedule: { b: { ...newEntry(), suspended: true } },
+    })
+
+    it('is left out of the queue and out of the due count', () => {
+      expect(buildQueue(deck(), { now: NOW })).toEqual([0, 2])
+      expect(dueCount(deck(), NOW)).toBe(2)
+    })
+
+    it('is left out of "review ahead" as well', () => {
+      // `all` means ignore the due dates, not ignore the reader's decision.
+      expect(buildQueue(deck(), { now: NOW, all: true })).toEqual([0, 2])
+    })
+
+    it('counts, so a deck showing nothing due can explain itself', () => {
+      expect(suspendedCount(deck())).toBe(1)
+      expect(suspendedCount({ cards: [{ id: 'a' }], schedule: {} })).toBe(0)
+    })
+
+    it('leaves an empty queue when every card is held back', () => {
+      const all = {
+        cards: [{ id: 'a' }, { id: 'b' }],
+        schedule: {
+          a: { ...newEntry(), suspended: true },
+          b: { ...newEntry(), suspended: true },
+        },
+      }
+      expect(buildQueue(all, { now: NOW, all: true })).toEqual([])
+      expect(dueCount(all, NOW)).toBe(0)
+    })
   })
 })

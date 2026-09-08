@@ -48,9 +48,26 @@ export const newEntry = () => ({
 /** A card with no entry, or one that has never been graded, is new. */
 export const isNew = (entry) => !entry || !entry.last
 
-/** New cards are always due; graded cards come due when their time passes. */
+/**
+ * Whether a card has been taken out of the rotation by hand.
+ *
+ * Deleting a card you do not want to see again also destroys its history and
+ * the fact that you ever knew it, which is a poor answer to "this one is off
+ * the syllabus" or "I know this cold". Suspending keeps the card and its
+ * record and simply stops offering it.
+ *
+ * The flag rides on the schedule entry rather than the card, so it travels
+ * with the scheduling through export, import and sync, and so a card that is
+ * unsuspended later comes back where it left off rather than as new.
+ */
+export const isSuspended = (entry) => entry?.suspended === true
+
+/**
+ * New cards are always due; graded cards come due when their time passes.
+ * A suspended card is never due, whatever its date says.
+ */
 export const isDue = (entry, now = Date.now()) =>
-  isNew(entry) || entry.due === null || entry.due <= now
+  !isSuspended(entry) && (isNew(entry) || entry.due === null || entry.due <= now)
 
 /**
  * Applies a grade and returns the next schedule entry.
@@ -82,6 +99,10 @@ export function grade(entry, g, now = Date.now()) {
     reps: g === 'again' ? 0 : prev.reps + 1,
     lapses: prev.lapses + (g === 'again' ? 1 : 0),
     last: g,
+    // A suspended card never reaches a rating, so this should not come up.
+    // Carrying it anyway means grading can never quietly unsuspend one: the
+    // flag is only ever cleared where a reader asked for it to be.
+    ...(prev.suspended ? { suspended: true } : {}),
   }
 }
 
@@ -101,6 +122,7 @@ export function formatInterval(minutes) {
 
 /** "Due now", "Due in 3 days", "Due in 2 hours". */
 export function formatDue(entry, now = Date.now()) {
+  if (isSuspended(entry)) return 'Suspended'
   if (isNew(entry)) return 'New'
   if (entry.due <= now) return 'Due now'
   return `Due in ${formatInterval((entry.due - now) / 60_000)}`
@@ -114,6 +136,10 @@ export const entryFor = (deck, card) => scheduleOf(deck)[card.id]
 export const dueCount = (deck, now = Date.now()) =>
   deck.cards.filter((c) => isDue(entryFor(deck, c), now)).length
 
+/** How many are sitting out. Worth showing, or "0 due" looks like a fault. */
+export const suspendedCount = (deck) =>
+  deck.cards.filter((c) => isSuspended(entryFor(deck, c))).length
+
 /**
  * The study queue: cards that have come due, soonest first, with new cards
  * after them. `all` ignores due dates so a user can deliberately review ahead.
@@ -122,7 +148,9 @@ export const dueCount = (deck, now = Date.now()) =>
 export function buildQueue(deck, { limit = Infinity, now = Date.now(), all = false } = {}) {
   const candidates = deck.cards
     .map((card, index) => ({ index, entry: entryFor(deck, card) }))
-    .filter(({ entry }) => all || isDue(entry, now))
+    // Suspended cards are held back from "review ahead" too: `all` means
+    // ignore the due dates, not ignore the reader's decision to skip a card.
+    .filter(({ entry }) => !isSuspended(entry) && (all || isDue(entry, now)))
 
   candidates.sort((a, b) => {
     const aNew = isNew(a.entry)

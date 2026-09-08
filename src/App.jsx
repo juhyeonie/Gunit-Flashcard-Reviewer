@@ -26,8 +26,17 @@ const CLOSED = { kind: null }
 function Shell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { addDeck, updateDeck, removeDeck, addCards, updateCard, removeCard, say, toast } =
-    useApp()
+  const {
+    addDeck,
+    updateDeck,
+    removeDeck,
+    addCards,
+    updateCard,
+    removeCard,
+    resetDeck,
+    say,
+    toast,
+  } = useApp()
 
   // One value rather than a flag per modal, so the Create -> Import handoff is
   // a single swap and two modals can never be open at once.
@@ -54,6 +63,7 @@ function Shell() {
   const openEditCard = (deck, index, card) => setModal({ kind: 'card-edit', deck, index, card })
   const openDeleteCard = (deck, index) => setModal({ kind: 'card-delete', deck, index })
   const openDeleteDeck = (deck) => setModal({ kind: 'deck-delete', deck })
+  const openResetDeck = (deck) => setModal({ kind: 'deck-reset', deck })
 
   /** Import against an existing deck, or standing alone as a new-deck flow. */
   const openImport = (deck, draft) =>
@@ -99,6 +109,7 @@ function Shell() {
                 onNewCard={openNewCard}
                 onEditCard={openEditCard}
                 onDeleteCard={openDeleteCard}
+                onResetDeck={openResetDeck}
                 onImport={(deck) => openImport(deck)}
               />
             }
@@ -162,6 +173,19 @@ function Shell() {
           // Leaving the deleted deck's own page open would strand the user on a
           // "no longer exists" screen.
           if (pathname.startsWith(`/decks/${id}`)) navigate('/decks')
+        }}
+      />
+
+      <ConfirmModal
+        open={modal.kind === 'deck-reset'}
+        kicker="Reset progress"
+        title={`Reset progress for “${modal.deck?.title ?? ''}”?`}
+        body="Every card becomes new again and the deck drops to 0% known. The cards, and the days you have already studied, are kept."
+        confirmLabel="Reset progress"
+        onClose={close}
+        onConfirm={() => {
+          resetDeck(modal.deck.id)
+          say(`Reset “${modal.deck.title}”`)
         }}
       />
 

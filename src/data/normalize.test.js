@@ -183,3 +183,34 @@ describe('a settings key that is no longer ours', () => {
     expect('email' in state.settings).toBe(false)
   })
 })
+
+describe('progressOf and suspended cards', () => {
+  const known = { last: 'good', due: NOW, interval: 4320, ease: 2.5, reps: 1, lapses: 0 }
+
+  it('leaves them out of the fraction entirely', () => {
+    // Counting a card the reader has taken out of the rotation as "not known"
+    // would put 100% permanently out of reach for anyone who used the feature.
+    const d = deck({
+      cards: [{ id: 'a' }, { id: 'b' }],
+      schedule: { a: known, b: { last: null, suspended: true } },
+    })
+    expect(progressOf(d)).toBe(1)
+  })
+
+  it('leaves out a suspended card that was known, rather than banking it', () => {
+    const d = deck({
+      cards: [{ id: 'a' }, { id: 'b' }],
+      schedule: { a: { ...known, suspended: true }, b: {} },
+    })
+    // One of one countable cards is unknown, not one of two known.
+    expect(progressOf(d)).toBe(0)
+  })
+
+  it('is zero when every card is suspended, rather than dividing by nothing', () => {
+    const d = deck({
+      cards: [{ id: 'a' }],
+      schedule: { a: { ...known, suspended: true } },
+    })
+    expect(progressOf(d)).toBe(0)
+  })
+})
