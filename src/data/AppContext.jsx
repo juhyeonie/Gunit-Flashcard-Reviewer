@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { uid } from './seed.js'
-import { grade } from './scheduler.js'
+import { grade, newEntry } from './scheduler.js'
 import { MAX_SESSIONS, appendSession } from './activity.js'
 import { DEFAULT_STATE, normalizeState, parseStoredState, progressOf } from './normalize.js'
 import { AppContext } from './appContext.js'
@@ -312,6 +312,60 @@ export function AppProvider({ children }) {
   }, [])
 
   /**
+   * Puts a deck back to unstudied: every card new again, progress at zero.
+   *
+   * There is otherwise no way out of a schedule. A deck imported with someone
+   * else's ratings, or one crammed the night before an exam and now wanted
+   * from scratch, can only be reset by deleting it and losing the cards too.
+   *
+   * Two things deliberately survive. Suspension is a decision about which
+   * cards to study rather than a record of studying them, so a suspended card
+   * stays suspended. And the session log is untouched: it says which days the
+   * reader sat down and worked, the streak is built from it, and resetting a
+   * deck is not grounds for rewriting that history.
+   */
+  const resetDeck = useCallback((deckId) => {
+    setState((s) => ({
+      ...s,
+      decks: s.decks.map((d) => {
+        if (d.id !== deckId) return d
+        const schedule = {}
+        for (const [cardId, entry] of Object.entries(d.schedule ?? {})) {
+          if (entry?.suspended) schedule[cardId] = { ...newEntry(), suspended: true }
+        }
+        const next = { ...d, schedule }
+        return { ...next, progress: progressOf(next) }
+      }),
+    }))
+  }, [])
+
+  /**
+   * Takes one card out of the rotation, or puts it back.
+   *
+   * The alternative a reader has today is deleting the card, which also throws
+   * away its history and the fact they ever knew it. This keeps both: the
+   * entry is left exactly as it was apart from the flag, so unsuspending
+   * resumes the schedule rather than starting it over.
+   */
+  const setCardSuspended = useCallback((deckId, cardId, suspended) => {
+    setState((s) => ({
+      ...s,
+      decks: s.decks.map((d) => {
+        if (d.id !== deckId) return d
+        const { [cardId]: current, ...others } = d.schedule ?? {}
+        const { suspended: _was, ...kept } = current ?? newEntry()
+        const entry = suspended ? { ...kept, suspended: true } : kept
+
+        // A card neither graded nor suspended needs no entry at all. An empty
+        // one would sit in the map looking like a record of something.
+        const schedule = entry.last || entry.suspended ? { ...others, [cardId]: entry } : others
+        const next = { ...d, schedule }
+        return { ...next, progress: progressOf(next) }
+      }),
+    }))
+  }, [])
+
+  /**
    * Logs a finished study session. `seconds` is real elapsed time, measured by
    * the page that ran the session, not estimated from the card count.
    */
@@ -350,6 +404,8 @@ export function AppProvider({ children }) {
       removeCard,
       recordGrades,
       restoreSchedule,
+      resetDeck,
+      setCardSuspended,
       recordSession,
     }),
     [
@@ -373,6 +429,8 @@ export function AppProvider({ children }) {
       removeCard,
       recordGrades,
       restoreSchedule,
+      resetDeck,
+      setCardSuspended,
       recordSession,
     ],
   )

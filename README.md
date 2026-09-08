@@ -94,6 +94,21 @@ key, restores the card's previous scheduling, drops it from the session's
 tally, and returns to it face down. It walks back through the whole session,
 not just the last card.
 
+A card can also be set aside. **Suspend card**, on the card's own menu, keeps
+the card and its whole review history but stops offering it — for something off
+the syllabus, or known so cold that being asked is a waste of the session. It
+is left out of the queue, of "review ahead", of the due count and of the
+percentage known, so a deck half suspended can still reach 100%. Unsuspending
+resumes the schedule where it stopped rather than starting the card over, which
+is the difference between this and deleting it.
+
+A deck can be put back to unstudied. **Reset progress**, on the deck's menu,
+clears every schedule entry so all its cards are new again. Two things survive
+deliberately: suspended cards stay suspended, because that is a decision about
+what to study rather than a record of having studied it, and the session log is
+untouched — it says which days the reader sat down and worked, and resetting a
+deck is not grounds for rewriting that.
+
 Finished sessions are logged to `src/data/activity.js`, which is where the
 streak, the weekly minutes chart and the daily goal come from.
 
@@ -121,7 +136,13 @@ visitor downloads.
 
 The files in `supabase/migrations/` create the tables, the policies and the
 function that applies a change set. Run them in order in the dashboard's SQL
-editor; both are written to be safe to re-run.
+editor; each is written to be safe to re-run.
+
+`0003` adds the `suspended` column and replaces `sync_library` with a version
+that carries it. Replacing the function whole rather than patching it is the
+only option — a function is its body — and it has to carry the column or every
+push would reset it: `on conflict do update` writes the columns it names, so a
+card suspended on one machine would come back from the account unsuspended.
 
 `0002` matters more than it looks. A change set goes up as one call to
 `sync_library`, which is one statement to Postgres and therefore one

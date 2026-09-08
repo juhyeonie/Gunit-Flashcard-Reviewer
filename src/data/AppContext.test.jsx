@@ -540,3 +540,148 @@ describe('the theme', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe(result.current.theme)
   })
 })
+
+describe('resetting a deck', () => {
+  /** Grades every card in the seeded deck, so there is progress to lose. */
+  const studied = (result) => {
+    const deck = first(result)
+    const grades = Object.fromEntries(deck.cards.map((c) => [c.id, 'good']))
+    act(() => result.current.recordGrades(deck.id, grades))
+    return result.current.decks.find((d) => d.id === deck.id)
+  }
+
+  it('puts every card back to new and progress back to zero', () => {
+    const { result } = store()
+    const deck = studied(result)
+    expect(deck.progress).toBe(1)
+
+    act(() => result.current.resetDeck(deck.id))
+
+    const after = result.current.decks.find((d) => d.id === deck.id)
+    expect(after.schedule).toEqual({})
+    expect(after.progress).toBe(0)
+  })
+
+  it('keeps the cards themselves', () => {
+    // The only way to clear a schedule before this was deleting the deck.
+    const { result } = store()
+    const deck = studied(result)
+    act(() => result.current.resetDeck(deck.id))
+
+    const after = result.current.decks.find((d) => d.id === deck.id)
+    expect(after.cards).toEqual(deck.cards)
+  })
+
+  it('does not rewrite the session log the streak is built from', () => {
+    // Resetting a deck says nothing about which days the reader sat down and
+    // worked, and the streak is a record of that rather than of progress.
+    const { result } = store()
+    act(() => result.current.recordSession({ deckId: 'republic', reviewed: 6, seconds: 90 }))
+    const before = result.current.sessions.length
+
+    act(() => result.current.resetDeck(first(result).id))
+    expect(result.current.sessions).toHaveLength(before)
+  })
+
+  it('leaves suspended cards suspended', () => {
+    // Suspension is a decision about which cards to study, not a record of
+    // having studied them, so a reset is not an answer to it.
+    const { result } = store()
+    const deck = studied(result)
+    const [held] = deck.cards
+
+    act(() => result.current.setCardSuspended(deck.id, held.id, true))
+    act(() => result.current.resetDeck(deck.id))
+
+    const after = result.current.decks.find((d) => d.id === deck.id)
+    expect(after.schedule[held.id]).toMatchObject({ suspended: true, last: null, reps: 0 })
+    expect(Object.keys(after.schedule)).toEqual([held.id])
+  })
+
+  it('touches no other deck', () => {
+    const { result } = store()
+    const [target, other] = result.current.decks
+    const before = other.schedule
+
+    act(() => result.current.resetDeck(target.id))
+    expect(result.current.decks.find((d) => d.id === other.id).schedule).toEqual(before)
+  })
+
+  it('survives a reload', () => {
+    const { result, unmount } = store()
+    const deck = studied(result)
+    act(() => result.current.resetDeck(deck.id))
+    unmount()
+
+    const second = store()
+    expect(second.result.current.decks.find((d) => d.id === deck.id).schedule).toEqual({})
+  })
+})
+
+describe('suspending a card', () => {
+  it('records the flag against the card', () => {
+    const { result } = store()
+    const deck = first(result)
+    const [card] = deck.cards
+
+    act(() => result.current.setCardSuspended(deck.id, card.id, true))
+
+    const after = result.current.decks.find((d) => d.id === deck.id)
+    expect(after.schedule[card.id].suspended).toBe(true)
+  })
+
+  it('keeps the schedule underneath, so unsuspending resumes it', () => {
+    // The alternative to suspending is deleting, which loses the history. If
+    // unsuspending started the card over, this would only be slower deleting.
+    const { result } = store()
+    const deck = first(result)
+    const [card] = deck.cards
+    act(() => result.current.recordGrades(deck.id, { [card.id]: 'easy' }))
+
+    const graded = result.current.decks.find((d) => d.id === deck.id).schedule[card.id]
+
+    act(() => result.current.setCardSuspended(deck.id, card.id, true))
+    act(() => result.current.setCardSuspended(deck.id, card.id, false))
+
+    expect(result.current.decks.find((d) => d.id === deck.id).schedule[card.id]).toEqual(graded)
+  })
+
+  it('leaves no entry behind for a card that was never graded', () => {
+    // An empty entry in the map is indistinguishable from a record of study,
+    // and would make a new card look seen.
+    const { result } = store()
+    const deck = first(result)
+    const fresh = deck.cards.find((c) => !deck.schedule[c.id])
+
+    act(() => result.current.setCardSuspended(deck.id, fresh.id, true))
+    act(() => result.current.setCardSuspended(deck.id, fresh.id, false))
+
+    expect(fresh.id in result.current.decks.find((d) => d.id === deck.id).schedule).toBe(false)
+  })
+
+  it('moves progress, because the card stops being counted', () => {
+    const { result } = store()
+    const deck = first(result)
+    const grades = Object.fromEntries(deck.cards.map((c, i) => [c.id, i === 0 ? 'again' : 'good']))
+    act(() => result.current.recordGrades(deck.id, grades))
+
+    const before = result.current.decks.find((d) => d.id === deck.id).progress
+    act(() => result.current.setCardSuspended(deck.id, deck.cards[0].id, true))
+    const after = result.current.decks.find((d) => d.id === deck.id).progress
+
+    expect(before).toBeLessThan(1)
+    expect(after).toBe(1)
+  })
+
+  it('survives a reload', () => {
+    const { result, unmount } = store()
+    const deck = first(result)
+    const [card] = deck.cards
+    act(() => result.current.setCardSuspended(deck.id, card.id, true))
+    unmount()
+
+    const second = store()
+    const after = second.result.current.decks.find((d) => d.id === deck.id)
+    expect(after.schedule[card.id].suspended).toBe(true)
+  })
+})

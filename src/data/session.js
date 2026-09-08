@@ -11,7 +11,7 @@
  * Both are arguments, so a shuffle can be replayed and a summary can be
  * measured.
  */
-import { buildQueue, entryFor, formatInterval } from './scheduler.js'
+import { buildQueue, entryFor, formatInterval, isSuspended } from './scheduler.js'
 
 /**
  * Fisher–Yates, over a copy.
@@ -59,7 +59,12 @@ export function openingQueue(deck, { limit, shuffleFirst = false, ahead = false,
 export function nextDueLabel(deck, now = Date.now()) {
   if (!deck) return null
   const upcoming = deck.cards
-    .map((card) => entryFor(deck, card)?.due)
+    .map((card) => entryFor(deck, card))
+    // A suspended card keeps whatever due date it had, and that date will
+    // never arrive. Promising a return in three days for a card the reader
+    // took out of the rotation would be a lie the app could not keep.
+    .filter((entry) => !isSuspended(entry))
+    .map((entry) => entry?.due)
     .filter((due) => typeof due === 'number' && due > now)
 
   if (!upcoming.length) return null

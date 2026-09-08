@@ -27,8 +27,10 @@ const text = (value) => (typeof value === 'string' ? value.trim() : '')
  */
 const schedulingOf = (entry) => {
   if (!entry || typeof entry !== 'object') return null
-  const { due, last, interval, ease, reps, lapses } = entry
-  return { due, last, interval, ease, reps, lapses }
+  const { due, last, interval, ease, reps, lapses, suspended } = entry
+  // Written only when set, so an ordinary card's scheduling stays as short as
+  // it was and a file from before suspension existed reads back unchanged.
+  return { due, last, interval, ease, reps, lapses, ...(suspended === true ? { suspended: true } : {}) }
 }
 
 const numberOr = (value, fallback) => (typeof value === 'number' && isFinite(value) ? value : fallback)

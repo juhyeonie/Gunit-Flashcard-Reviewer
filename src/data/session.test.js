@@ -162,3 +162,24 @@ describe('summarise', () => {
     expect(summarise()).toEqual({ reviewed: 0, known: 0, again: 0, seconds: 0 })
   })
 })
+
+describe('suspended cards in a session', () => {
+  const held = (dueIn) => ({ ...seen(dueIn), suspended: true })
+
+  it('never open a session, even when the reader is reviewing ahead', () => {
+    const d = deck({ c0: held(-60), c1: seen(-60) })
+    expect(openingQueue(d, { now: NOW })).toEqual([1, 2, 3])
+    expect(openingQueue(d, { now: NOW, ahead: true })).toEqual([1, 2, 3])
+  })
+
+  it('do not set the "come back in" promise', () => {
+    // The date on a suspended card will never arrive. Quoting it would send
+    // the reader away for three days and give them nothing when they returned.
+    const d = deck({ c0: held(45), c1: seen(3 * 60) }, 2)
+    expect(nextDueLabel(d, NOW)).toBe('3 hours')
+  })
+
+  it('leave no promise at all when they are the only scheduled cards', () => {
+    expect(nextDueLabel(deck({ c0: held(45) }, 1), NOW)).toBe(null)
+  })
+})

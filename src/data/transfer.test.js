@@ -316,3 +316,45 @@ describe('fromLibraryTransfer', () => {
     expect(out.library.decks).toEqual([])
   })
 })
+
+describe('suspension in a file', () => {
+  const held = (over = {}) => deck({ schedule: { c0: { ...entry(), suspended: true } }, ...over })
+
+  it('travels with the card it belongs to', () => {
+    const out = toTransfer(held(), { now: NOW })
+    expect(out.cards[0].scheduling.suspended).toBe(true)
+  })
+
+  it('comes back on the way in', () => {
+    const { deck: back } = fromTransfer(toTransfer(held(), { now: NOW }))
+    expect(back.cards[0].scheduling.suspended).toBe(true)
+    expect(back.cards[0].scheduling.reps).toBe(3)
+  })
+
+  it('is absent rather than false on an ordinary card', () => {
+    // Every card in every export would otherwise carry a key answering a
+    // question nobody asked, and older files would read differently from new
+    // ones for no reason.
+    const out = toTransfer(deck(), { now: NOW })
+    expect('suspended' in out.cards[0].scheduling).toBe(false)
+  })
+
+  it('is not invented by a file written before it existed', () => {
+    const older = toTransfer(deck(), { now: NOW })
+    const { deck: back } = fromTransfer(older)
+    expect(back.cards[0].scheduling.suspended).toBeUndefined()
+  })
+
+  it('ignores anything but the flag itself', () => {
+    const tampered = toTransfer(deck(), { now: NOW })
+    tampered.cards[0].scheduling.suspended = 'true'
+    const { deck: back } = fromTransfer(tampered)
+    expect(back.cards[0].scheduling.suspended).toBeUndefined()
+  })
+
+  it('survives a whole-library round trip', () => {
+    const file = toLibraryTransfer({ decks: [held()], sessions: [] }, { now: NOW })
+    const { library } = fromLibraryTransfer(file)
+    expect(library.decks[0].cards[0].scheduling.suspended).toBe(true)
+  })
+})

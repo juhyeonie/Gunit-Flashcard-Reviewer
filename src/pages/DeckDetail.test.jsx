@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DeckDetail from './DeckDetail.jsx'
 import { MIN_QUIZ_CARDS } from '../data/quiz.js'
-import { deck, entry, renderRoute, seed } from '../../test/render-app.jsx'
+import { deck, entry, renderRoute, seed, stored } from '../../test/render-app.jsx'
 import { FORMAT } from '../data/transfer.js'
 
 /**
@@ -20,6 +20,7 @@ const props = () => ({
   onNewCard: vi.fn(),
   onEditCard: vi.fn(),
   onDeleteCard: vi.fn(),
+  onResetDeck: vi.fn(),
   onImport: vi.fn(),
 })
 
@@ -221,5 +222,96 @@ describe('exporting the deck', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Export deck' }))
     expect(JSON.parse(await blobs[0].text()).cards).toEqual([])
+  })
+})
+
+describe('suspending a card', () => {
+  /** Opens the kebab beside card `i` and returns the item asked for. */
+  const cardMenu = async (i, item) => {
+    await userEvent.click(screen.getAllByRole('button', { name: 'Card options' })[i])
+    return screen.getByRole('button', { name: new RegExp(item) })
+  }
+
+  it('offers it on every card, without a confirmation', () => {
+    // Nothing is lost by it and it is one click to undo, so a modal here would
+    // be ceremony rather than a safeguard.
+    seed({ decks: [deck({ count: 2 })] })
+    open(props())
+    return cardMenu(0, 'Suspend card').then((item) => expect(item).toBeTruthy())
+  })
+
+  it('marks the card and takes it out of the due count', async () => {
+    seed({ decks: [deck({ count: 3 })] })
+    open(props())
+    expect(screen.getByText('Due now').previousSibling.textContent).toBe('3')
+
+    await userEvent.click(await cardMenu(0, 'Suspend card'))
+
+    expect(screen.getByText('Suspended', { selector: 'span' })).toBeTruthy()
+    expect(screen.getByText('Due now').previousSibling.textContent).toBe('2')
+  })
+
+  it('counts them, so a deck with nothing due can explain itself', async () => {
+    seed({ decks: [deck({ count: 1 })] })
+    open(props())
+    // Absent until it applies — a permanent "Suspended 0" is noise.
+    expect(screen.queryByText('Suspended')).toBe(null)
+
+    await userEvent.click(await cardMenu(0, 'Suspend card'))
+
+    expect(screen.getByText('Due now').previousSibling.textContent).toBe('0')
+    expect(screen.getAllByText('Suspended').some((el) => el.previousSibling?.textContent === '1')).toBe(
+      true,
+    )
+  })
+
+  it('offers the way back, and takes it', async () => {
+    seed({ decks: [deck({ count: 2 })] })
+    open(props())
+    await userEvent.click(await cardMenu(0, 'Suspend card'))
+    await userEvent.click(await cardMenu(0, 'Unsuspend card'))
+
+    expect(screen.queryByText('Suspended', { selector: 'span' })).toBe(null)
+    expect(screen.getByText('Due now').previousSibling.textContent).toBe('2')
+  })
+
+  it('keeps the card in the deck', async () => {
+    // The whole point of it over deleting: the card and its history stay.
+    seed({ decks: [deck({ count: 2, schedule: { c0: entry(-10) } })] })
+    open(props())
+    await userEvent.click(await cardMenu(0, 'Suspend card'))
+
+    expect(screen.getByText('Cards').previousSibling.textContent).toBe('2')
+    expect(screen.getByText('Question 0?')).toBeTruthy()
+    expect(stored().decks[0].schedule.c0).toMatchObject({ reps: 1, suspended: true })
+  })
+
+  it('says which card it was, since the menu closes behind it', async () => {
+    seed({ decks: [deck({ count: 2 })] })
+    open(props())
+    await userEvent.click(await cardMenu(1, 'Suspend card'))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Card 2 suspended/))
+  })
+})
+
+describe('resetting a deck', () => {
+  const openDeckMenu = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Deck options' }))
+    return screen.getByRole('button', { name: /Reset progress/ })
+  }
+
+  it('hands the deck to the shell rather than clearing it here', async () => {
+    // Destructive and irreversible, so it goes through the same confirmation
+    // path as deleting a deck instead of firing from the menu.
+    seed({ decks: [deck({ count: 2, schedule: { c0: entry(60) } })] })
+    const p = props()
+    open(p)
+
+    await userEvent.click(await openDeckMenu())
+
+    expect(p.onResetDeck).toHaveBeenCalledTimes(1)
+    expect(p.onResetDeck.mock.calls[0][0].id).toBe('republic')
+    // Nothing has happened to the library yet.
+    expect(stored().decks[0].schedule.c0).toBeTruthy()
   })
 })

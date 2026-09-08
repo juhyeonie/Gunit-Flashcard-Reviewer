@@ -299,3 +299,53 @@ describe('toPayload', () => {
     expect(typeof payload.cards_remove[0]).toBe('string')
   })
 })
+
+describe('suspension over the wire', () => {
+  const held = (over = {}) =>
+    library({
+      decks: [{ ...library().decks[0], schedule: { c0: entry({ suspended: true }), ...over } }],
+    })
+
+  it('goes up as a column, and every other card answers false', () => {
+    // Not null: the column is `not null default false`, and a three-valued
+    // answer would need handling everywhere it is read.
+    const { cards } = toRows(held(), USER)
+    expect(cards[0].suspended).toBe(true)
+    expect(cards[1].suspended).toBe(false)
+  })
+
+  it('comes back down onto the entry it belongs to', () => {
+    const back = fromRows(toRows(held(), USER))
+    const [first] = back.decks[0].cards
+    expect(back.decks[0].schedule[first.id].suspended).toBe(true)
+    expect(back.decks[0].schedule[first.id].reps).toBe(3)
+  })
+
+  it('keeps an entry for a card suspended before it was ever graded', () => {
+    // A row with no last_grade normally gets no entry at all. Without this
+    // exception there would be nothing to hang the flag on, and signing in on
+    // another machine would silently unsuspend the card.
+    const never = library({
+      decks: [{ ...library().decks[0], schedule: { c1: { ...entry(), last: null, suspended: true } } }],
+    })
+    const back = fromRows(toRows(never, USER))
+    const second = back.decks[0].cards[1]
+    expect(back.decks[0].schedule[second.id]).toMatchObject({ suspended: true, last: null })
+  })
+
+  it('does not put the key on an ordinary card', () => {
+    const back = fromRows(toRows(library(), USER))
+    const [first] = back.decks[0].cards
+    expect('suspended' in back.decks[0].schedule[first.id]).toBe(false)
+  })
+
+  it('is a change worth pushing on its own', () => {
+    // Suspending a card edits nothing visible on the row but the flag. If the
+    // diff missed it, the decision would live on one machine only.
+    const before = toRows(library(), USER)
+    const after = { ...before, cards: before.cards.map((c, i) => (i === 0 ? { ...c, suspended: true } : c)) }
+    const change = changesBetween(before, after)
+    expect(change.cards.upsert).toHaveLength(1)
+    expect(change.cards.upsert[0].suspended).toBe(true)
+  })
+})
