@@ -55,7 +55,9 @@ function fakeClient({ decks = [], cards = [], sessions = [], profile = null } = 
         },
       }
     },
+    rpcPayloads: [],
     async rpc(_name, { payload }) {
+      client.rpcPayloads.push(payload)
       // The real function writes, so the next select sees what was pushed.
       // Without this the upload path and the pull path cannot follow one
       // another, which is exactly the sequence that goes wrong.
@@ -71,9 +73,22 @@ function fakeClient({ decks = [], cards = [], sessions = [], profile = null } = 
 let client
 let api
 
-vi.mock('./useAuth.js', () => ({
-  useAuth: () => ({ user: { id: USER }, available: true }),
-}))
+/**
+ * Signing out has to be something a test can do, so the mocked hook holds
+ * React state and hands the setter out. Calling it with null is the same
+ * re-render LibrarySync sees when a real session ends.
+ */
+let setAuthUser
+vi.mock('./useAuth.js', async () => {
+  const { useState } = await import('react')
+  return {
+    useAuth: () => {
+      const [user, set] = useState({ id: USER })
+      setAuthUser = set
+      return { user, available: true }
+    },
+  }
+})
 
 vi.mock('./supabase.js', () => ({
   isConfigured: true,
@@ -83,6 +98,7 @@ vi.mock('./supabase.js', () => ({
 const { AppProvider } = await import('./AppContext.jsx')
 const { useApp } = await import('./useApp.js')
 const { default: LibrarySync } = await import('./LibrarySync.jsx')
+const { flushPendingSync } = await import('./pendingSync.js')
 
 /** Hands the store out so a test can change settings the way a reader would. */
 function Harness() {
@@ -254,5 +270,102 @@ describe('what the account hands back', () => {
     // One of two cards has been graded something other than "again".
     expect(deck.progress).toBe(0.5)
     expect(Math.round(deck.progress * 100)).toBe(50)
+  })
+})
+
+describe('signing out without reloading first', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+
+  const account = () =>
+    fakeClient({
+      decks: [
+        { id: DECK, user_id: USER, title: 'From the account', subject: 'Rome', description: '', studied_at: null },
+      ],
+      cards: [
+        { id: 'aaaaaaaa-0000-4000-8000-000000000001', deck_id: DECK, user_id: USER, front: 'Q1', back: 'A1', position: 0, due: null, interval: 0, ease: 2.5, reps: 0, lapses: 0, last_grade: null, suspended: false },
+      ],
+      profile: null,
+    })
+
+  /** Signs in, waits for the pull, and returns the library that was put aside. */
+  const signedIn = async () => {
+    client = account()
+    mount()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+    return JSON.parse(localStorage.getItem('gunit.state.presync')).decks.map((d) => d.title)
+  }
+
+  it('sends a card added seconds earlier, instead of dropping it', async () => {
+    // The bug: pushes are debounced, and signing out clears that timer while
+    // handing the browser its own library back. A card added inside the last
+    // beat was never sent and no longer here — gone from both places.
+    const mine = await signedIn()
+
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Added while signed in', back: 'And not yet pushed' }])
+    })
+
+    // No waiting: this is a reader who adds a card and signs out at once.
+    await act(async () => {
+      await flushPendingSync()
+      setAuthUser(null)
+    })
+
+    const pushed = client.rpcPayloads.flatMap((p) => p.cards_upsert ?? [])
+    expect(pushed.map((c) => c.front)).toContain('Added while signed in')
+
+    // And the swap still happens: this browser gets its own decks back.
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(mine))
+  })
+
+  it('sends an edit to an existing card', async () => {
+    await signedIn()
+
+    await act(async () => {
+      api.updateCard(DECK, 0, { front: 'Edited while signed in', back: 'A1' })
+    })
+    await act(async () => {
+      await flushPendingSync()
+      setAuthUser(null)
+    })
+
+    const pushed = client.rpcPayloads.flatMap((p) => p.cards_upsert ?? [])
+    expect(pushed.map((c) => c.front)).toContain('Edited while signed in')
+  })
+
+  it('sends a deletion', async () => {
+    await signedIn()
+
+    await act(async () => {
+      api.removeCard(DECK, 0)
+    })
+    await act(async () => {
+      await flushPendingSync()
+      setAuthUser(null)
+    })
+
+    const removed = client.rpcPayloads.flatMap((p) => p.cards_remove ?? [])
+    expect(removed).toContain('aaaaaaaa-0000-4000-8000-000000000001')
+  })
+
+  it('sends nothing when nothing changed', async () => {
+    // Signing out of a library nobody touched should not write to the account.
+    await signedIn()
+    const before = client.rpcPayloads.length
+
+    await act(async () => {
+      await flushPendingSync()
+      setAuthUser(null)
+    })
+
+    expect(client.rpcPayloads.length).toBe(before)
+  })
+
+  it('has nothing to flush once signed out', async () => {
+    await signedIn()
+    await act(async () => {
+      setAuthUser(null)
+    })
+    await expect(flushPendingSync()).resolves.toEqual({ error: null })
   })
 })

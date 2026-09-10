@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useApp } from './useApp.js'
 import { useAuth } from './useAuth.js'
 import { getSupabase } from './supabase.js'
+import { registerPendingSync } from './pendingSync.js'
 import {
   changesBetween,
   fromRows,
@@ -198,6 +199,54 @@ export default function LibrarySync() {
     // would re-run the pull in response to its own result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [available, userId, replaceLibrary, releaseSyncedLibrary, say, trouble])
+
+  /*
+   * The latest library, for the flush below to read.
+   *
+   * The flush is registered once and called from outside React, so a closure
+   * over this render's props would send whatever was on screen when it was
+   * registered rather than what is there when it runs — which is precisely the
+   * change it exists to rescue.
+   */
+  const latest = useRef({ decks, sessions, userId })
+  // Written after each render rather than during one: a ref updated in the
+  // render body is a value React may have thrown away and re-derived.
+  useEffect(() => {
+    latest.current = { decks, sessions, userId }
+  })
+
+  /**
+   * Sends anything the debounce is still sitting on, and waits for it.
+   *
+   * Signing out clears that timer and hands the browser its own library back
+   * in the same breath, so a change made in the last second was sent nowhere
+   * and then taken off the machine. This is what signing out calls first,
+   * while there is still a session for row level security to accept.
+   */
+  const flushNow = useCallback(async () => {
+    clearTimeout(pushTimer.current)
+
+    const { decks: nowDecks, sessions: nowSessions, userId: nowUser } = latest.current
+    if (!available || !nowUser || !synced.current) return { error: null }
+
+    const next = toRows({ decks: nowDecks, sessions: nowSessions }, nowUser)
+    const change = changesBetween(synced.current, next)
+    if (isEmptyChange(change)) return { error: null }
+
+    const supabase = await getSupabase()
+    const { error } = await write(supabase, change)
+    if (error) {
+      // Said plainly rather than through `trouble`, which is worded for a
+      // change that is still safely on this device. After signing out it will
+      // not be — the library is about to be swapped away.
+      say('Your last changes could not be saved to your account')
+      return { error }
+    }
+    synced.current = next
+    return { error: null }
+  }, [available, say])
+
+  useEffect(() => registerPendingSync(flushNow), [flushNow])
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {
