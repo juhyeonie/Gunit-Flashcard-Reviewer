@@ -13,6 +13,10 @@ const variants = {
   ghost: 'border-transparent bg-transparent text-ink-2 hover:text-ink hover:bg-raised',
   danger: 'border-err bg-err text-paper hover:opacity-90',
   quiet: 'border-line bg-transparent text-ink-2 hover:border-ink-3 hover:text-ink',
+  // Deliberately against the rule above, and only for signing in. The auth
+  // page is the one screen with a single thing to do and no deck on it to
+  // reserve the accent for, so the green carries the identity instead.
+  accent: 'border-accent bg-accent text-paper hover:bg-accent-2 hover:border-accent-2',
 }
 
 const sizes = {
