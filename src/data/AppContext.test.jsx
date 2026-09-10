@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from './AppContext.jsx'
 import { AuthProvider } from './AuthProvider.jsx'
 import { useApp } from './useApp.js'
+import { GUEST_KEY } from './storageKeys.js'
 
 /**
  * The store: what every mutator leaves behind, and what survives a reload.
@@ -14,7 +15,9 @@ import { useApp } from './useApp.js'
  * is inspected directly.
  */
 
-const KEY = 'gunit.state.v2'
+// The signed-out library. These suites render nobody in particular, so
+// this is the key the store reads.
+const KEY = GUEST_KEY
 
 /** The store, inside the auth provider the app always puts it in. */
 const wrapper = ({ children }) => (
@@ -57,7 +60,9 @@ describe('starting up', () => {
     // library resetting, which they can at least see happen.
     localStorage.setItem(KEY, '{ not json at all')
     store()
-    expect(localStorage.getItem('gunit.state.unreadable')).toBe('{ not json at all')
+    // Parked under a name that says which library it came from, since there
+    // is one per identity now.
+    expect(localStorage.getItem(`gunit.state.unreadable.${KEY}`)).toBe('{ not json at all')
   })
 
   it('starts anyway when storage refuses to answer', () => {
@@ -277,47 +282,34 @@ describe('restoring a backup', () => {
   })
 })
 
-describe('adopting an account’s library', () => {
-  const arriving = {
+describe('installing an account’s library', () => {
+  const account = {
     decks: [
-      {
-        id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
-        title: 'From the account',
-        subject: 'Rome',
-        desc: '',
-        studiedAt: null,
-        cards: [{ id: 'ffffffff-1111-4222-8333-444444444444', front: 'Q', back: 'A' }],
-        schedule: {},
-      },
+      { id: 'acc', title: 'From the account', subject: 'Rome', desc: '', cards: [], schedule: {} },
     ],
     sessions: [{ at: 1000, deckId: null, reviewed: 3, seconds: 60 }],
   }
 
-  it('swaps the library for the one signing in brought', () => {
+  it('shows what signing in brought', () => {
     const { result } = store()
-    act(() => result.current.replaceLibrary(arriving))
-
-    expect(result.current.decks).toHaveLength(1)
-    expect(result.current.decks[0].title).toBe('From the account')
-    expect(result.current.sessions).toHaveLength(1)
+    act(() => result.current.installLibrary(account))
+    expect(result.current.decks.map((d) => d.title)).toEqual(['From the account'])
   })
 
-  it('keeps what this browser had rather than dropping it', () => {
-    // "You signed in and your decks went" is not a sentence this app should
-    // ever cause. The same reasoning as the salvage key for a bad payload.
+  it('derives progress, which the database does not store', () => {
+    // Decks arriving from an account carry no `progress` — it is a function of
+    // the schedule and is never sent up. Installed raw, every page rendering
+    // `Math.round(deck.progress * 100)` showed NaN%.
     const { result } = store()
-    const had = result.current.decks.map((d) => d.title)
-
-    act(() => result.current.replaceLibrary(arriving))
-
-    const kept = JSON.parse(localStorage.getItem('gunit.state.presync'))
-    expect(kept.decks.map((d) => d.title)).toEqual(had)
+    act(() => result.current.installLibrary(account))
+    expect(result.current.decks[0].progress).toBe(0)
+    expect(Number.isNaN(result.current.decks[0].progress)).toBe(false)
   })
 
   it('takes the account’s settings and theme when they come with it', () => {
     const { result } = store()
     act(() =>
-      result.current.replaceLibrary({ ...arriving, settings: { goalMinutes: 45 }, theme: 'dark' }),
+      result.current.installLibrary({ ...account, settings: { goalMinutes: 45 }, theme: 'dark' }),
     )
     expect(result.current.settings.goalMinutes).toBe(45)
     expect(result.current.theme).toBe('dark')
@@ -325,84 +317,15 @@ describe('adopting an account’s library', () => {
 
   it('leaves settings alone when they do not', () => {
     const { result } = store()
-    const before = result.current.settings.goalMinutes
-    act(() => result.current.replaceLibrary(arriving))
-    expect(result.current.settings.goalMinutes).toBe(before)
-  })
-
-  it('adopts an empty library without complaint', () => {
-    const { result } = store()
-    act(() => result.current.replaceLibrary({ decks: [], sessions: [] }))
-    expect(result.current.decks).toEqual([])
-  })
-})
-
-describe('handing the account’s library back', () => {
-  const account = {
-    decks: [
-      {
-        id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
-        title: 'From the account',
-        subject: 'Rome',
-        desc: '',
-        studiedAt: null,
-        cards: [{ id: 'ffffffff-1111-4222-8333-444444444444', front: 'Q', back: 'A' }],
-        schedule: {},
-      },
-    ],
-    sessions: [{ at: 1000, deckId: null, reviewed: 3, seconds: 60 }],
-  }
-
-  it('gives back what this browser had before it signed in', () => {
-    // Signing out on a shared laptop must not leave someone else's revision
-    // sitting there for the next person.
-    const { result } = store()
-    const mine = result.current.decks.map((d) => d.title)
-
-    act(() => result.current.replaceLibrary(account))
-    expect(result.current.decks[0].title).toBe('From the account')
-
-    act(() => result.current.releaseSyncedLibrary())
-    expect(result.current.decks.map((d) => d.title)).toEqual(mine)
-  })
-
-  it('keeps the account’s library rather than dropping it on the way out', () => {
-    // It is in Postgres too, but the two simply swap places here — neither
-    // copy is destroyed by the other arriving or leaving.
-    const { result } = store()
-    act(() => result.current.replaceLibrary(account))
-    act(() => result.current.releaseSyncedLibrary())
-
-    const kept = JSON.parse(localStorage.getItem('gunit.state.presync'))
-    expect(kept.decks[0].title).toBe('From the account')
-  })
-
-  it('leaves an empty library rather than someone else’s when there is nothing to give back', () => {
-    const { result } = store()
-    act(() => result.current.replaceLibrary(account))
-    localStorage.removeItem('gunit.state.presync')
-
-    act(() => result.current.releaseSyncedLibrary())
-    expect(result.current.decks).toEqual([])
-  })
-
-  it('survives an unreadable stash the same way', () => {
-    const { result } = store()
-    act(() => result.current.replaceLibrary(account))
-    localStorage.setItem('gunit.state.presync', '{ not json')
-
-    act(() => result.current.releaseSyncedLibrary())
-    expect(result.current.decks).toEqual([])
-  })
-
-  it('brings back the settings that came with it', () => {
-    const { result } = store()
     act(() => result.current.updateSettings({ goalMinutes: 35 }))
-    act(() => result.current.replaceLibrary({ ...account, settings: { goalMinutes: 5 } }))
-    expect(result.current.settings.goalMinutes).toBe(5)
-
-    act(() => result.current.releaseSyncedLibrary())
+    act(() => result.current.installLibrary(account))
     expect(result.current.settings.goalMinutes).toBe(35)
+  })
+
+  it('installs an empty library without complaint', () => {
+    const { result } = store()
+    act(() => result.current.installLibrary({ decks: [], sessions: [] }))
+    expect(result.current.decks).toEqual([])
   })
 })
 
@@ -683,53 +606,5 @@ describe('suspending a card', () => {
     const second = store()
     const after = second.result.current.decks.find((d) => d.id === deck.id)
     expect(after.schedule[card.id].suspended).toBe(true)
-  })
-})
-
-describe('the pre-sign-in stash', () => {
-  const PRESYNC = 'gunit.state.presync'
-  const account = { decks: [{ id: 'acc', title: 'From the account', subject: 'S', desc: '', cards: [], schedule: {} }], sessions: [] }
-  const other = { decks: [{ id: 'oth', title: 'A later pull', subject: 'S', desc: '', cards: [], schedule: {} }], sessions: [] }
-
-  it('keeps what the browser was holding', () => {
-    const { result } = store()
-    const mine = result.current.decks.map((d) => d.title)
-
-    act(() => result.current.replaceLibrary(account))
-
-    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
-  })
-
-  it('does not let a second replacement overwrite it', () => {
-    // The stash is one slot. Overwritten while signed in it holds the
-    // account's library rather than the browser's, and signing out then hands
-    // the account's decks back to the machine instead of taking them off it.
-    // A second call is not hypothetical: StrictMode runs every effect twice.
-    const { result } = store()
-    const mine = result.current.decks.map((d) => d.title)
-
-    act(() => result.current.replaceLibrary(account, { stash: true }))
-    act(() => result.current.replaceLibrary(other, { stash: false }))
-
-    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
-    expect(result.current.decks.map((d) => d.title)).toEqual(['A later pull'])
-  })
-
-  it('hands the browser back its own library, not the account it just left', () => {
-    const { result } = store()
-    const mine = result.current.decks.map((d) => d.title)
-
-    act(() => result.current.replaceLibrary(account, { stash: true }))
-    act(() => result.current.replaceLibrary(other, { stash: false }))
-    act(() => result.current.releaseSyncedLibrary())
-
-    expect(result.current.decks.map((d) => d.title)).toEqual(mine)
-  })
-
-  it('still stashes by default, for callers that do not say', () => {
-    const { result } = store()
-    const mine = result.current.decks.map((d) => d.title)
-    act(() => result.current.replaceLibrary(account))
-    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
   })
 })

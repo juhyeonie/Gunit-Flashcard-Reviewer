@@ -349,3 +349,44 @@ describe('suspension over the wire', () => {
     expect(change.cards.upsert[0].suspended).toBe(true)
   })
 })
+
+describe('adopting a library into an account', () => {
+  const uploaded = () => {
+    // A library that some account has already uploaded: every id is a uuid.
+    const { decks, cards } = toRows(library(), USER)
+    return fromRows({ decks, cards, sessions: [] })
+  }
+
+  it('mints new ids even for ones that already look like uuids', () => {
+    // A uuid in a local library is not a promise that it belongs to *this*
+    // account. On a shared browser it is very often another reader's, and the
+    // upsert then reaches for rows this user does not own: row level security
+    // refuses the whole change set and nothing is adopted.
+    const before = uploaded()
+    const { decks, cards } = toRows(before, USER, { reissueIds: true })
+
+    expect(decks[0].id).not.toBe(before.decks[0].id)
+    expect(isUuid(decks[0].id)).toBe(true)
+    for (const card of cards) expect(before.decks[0].cards.some((c) => c.id === card.id)).toBe(false)
+  })
+
+  it('keeps the cards pointing at their deck under the new ids', () => {
+    const { decks, cards } = toRows(uploaded(), USER, { reissueIds: true })
+    for (const card of cards) expect(card.deck_id).toBe(decks[0].id)
+  })
+
+  it('carries the review history across the reissue', () => {
+    // The schedule is keyed by the card's local id and looked up before the
+    // new one is written. Get that wrong and adopting a library silently
+    // resets every card's history.
+    const before = uploaded()
+    const { cards } = toRows(before, USER, { reissueIds: true })
+    const graded = cards.find((c) => c.front === 'Consul?')
+    expect(graded).toMatchObject({ interval: 1440, ease: 2.5, reps: 3, last_grade: 'good' })
+  })
+
+  it('leaves ids alone when not asked to reissue', () => {
+    const before = uploaded()
+    expect(toRows(before, USER).decks[0].id).toBe(before.decks[0].id)
+  })
+})

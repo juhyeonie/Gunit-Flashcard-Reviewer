@@ -3,6 +3,8 @@ import { useApp } from './useApp.js'
 import { useAuth } from './useAuth.js'
 import { getSupabase } from './supabase.js'
 import { registerPendingSync } from './pendingSync.js'
+import { GUEST_KEY } from './storageKeys.js'
+import { parseStoredState } from './normalize.js'
 import {
   changesBetween,
   fromRows,
@@ -24,6 +26,23 @@ import {
  * Signed out, or with no project configured, it does nothing at all.
  */
 
+/**
+ * The guest library, read straight from its key.
+ *
+ * Once signed in, `decks` from the store is the *account's* library — that is
+ * the point of the split — so the one case that needs the guest's decks, an
+ * empty account adopting them, has to go and get them. Reading rather than
+ * moving: the guest key is left exactly as it is, so a failed upload costs
+ * nothing and signing out still finds them.
+ */
+function readGuestLibrary() {
+  try {
+    return parseStoredState(localStorage.getItem(GUEST_KEY)).state
+  } catch {
+    return { decks: [], sessions: [] }
+  }
+}
+
 /** How long the library has to sit still before a push is worth making. */
 const QUIET_MS = 1200
 
@@ -33,17 +52,12 @@ export default function LibrarySync() {
    * The account, not the session object it arrived in.
    *
    * Supabase publishes a fresh session — and so a fresh `user` — on every
-   * token refresh, roughly hourly. Keyed on that object, the effects below
-   * re-ran on a timer: the library was re-fetched for no reason, and worse,
-   * `replaceLibrary` stashed the state again each time, overwriting the
-   * pre-sign-in library that signing out is supposed to hand back. An hour in,
-   * signing out returned the account's decks instead of your own.
-   *
-   * The id only changes when the account does.
+   * token refresh, roughly hourly. Keyed on that object the effects below
+   * re-ran on a timer, re-fetching the library for no reason. The id only
+   * changes when the account does.
    */
   const userId = user?.id ?? null
-  const { decks, sessions, settings, theme, syncedFor, replaceLibrary, releaseSyncedLibrary, say } =
-    useApp()
+  const { decks, sessions, settings, theme, installLibrary, say } = useApp()
 
   /*
    * The rows as the database last confirmed them. Every push is the difference
@@ -59,25 +73,6 @@ export default function LibrarySync() {
   // Who was signed in last time this ran, so signing out is distinguishable
   // from having never signed in.
   const wasSignedInAs = useRef(null)
-  /*
-   * Whether this sign-in has already put its library aside.
-   *
-   * `replaceLibrary` stashes whatever is in local storage before overwriting
-   * it, and signing out hands that stash back. Called a second time while
-   * signed in it stashed the account's library over the browser's own, so
-   * signing out returned the account's decks and left them on the machine —
-   * the exact thing releaseSyncedLibrary exists to prevent.
-   *
-   * A second call is not hypothetical. React's StrictMode runs every effect
-   * twice in development, and the second run finds the library already
-   * uploaded and takes the account-wins branch.
-   *
-   * This covers a second run within one mount. A reload is the other half and
-   * a ref cannot see across it — that is what the stored `syncedFor` is for,
-   * read below. Both are needed: the ref catches two runs racing before any
-   * state has been written, the stored marker catches a fresh mount.
-   */
-  const stashed = useRef(false)
 
   useEffect(() => {
     alive.current = true
@@ -98,39 +93,28 @@ export default function LibrarySync() {
   )
 
   /**
-   * Signing in: read the account's library and decide which one wins.
+   * Signing in: read the account's library into this browser's copy of it.
    *
-   * An account with nothing in it adopts whatever this browser was holding —
-   * that is the migration, and it is the only case where local wins. Once the
-   * account has decks, the account is the library, because it is the copy the
-   * reader's other machines also see.
+   * An account with nothing in it adopts whatever the guest library was
+   * holding — that is the migration, and it is the only case where local wins.
+   * Once the account has decks, the account is the library, because it is the
+   * copy the reader's other machines also see.
+   *
+   * Nothing is stashed and nothing is swapped. The guest library sits under
+   * its own key throughout, and signing out reads it again.
    */
   useEffect(() => {
     if (!available || !userId) {
       synced.current = null
       complained.current = false
-
-      // Signing out, rather than never having signed in. The account's decks
-      // do not stay behind on the machine.
       if (wasSignedInAs.current) {
         wasSignedInAs.current = null
-        stashed.current = false
-        releaseSyncedLibrary()
         say('Signed out — your own decks are back')
       }
-      return
+      return undefined
     }
 
     wasSignedInAs.current = userId
-
-    /*
-     * Whether this browser is holding its own library or already this
-     * account's. A reload while signed in arrives here exactly as a fresh
-     * sign-in does — an account library to install — and stashing again would
-     * put the account's decks into the slot signing out reads from, leaving
-     * them on the machine.
-     */
-    const handingOver = syncedFor !== userId
 
     let cancelled = false
 
@@ -147,14 +131,22 @@ export default function LibrarySync() {
 
       const failure = deckRes.error || cardRes.error || sessionRes.error
       if (failure) {
-        trouble('Signed in, but your library could not be loaded')
+        // The account's own key may already hold a copy from last time, which
+        // is what the reader is looking at. Studying carries on offline.
+        trouble('Signed in, but your library could not be refreshed')
         return
       }
       if (cancelled || !alive.current) return
 
-      if (deckRes.data.length === 0 && decks.length > 0) {
-        // Nothing up there yet: this browser's library becomes the account's.
-        const rows = toRows({ decks, sessions }, userId)
+      const guest = readGuestLibrary()
+      if (deckRes.data.length === 0 && guest.decks.length > 0) {
+        // Nothing up there yet: the guest library becomes the account's. It is
+        // copied rather than moved — the guest key is left exactly as it is,
+        // so a failed upload costs nothing and signing out still finds it.
+        // Fresh ids, always. A uuid in the guest library means some account
+        // uploaded it once — possibly another one on a shared browser — and
+        // offering those ids back reaches for rows this user does not own.
+        const rows = toRows(guest, userId, { reissueIds: true })
         const { error } = await write(supabase, {
           decks: { upsert: rows.decks, remove: [] },
           cards: { upsert: rows.cards, remove: [] },
@@ -166,13 +158,7 @@ export default function LibrarySync() {
           return
         }
         synced.current = rows
-        // Ids were minted during the upload; local state has to adopt them or
-        // the next push would upload the same library a second time.
-        replaceLibrary(fromRows(rows), {
-          stash: handingOver && !stashed.current,
-          syncedFor: userId,
-        })
-        stashed.current = true
+        installLibrary(fromRows(rows))
         say(`Uploaded ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'}`)
         return
       }
@@ -181,11 +167,7 @@ export default function LibrarySync() {
       synced.current = toRows(fromRows(rows), userId)
 
       const profile = profileRes.data ? profileToSettings(profileRes.data) : {}
-      replaceLibrary(
-        { ...fromRows(rows), ...profile },
-        { stash: handingOver && !stashed.current, syncedFor: userId },
-      )
-      stashed.current = true
+      installLibrary({ ...fromRows(rows), ...profile })
       say(`Signed in — ${deckRes.data.length} ${deckRes.data.length === 1 ? 'deck' : 'decks'}`)
     }
 
@@ -193,12 +175,10 @@ export default function LibrarySync() {
     return () => {
       cancelled = true
     }
-    // Deliberately keyed on the account alone. Including the library would
-    // re-pull on every edit, and pulling is what the push below is for, and
-    // `syncedFor` is read here but written by this same effect — listing it
-    // would re-run the pull in response to its own result.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [available, userId, replaceLibrary, releaseSyncedLibrary, say, trouble])
+    // Keyed on the account alone, and now honestly so: the library this reads
+    // comes from its key rather than from props, so there is nothing missing
+    // from this list. It used to need a lint exception to say the same thing.
+  }, [available, userId, installLibrary, say, trouble])
 
   /*
    * The latest library, for the flush below to read.
