@@ -175,18 +175,26 @@ synchronously, studying still works with no network, and a paused free project
 is a sync that retries rather than an app that is gone. Supabase is the durable
 copy alongside it, kept in step by `src/data/LibrarySync.jsx`.
 
-Signing in reads the account's library and decides which one wins. **An account
-with nothing in it adopts whatever this browser was holding** — that is the
-migration, and it is the only case where local wins. Once the account has
-decks, the account is the library, because it is the copy your other machines
-see. Whatever was here first is written to `gunit.state.presync` rather than
-dropped.
+**Every library has its own key.** Signed out you are reading
+`gunit.state.guest`; signed in, `gunit.state.user.<id>`. Signing in and out
+changes which key is read and nothing else — nothing is copied on the way in,
+nothing is swapped on the way out, and the two libraries have no slot to meet
+in. Signing out therefore leaves the account's decks nowhere on screen, which
+matters because students borrow machines and finding somebody else's revision
+on a library PC is the wrong default.
 
-Signing out hands the browser back what it was holding before, and the
-account's decks do not stay behind. Students borrow machines, and finding
-somebody else's revision on a library PC is the wrong default. Nothing is lost
-by it — the account's library is in Postgres, and the two copies simply swap
-places.
+**An empty account is asked, not filled.** Sign in with a new account while the
+guest library has decks and Gunit offers to bring them in. It is a question
+rather than a default: the decks in front of you when you sign up are not
+always yours, and once they are in an account they follow it to every machine
+it signs in on. They are **copied**, so they stay on this browser too, and
+answering no is remembered so the same question does not return on every
+sign-in.
+
+Decks brought in are given new ids on the way. A deck id that already looks
+like a uuid means some account uploaded that library once — quite possibly a
+different one on a shared browser — and offering those ids back reaches for
+rows the new account does not own, which row level security refuses outright.
 
 Changes go up as a diff, not as the whole library: `src/data/sync.js` works out
 what actually changed between the last confirmed push and now, so grading one

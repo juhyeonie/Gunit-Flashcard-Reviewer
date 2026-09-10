@@ -29,6 +29,9 @@ export default function Modal({
   confirmLabel,
   onConfirm,
   confirmVariant = 'primary',
+  // "Cancel" is right for a form and wrong for an offer, where declining is
+  // an ordinary answer rather than backing out of something.
+  cancelLabel = 'Cancel',
   confirmDisabled = false,
   secondaryAction,
   maxWidth = 460,
@@ -159,7 +162,7 @@ export default function Modal({
               cannot be hit by someone reaching for "Save". */}
           {secondaryAction && <div className="mr-auto">{secondaryAction}</div>}
           <Button variant="outline" size="sm" onClick={onClose}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button size="sm" variant={confirmVariant} onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}

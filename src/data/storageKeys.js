@@ -100,3 +100,30 @@ export function migrateLegacyStorage() {
   write(GUEST_KEY, legacy)
   return { migrated: true, account: null, guestFromStash: false }
 }
+
+/**
+ * Whether this account has already been offered the guest library and said no.
+ *
+ * Without it the offer returns on every sign-in for as long as the account
+ * stays empty, which is nagging rather than asking. The answer is per account
+ * and per browser, which is the same scope as the question.
+ */
+const declinedKey = (userId) => `gunit.offer.declined.${userId}`
+
+export function hasDeclinedImport(userId) {
+  try {
+    return localStorage.getItem(declinedKey(userId)) === 'yes'
+  } catch {
+    // No storage means no memory of the answer; asking again is the safe way
+    // round, since the alternative is never offering at all.
+    return false
+  }
+}
+
+export function rememberDeclinedImport(userId) {
+  try {
+    localStorage.setItem(declinedKey(userId), 'yes')
+  } catch {
+    // Then it will be asked again. Not worth failing a sign-in over.
+  }
+}

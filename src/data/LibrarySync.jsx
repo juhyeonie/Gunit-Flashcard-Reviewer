@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp } from './useApp.js'
 import { useAuth } from './useAuth.js'
 import { getSupabase } from './supabase.js'
 import { registerPendingSync } from './pendingSync.js'
-import { GUEST_KEY } from './storageKeys.js'
+import { GUEST_KEY, hasDeclinedImport, rememberDeclinedImport } from './storageKeys.js'
 import { parseStoredState } from './normalize.js'
+import Modal from '../components/Modal.jsx'
 import {
   changesBetween,
   fromRows,
@@ -73,6 +74,8 @@ export default function LibrarySync() {
   // Who was signed in last time this ran, so signing out is distinguishable
   // from having never signed in.
   const wasSignedInAs = useRef(null)
+  /** The guest library waiting to be offered to an empty account, if any. */
+  const [offer, setOffer] = useState(null)
 
   useEffect(() => {
     alive.current = true
@@ -138,36 +141,28 @@ export default function LibrarySync() {
       }
       if (cancelled || !alive.current) return
 
-      const guest = readGuestLibrary()
-      if (deckRes.data.length === 0 && guest.decks.length > 0) {
-        // Nothing up there yet: the guest library becomes the account's. It is
-        // copied rather than moved — the guest key is left exactly as it is,
-        // so a failed upload costs nothing and signing out still finds it.
-        // Fresh ids, always. A uuid in the guest library means some account
-        // uploaded it once — possibly another one on a shared browser — and
-        // offering those ids back reaches for rows this user does not own.
-        const rows = toRows(guest, userId, { reissueIds: true })
-        const { error } = await write(supabase, {
-          decks: { upsert: rows.decks, remove: [] },
-          cards: { upsert: rows.cards, remove: [] },
-          sessions: { insert: rows.sessions },
-        })
-        if (cancelled || !alive.current) return
-        if (error) {
-          trouble('Signed in, but your decks could not be uploaded')
-          return
-        }
-        synced.current = rows
-        installLibrary(fromRows(rows))
-        say(`Uploaded ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'}`)
-        return
-      }
-
       const rows = { decks: deckRes.data, cards: cardRes.data, sessions: sessionRes.data }
       synced.current = toRows(fromRows(rows), userId)
 
       const profile = profileRes.data ? profileToSettings(profileRes.data) : {}
       installLibrary({ ...fromRows(rows), ...profile })
+
+      /*
+       * An empty account, and decks sitting in the guest library: ask.
+       *
+       * This used to happen by itself. Copying somebody's decks into an
+       * account is not a thing to do quietly on a shared browser — the decks
+       * in front of you when you sign up are not always yours, and once they
+       * are in an account they are visible from every machine that account
+       * signs in on. The account's library is installed either way; the offer
+       * sits on top of it.
+       */
+      const guest = readGuestLibrary()
+      if (deckRes.data.length === 0 && guest.decks.length > 0 && !hasDeclinedImport(userId)) {
+        setOffer({ decks: guest.decks.length })
+        return
+      }
+
       say(`Signed in — ${deckRes.data.length} ${deckRes.data.length === 1 ? 'deck' : 'decks'}`)
     }
 
@@ -281,7 +276,72 @@ export default function LibrarySync() {
     })
   }, [available, userId, settings, theme, trouble])
 
-  return null
+  /**
+   * Yes: the guest library is copied into the account.
+   *
+   * Copied, not moved. The guest key is left exactly as it is, so a failed
+   * upload costs nothing and signing out still finds those decks where they
+   * were. Fresh ids, always — a uuid in the guest library means some account
+   * uploaded it once, possibly another one on this browser, and offering those
+   * ids back reaches for rows this user does not own.
+   */
+  const acceptOffer = useCallback(async () => {
+    setOffer(null)
+    const { userId: uid } = latest.current
+    const supabase = await getSupabase()
+    if (!supabase || !uid) return
+
+    const guest = readGuestLibrary()
+    const rows = toRows(guest, uid, { reissueIds: true })
+    const { error } = await write(supabase, {
+      decks: { upsert: rows.decks, remove: [] },
+      cards: { upsert: rows.cards, remove: [] },
+      sessions: { insert: rows.sessions },
+    })
+    if (!alive.current) return
+    if (error) {
+      trouble('Your decks could not be brought into this account')
+      return
+    }
+    synced.current = rows
+    installLibrary(fromRows(rows))
+    say(`Brought ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'} in`)
+  }, [installLibrary, say, trouble])
+
+  /** No: remembered, so signing in again does not ask the same thing forever. */
+  const declineOffer = useCallback(() => {
+    setOffer(null)
+    if (latest.current.userId) rememberDeclinedImport(latest.current.userId)
+    say('Left your own decks where they were')
+  }, [say])
+
+  /*
+   * The one thing this component draws. Everything else it does is invisible,
+   * but a question cannot be.
+   */
+  return (
+    <Modal
+      /*
+       * Gated on there being a session rather than cleared on the way out.
+       * Signing out simply stops asking, and the next sign-in sets its own
+       * offer or none — which saves clearing state from inside an effect for
+       * no behaviour anyone can see.
+       */
+      open={Boolean(offer) && Boolean(userId)}
+      onClose={declineOffer}
+      kicker="Your decks"
+      title={
+        offer?.decks === 1
+          ? 'Bring your deck into this account?'
+          : `Bring your ${offer?.decks ?? 0} decks into this account?`
+      }
+      body="This account is empty. Copying them in makes them available on your other machines — they also stay on this browser either way."
+      confirmLabel="Bring them in"
+      cancelLabel="Not now"
+      onConfirm={acceptOffer}
+      maxWidth={420}
+    />
+  )
 }
 
 /**
