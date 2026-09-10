@@ -127,3 +127,29 @@ export function rememberDeclinedImport(userId) {
     // Then it will be asked again. Not worth failing a sign-in over.
   }
 }
+
+/**
+ * Takes an account's library off this machine.
+ *
+ * Called on an explicit sign-out, and only once whatever was queued has gone
+ * up. Signing out already stops the account's decks being *shown* — the store
+ * reads the guest key again — but leaving them on disk is not the same as
+ * taking them off it, and students borrow machines.
+ *
+ * Nothing is lost by it. The library is in Postgres and signing in again
+ * fetches it. What it costs is the offline copy: sign in somewhere with no
+ * network after signing out here, and there is nothing to read until there is
+ * a connection. That is the trade, and it is the right way round — a copy of
+ * somebody's revision left on a library PC is worse than a sign-in that needs
+ * the network.
+ */
+export function forgetAccountLibrary(userId) {
+  if (!userId) return false
+  try {
+    localStorage.removeItem(userKey(userId))
+    return true
+  } catch {
+    // Storage refused. The decks stay, which is the safe direction to fail in.
+    return false
+  }
+}

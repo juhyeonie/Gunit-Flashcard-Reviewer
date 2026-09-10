@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthContext } from './authContext.js'
 import { getSupabase, isConfigured } from './supabase.js'
 import { flushPendingSync } from './pendingSync.js'
+import { forgetAccountLibrary } from './storageKeys.js'
 
 /**
  * Who is signed in, if anyone, and the four things you can do about it.
@@ -103,11 +104,29 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(
     () =>
       call(async (supabase) => {
+        // Read before the session goes, or there is nothing left to name.
+        const { data } = await supabase.auth.getSession()
+        const userId = data.session?.user?.id ?? null
+
         // A failure here has already been reported to the reader. Signing out
         // is still what they asked for, and refusing to would strand them
         // signed in on a machine they may be walking away from.
-        await flushPendingSync()
-        return supabase.auth.signOut()
+        const { error: unsent } = await flushPendingSync()
+
+        const result = await supabase.auth.signOut()
+
+        /*
+         * The account's library comes off the machine, but only once it is
+         * safely in Postgres.
+         *
+         * Three conditions, and each earns its place: the sign-out has to have
+         * worked, or the reader is still signed in and would be looking at an
+         * empty library; the flush has to have worked, or the only copy of the
+         * last change is the one about to be removed; and there has to be an
+         * account to name.
+         */
+        if (!result.error && !unsent && userId) forgetAccountLibrary(userId)
+        return result
       }),
     [call],
   )
