@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import CreatorCredit from '../components/CreatorCredit.jsx'
 
 /**
  * What somebody sees at `/` before they have signed in.
@@ -77,6 +78,9 @@ export default function Landing() {
         >
           Or start studying without one
         </Link>
+
+        {/* Last on the page, under the way in rather than beside it. */}
+        <CreatorCredit className="border-t border-line-soft pt-6 w-full" />
       </div>
     </div>
   )

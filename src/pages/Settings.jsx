@@ -287,6 +287,25 @@ export default function Settings() {
       </section>
 
       {/*
+        Where app credits belong, and the one place the app talks about itself
+        rather than about your library. "About you", further up, is your name —
+        a different thing that happens to share a word.
+
+        Allowed to be a little louder than the same line on the landing page:
+        nobody arrives here by accident, and it is the last thing on the page.
+      */}
+      <section className="flex flex-col gap-3.5">
+        <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">About</h2>
+        <div className="flex flex-col gap-1">
+          <div className="font-serif text-[20px] leading-[1.2] text-accent">Gunit</div>
+          <p className="m-0 text-[13px] leading-[1.5] text-ink-2">
+            Designed &amp; developed by{' '}
+            <span className="font-semibold text-ink">Justine Pelgone</span>
+          </p>
+        </div>
+      </section>
+
+      {/*
         Driven by the visible button above, so it is taken out of the tab order
         and hidden from the reader. Left in, focus lands on an invisible
         control off the side of the page with nothing to announce.
