@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { EyeIcon } from '../components/Icons.jsx'
 import { useAuth } from '../data/useAuth.js'
@@ -123,7 +123,15 @@ const input =
 export default function SignIn() {
   const { available, user, signIn, signUp, requestPasswordReset } = useAuth()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('in')
+  /*
+   * The landing page's "Create an account" asks for the sign-up mode by
+   * carrying it in the navigation rather than in the address. The mode has
+   * never been a route — there is nothing to bookmark about the sign-up
+   * variant — and inventing one to serve a button would be a worse trade than
+   * reading a hint the router already carries.
+   */
+  const { state } = useLocation()
+  const [mode, setMode] = useState(state?.mode === 'up' ? 'up' : 'in')
   useDocumentTitle(COPY[mode].document)
 
   const [name, setName] = useState('')
