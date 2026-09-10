@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthContext } from './authContext.js'
 import { getSupabase, isConfigured } from './supabase.js'
-import { flushPendingSync } from './pendingSync.js'
+import { flushPendingSync, hasOutstandingChanges } from './pendingSync.js'
 import { forgetAccountLibrary } from './storageKeys.js'
 
 /**
@@ -22,6 +22,8 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState(isConfigured ? 'loading' : 'unavailable')
   const [session, setSession] = useState(null)
   const alive = useRef(true)
+  // Who the last event said was signed in, so the next one can tell who left.
+  const signedInAs = useRef(null)
 
   useEffect(() => {
     alive.current = true
@@ -40,6 +42,7 @@ export function AuthProvider({ children }) {
 
       supabase.auth.getSession().then(({ data }) => {
         if (!alive.current) return
+        signedInAs.current = data.session?.user?.id ?? null
         setSession(data.session ?? null)
         setStatus('ready')
       })
@@ -48,8 +51,28 @@ export function AuthProvider({ children }) {
       // password-recovery link — all of which change who this browser is.
       const { data } = supabase.auth.onAuthStateChange((_event, next) => {
         if (!alive.current) return
+
+        const leaving = signedInAs.current
+        signedInAs.current = next?.user?.id ?? null
         setSession(next ?? null)
         setStatus('ready')
+
+        /*
+         * A session that ended without going through the button: expired,
+         * revoked, or signed out in another tab.
+         *
+         * The account's library comes off the machine there too, or the
+         * guarantee is only as good as the reader remembering to press the
+         * right thing. Nothing can be flushed at this point — there is no
+         * token left — so the one reason to keep it is a change that never
+         * went up, which is what `hasOutstandingChanges` answers.
+         *
+         * This also runs after an ordinary sign-out, where the key has already
+         * gone and removing it again is a no-op. If that sign-out's flush
+         * failed, the change is still outstanding and this leaves the copy
+         * exactly as that path did.
+         */
+        if (leaving && !next && !hasOutstandingChanges()) forgetAccountLibrary(leaving)
       })
       unsubscribe = () => data.subscription.unsubscribe()
     })

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -19,6 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const order = []
 let signOutResult = { error: null }
+let outstanding = false
+/** Lets a test end the session the way a token refresh failure would. */
+let publishAuthEvent = () => {}
 
 const USER = '83b19958-70bb-4c66-a4e2-18b9c39dbec0'
 
@@ -27,7 +30,10 @@ vi.mock('./supabase.js', () => ({
   getSupabase: async () => ({
     auth: {
       getSession: async () => ({ data: { session: { user: { id: USER } } } }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      onAuthStateChange: (fn) => {
+        publishAuthEvent = fn
+        return { data: { subscription: { unsubscribe: () => {} } } }
+      },
       signOut: async () => {
         order.push('signOut')
         return signOutResult
@@ -42,6 +48,7 @@ vi.mock('./pendingSync.js', () => ({
     order.push('flush')
     return { error: null }
   },
+  hasOutstandingChanges: () => outstanding,
 }))
 
 const { AuthProvider } = await import('./AuthProvider.jsx')
@@ -52,6 +59,7 @@ const auth = () => renderHook(() => useAuth(), { wrapper: AuthProvider })
 beforeEach(() => {
   order.length = 0
   signOutResult = { error: null }
+  outstanding = false
   localStorage.clear()
 })
 
@@ -160,5 +168,79 @@ describe('taking the account off the machine', () => {
     await result.current.signOut()
 
     expect(localStorage.getItem(other)).toBeTruthy()
+  })
+})
+
+describe('a session that ends without the button', () => {
+  const key = `gunit.state.user.${USER}`
+
+  /** What a failed token refresh, a revoked session, or another tab looks like. */
+  const sessionEnds = async () => {
+    await act(async () => {
+      publishAuthEvent('SIGNED_OUT', null)
+    })
+  }
+
+  it('takes the library off the machine too', async () => {
+    // Otherwise the guarantee is only as good as the reader remembering to
+    // press the right thing, and an expired session presses nothing.
+    localStorage.setItem(key, '{"decks":[]}')
+    const { result } = auth()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await sessionEnds()
+
+    expect(localStorage.getItem(key)).toBe(null)
+  })
+
+  it('keeps it when something never reached the account', async () => {
+    // There is no token left, so nothing can be pushed now. The copy about to
+    // be removed is the only one holding that change.
+    outstanding = true
+    localStorage.setItem(key, '{"decks":[]}')
+    const { result } = auth()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await sessionEnds()
+
+    expect(localStorage.getItem(key)).toBeTruthy()
+  })
+
+  it('does not reach for a library when nobody was signed in', async () => {
+    // A signed-out browser publishing a signed-out event should do nothing at
+    // all, rather than removing a key named after nobody.
+    const { result } = auth()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await sessionEnds()
+
+    localStorage.setItem(key, '{"decks":[]}')
+    await sessionEnds()
+
+    expect(localStorage.getItem(key)).toBeTruthy()
+  })
+
+  it('leaves the guest library alone', async () => {
+    localStorage.setItem(key, '{"decks":[]}')
+    localStorage.setItem('gunit.state.guest', '{"decks":[{"id":"mine"}]}')
+    const { result } = auth()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await sessionEnds()
+
+    expect(JSON.parse(localStorage.getItem('gunit.state.guest')).decks).toHaveLength(1)
+  })
+
+  it('does not remove anything on an ordinary token refresh', async () => {
+    // The session is replaced, not ended. Removing the library here would
+    // empty it roughly once an hour.
+    localStorage.setItem(key, '{"decks":[]}')
+    const { result } = auth()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      publishAuthEvent('TOKEN_REFRESHED', { user: { id: USER } })
+    })
+
+    expect(localStorage.getItem(key)).toBeTruthy()
   })
 })
