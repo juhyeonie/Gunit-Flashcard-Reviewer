@@ -179,9 +179,16 @@ copy alongside it, kept in step by `src/data/LibrarySync.jsx`.
 `gunit.state.guest`; signed in, `gunit.state.user.<id>`. Signing in and out
 changes which key is read and nothing else — nothing is copied on the way in,
 nothing is swapped on the way out, and the two libraries have no slot to meet
-in. Signing out therefore leaves the account's decks nowhere on screen, which
-matters because students borrow machines and finding somebody else's revision
-on a library PC is the wrong default.
+in.
+
+**Signing out takes the account's library off the machine**, once whatever was
+queued has gone up — not merely off the screen. Students borrow machines, and a
+copy of somebody's revision left on a library PC is the wrong thing to leave
+behind. Nothing is lost by it: the library is in Postgres and signing in again
+fetches it. What it costs is the offline copy, so signing in somewhere with no
+network gives you nothing to read until there is a connection — the right way
+round of the two. The key stays if the final push failed, because then the copy
+about to be removed is the only one.
 
 **An empty account is asked, not filled.** Sign in with a new account while the
 guest library has decks and Gunit offers to bring them in. It is a question
