@@ -19,6 +19,25 @@ export default defineConfig({
     port: Number(process.env.PORT) || 5174,
   },
   test: {
+    /*
+     * Vitest defaults to five seconds a test, and this suite runs twenty-five
+     * files in twenty-five workers. On a machine with anything else going on,
+     * ordinary DOM tests that finish in tens of milliseconds when run alone
+     * cross that line together: one run in four failed somewhere between three
+     * and eight tests at once, spread across six unrelated files, every one of
+     * them reporting "Test timed out in 5000ms" at a duration just past it.
+     *
+     * Nothing here is slow. The default is simply tuned for a suite smaller
+     * than this one, and a timeout that fires on a busy laptop is a test that
+     * reports the laptop rather than the code. Twenty seconds matches the
+     * budget the PDF tests already give themselves by hand.
+     *
+     * The cost is that a genuinely hung test now takes twenty seconds to say
+     * so instead of five. That is the right way round: a slow report is an
+     * inconvenience, and a false failure teaches you to distrust the suite.
+     */
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
     alias: {
       /*
        * Mammoth picks its unzip implementation through the "browser" field in
