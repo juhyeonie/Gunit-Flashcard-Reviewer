@@ -174,19 +174,85 @@ describe('carrying preferences to the account', () => {
 })
 
 describe('the library it puts aside on the way in', () => {
-  /*
-   * Not covered, and worth saying so rather than leaving it to be discovered.
-   *
-   * Reloading the page while signed in mounts everything afresh: local storage
-   * already holds the account's library, the pull takes the account-wins
-   * branch, and `stashed` starts false again — so the slot is overwritten with
-   * the account's decks and signing out afterwards hands them back to the
-   * machine.
-   *
-   * Fixing that needs the stored state to say which account it belongs to, so
-   * a pull can tell a handover from a reload. That is a change to the shape
-   * that gets persisted and migrated, and it is left for its own commit rather
-   * than smuggled in beside a one-line await.
-   */
-  it.todo('survives a reload while signed in')
+  const PRESYNC = 'gunit.state.presync'
+
+  const account = () =>
+    fakeClient({
+      decks: [
+        {
+          id: '95c84be2-9060-42c7-a072-9b7e7c7b5591',
+          user_id: USER,
+          title: 'From the account',
+          subject: 'Rome',
+          description: '',
+          studied_at: null,
+        },
+      ],
+      profile: null,
+    })
+
+  it('puts the browser own library aside when signing in', async () => {
+    client = account()
+    mount()
+
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+    const kept = JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)
+    expect(kept.length).toBeGreaterThan(1)
+    expect(kept).not.toEqual(['From the account'])
+  })
+
+  it('leaves the slot alone on a reload while signed in', async () => {
+    // A reload arrives here exactly as a sign-in does: an account library to
+    // install. Stashing again puts the account's decks into the slot signing
+    // out reads from, and hands them back to the machine afterwards — the one
+    // thing releaseSyncedLibrary exists to prevent. A ref cannot see across a
+    // reload, so the stored library says which account it belongs to.
+    client = account()
+    const first = mount()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+    const mine = JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)
+
+    // Everything mounts afresh, reading the library back from storage.
+    first.unmount()
+    cleanup()
+    client = account()
+    mount()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+
+    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
+  })
+
+  it('records which account the stored library belongs to', async () => {
+    client = account()
+    mount()
+    await waitFor(() => expect(api.syncedFor).toBe(USER))
+    expect(JSON.parse(localStorage.getItem('gunit.state.v2')).syncedFor).toBe(USER)
+  })
+})
+
+describe('what the account hands back', () => {
+  it('derives progress, which the database does not store', async () => {
+    // Progress is a function of the schedule and is never sent up, so decks
+    // coming back carry none. Installed raw, every page rendering
+    // `Math.round(deck.progress * 100)` showed NaN% until the next reload.
+    client = fakeClient({
+      decks: [
+        { id: '95c84be2-9060-42c7-a072-9b7e7c7b5591', user_id: USER, title: 'From the account', subject: 'Rome', description: '', studied_at: null },
+      ],
+      cards: [
+        { id: 'aaaaaaaa-0000-4000-8000-000000000001', deck_id: '95c84be2-9060-42c7-a072-9b7e7c7b5591', user_id: USER, front: 'Q1', back: 'A1', position: 0, due: null, interval: 1440, ease: 2.5, reps: 1, lapses: 0, last_grade: 'good', suspended: false },
+        { id: 'aaaaaaaa-0000-4000-8000-000000000002', deck_id: '95c84be2-9060-42c7-a072-9b7e7c7b5591', user_id: USER, front: 'Q2', back: 'A2', position: 1, due: null, interval: 0, ease: 2.5, reps: 0, lapses: 0, last_grade: null, suspended: false },
+      ],
+      profile: null,
+    })
+    mount()
+
+    await waitFor(() => expect(api.decks).toHaveLength(1))
+    const [deck] = api.decks
+    expect(typeof deck.progress).toBe('number')
+    expect(Number.isNaN(deck.progress)).toBe(false)
+    // One of two cards has been graded something other than "again".
+    expect(deck.progress).toBe(0.5)
+    expect(Math.round(deck.progress * 100)).toBe(50)
+  })
 })
