@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
+import Modal from '../components/Modal.jsx'
 import { useApp } from '../data/useApp.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { useAuth } from '../data/useAuth.js'
@@ -79,6 +80,28 @@ export default function Settings() {
   const fileRef = useRef(null)
   const deckCount = decks.length
   const { available, user, signOut } = useAuth()
+
+  /*
+   * Signing out asks first, and it did not used to.
+   *
+   * It stopped being a one-click undo when the storage was split: the account's
+   * library now comes off this machine as well as off the screen. Nothing is
+   * lost by it — the decks are in Postgres and signing back in fetches them —
+   * but on a train that is the difference between having your decks and not,
+   * and it is worth a sentence before rather than a surprise after.
+   */
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  const leave = async () => {
+    // Busy, because this is no longer instant: whatever the push debounce is
+    // still holding goes up first, and that is a round trip.
+    setSigningOut(true)
+    const { error } = await signOut()
+    setSigningOut(false)
+    setConfirmingSignOut(false)
+    say(error ?? 'Signed out')
+  }
 
   /**
    * A deck at a time is a way to share; this is the file you want before
@@ -223,14 +246,7 @@ export default function Settings() {
           <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Signing in</h2>
           {user ? (
             <Row label="Signed in" hint={user.email}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const { error } = await signOut()
-                  say(error ?? 'Signed out')
-                }}
-              >
+              <Button variant="outline" size="sm" onClick={() => setConfirmingSignOut(true)}>
                 Sign out
               </Button>
             </Row>
@@ -285,6 +301,19 @@ export default function Settings() {
           e.target.value = ''
         }}
         className="absolute -left-[9999px] h-px w-px opacity-0"
+      />
+
+      <Modal
+        open={confirmingSignOut}
+        onClose={() => setConfirmingSignOut(false)}
+        maxWidth={420}
+        kicker="Signing out"
+        title="Sign out of Gunit?"
+        body="Your decks stay in your account and come back when you sign in. This browser returns to its own library, and the account's copy is taken off this machine — so studying offline here will need a sign-in first."
+        confirmLabel={signingOut ? 'Signing out…' : 'Sign out'}
+        confirmDisabled={signingOut}
+        cancelLabel="Stay signed in"
+        onConfirm={leave}
       />
     </div>
   )
