@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthContext } from './authContext.js'
 import { getSupabase, isConfigured } from './supabase.js'
+import { flushPendingSync } from './pendingSync.js'
 
 /**
  * Who is signed in, if anyone, and the four things you can do about it.
@@ -91,7 +92,25 @@ export function AuthProvider({ children }) {
     [call],
   )
 
-  const signOut = useCallback(() => call((supabase) => supabase.auth.signOut()), [call])
+  /**
+   * Signing out, but not before whatever is still queued has gone up.
+   *
+   * Pushes are debounced, and signing out both cancels that timer and takes
+   * the account's library out of local storage — so a change made in the last
+   * second used to end up in neither place. It has to go first, too: after
+   * `signOut` there is no session, and row level security refuses every row.
+   */
+  const signOut = useCallback(
+    () =>
+      call(async (supabase) => {
+        // A failure here has already been reported to the reader. Signing out
+        // is still what they asked for, and refusing to would strand them
+        // signed in on a machine they may be walking away from.
+        await flushPendingSync()
+        return supabase.auth.signOut()
+      }),
+    [call],
+  )
 
   /**
    * Sends the recovery email. `redirectTo` has to be a URL the project allows
