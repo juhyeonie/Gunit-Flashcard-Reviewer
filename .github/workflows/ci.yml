@@ -24,9 +24,11 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      # v5 rather than v4: v4 targets Node 20, which the runners have
+      # deprecated and now force onto 24 with a warning on every run.
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # Matches the major version the app is developed against. Pinned
           # rather than "latest", so a new Node release is something this
