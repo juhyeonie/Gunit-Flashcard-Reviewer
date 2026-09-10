@@ -685,3 +685,51 @@ describe('suspending a card', () => {
     expect(after.schedule[card.id].suspended).toBe(true)
   })
 })
+
+describe('the pre-sign-in stash', () => {
+  const PRESYNC = 'gunit.state.presync'
+  const account = { decks: [{ id: 'acc', title: 'From the account', subject: 'S', desc: '', cards: [], schedule: {} }], sessions: [] }
+  const other = { decks: [{ id: 'oth', title: 'A later pull', subject: 'S', desc: '', cards: [], schedule: {} }], sessions: [] }
+
+  it('keeps what the browser was holding', () => {
+    const { result } = store()
+    const mine = result.current.decks.map((d) => d.title)
+
+    act(() => result.current.replaceLibrary(account))
+
+    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
+  })
+
+  it('does not let a second replacement overwrite it', () => {
+    // The stash is one slot. Overwritten while signed in it holds the
+    // account's library rather than the browser's, and signing out then hands
+    // the account's decks back to the machine instead of taking them off it.
+    // A second call is not hypothetical: StrictMode runs every effect twice.
+    const { result } = store()
+    const mine = result.current.decks.map((d) => d.title)
+
+    act(() => result.current.replaceLibrary(account, { stash: true }))
+    act(() => result.current.replaceLibrary(other, { stash: false }))
+
+    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
+    expect(result.current.decks.map((d) => d.title)).toEqual(['A later pull'])
+  })
+
+  it('hands the browser back its own library, not the account it just left', () => {
+    const { result } = store()
+    const mine = result.current.decks.map((d) => d.title)
+
+    act(() => result.current.replaceLibrary(account, { stash: true }))
+    act(() => result.current.replaceLibrary(other, { stash: false }))
+    act(() => result.current.releaseSyncedLibrary())
+
+    expect(result.current.decks.map((d) => d.title)).toEqual(mine)
+  })
+
+  it('still stashes by default, for callers that do not say', () => {
+    const { result } = store()
+    const mine = result.current.decks.map((d) => d.title)
+    act(() => result.current.replaceLibrary(account))
+    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
+  })
+})

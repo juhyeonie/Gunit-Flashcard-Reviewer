@@ -38,6 +38,25 @@ export default defineConfig({
      */
     testTimeout: 20_000,
     hookTimeout: 20_000,
+    /*
+     * The suite runs as a clone with no project, always.
+     *
+     * Vitest loads .env the same way the dev server does, and `isConfigured`
+     * in supabase.js is read once at import. So the moment a developer
+     * configured a real project, seven tests that assert the local-only path
+     * began asserting the opposite — and one of them signed in for real,
+     * against the live project, on every single run. It came back "Invalid
+     * login credentials", which is the polite version of what that is.
+     *
+     * Blanking the two variables here makes the suite independent of whatever
+     * is in .env. Tests that want a configured project mock supabase.js
+     * outright, as LibrarySync.test.jsx does, rather than depending on the
+     * machine they happen to run on.
+     */
+    env: {
+      VITE_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: '',
+    },
     alias: {
       /*
        * Mammoth picks its unzip implementation through the "browser" field in

@@ -165,10 +165,19 @@ export function AppProvider({ children }) {
    * sentence this app should ever cause — the same reasoning as the salvage
    * key for an unreadable payload.
    */
-  const replaceLibrary = useCallback(({ decks, sessions, settings, theme }) => {
+  /**
+   * Swaps in an account's library, keeping what was here for the swap back.
+   *
+   * `stash` is how the caller says whether this is the first replacement of a
+   * sign-in. It has to, because the stash is a single slot: overwritten on a
+   * second call it holds the account's library rather than the browser's, and
+   * signing out then hands the account's decks straight back to the machine
+   * instead of taking them off it.
+   */
+  const replaceLibrary = useCallback(({ decks, sessions, settings, theme }, { stash = true } = {}) => {
     setState((s) => {
       try {
-        localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
+        if (stash) localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
       } catch {
         // Storage full or refused; the swap still happens.
       }
