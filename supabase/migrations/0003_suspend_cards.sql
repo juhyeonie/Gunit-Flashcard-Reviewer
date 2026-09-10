@@ -11,10 +11,25 @@
 alter table public.cards
   add column if not exists suspended boolean not null default false;
 
--- Only the cards a reader is still studying are worth an index. Suspended
--- rows are read when the deck is listed and never when the queue is built,
--- and leaving them out keeps the index the size of the working set.
-create index if not exists cards_due_idx
+-- Only the cards a reader is still studying are worth an index. Suspended rows
+-- are read when the deck is listed and never when a queue is built, so leaving
+-- them out keeps the index the size of the working set.
+--
+-- A different name from 0001's cards_due_idx, and deliberately. This first
+-- read `create index if not exists cards_due_idx ... where not suspended`,
+-- which does nothing at all on any project that has run 0001: the name is
+-- already taken, so "if not exists" skips it and the full index stays. No
+-- error, no partial index, and a comment claiming otherwise.
+--
+-- 0001's cards_due_idx is now covered by this one and can go, but dropping it
+-- is left to you rather than done here:
+--
+--   drop index if exists public.cards_due_idx;
+--
+-- Worth knowing before you decide: nothing queries by due date server-side
+-- today. LibrarySync reads `select('*')` and builds the queue in the browser,
+-- so both indexes are provision for a query this app does not yet make.
+create index if not exists cards_due_active_idx
   on public.cards (user_id, due)
   where not suspended;
 
