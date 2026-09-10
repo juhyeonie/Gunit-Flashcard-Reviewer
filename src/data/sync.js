@@ -48,13 +48,27 @@ const asMillis = (stamp) => {
  * Ids are minted here rather than left to Postgres so that the caller can put
  * the same ids into local state: a deck that exists under one id locally and
  * another remotely would be uploaded again on every sign-in.
+ *
+ * `reissueIds` mints new ones even for ids that already look like uuids, and
+ * exists for exactly one caller: an empty account adopting the guest library.
+ *
+ * A uuid in a local library is not a promise that it belongs to *this*
+ * account. It usually means some account uploaded that library once already —
+ * and on a shared browser that can easily be somebody else's. Offered back
+ * under the same ids, the upsert's `on conflict do update` reaches for rows
+ * another user owns, and row level security refuses the whole change set:
+ * "new row violates row-level security policy (USING expression)". Nothing is
+ * adopted, and no reason is given that means anything to the reader.
+ *
+ * The schedule survives the reissue because it is looked up by the card's
+ * local id below, before the new one is written.
  */
-export function toRows(state, userId) {
+export function toRows(state, userId, { reissueIds = false } = {}) {
   const decks = []
   const cards = []
 
   for (const deck of state.decks ?? []) {
-    const deckId = isUuid(deck.id) ? deck.id : newId()
+    const deckId = !reissueIds && isUuid(deck.id) ? deck.id : newId()
     decks.push({
       id: deckId,
       user_id: userId,
@@ -67,7 +81,7 @@ export function toRows(state, userId) {
     deck.cards.forEach((card, position) => {
       const entry = deck.schedule?.[card.id] ?? null
       cards.push({
-        id: isUuid(card.id) ? card.id : newId(),
+        id: !reissueIds && isUuid(card.id) ? card.id : newId(),
         deck_id: deckId,
         user_id: userId,
         front: card.front,
@@ -85,11 +99,11 @@ export function toRows(state, userId) {
   }
 
   const sessions = (state.sessions ?? []).map((s) => ({
-    id: isUuid(s.id) ? s.id : newId(),
+    id: !reissueIds && isUuid(s.id) ? s.id : newId(),
     user_id: userId,
     // A session logged against a deck that has since been deleted keeps its
     // place in the streak, which is why the column is nullable.
-    deck_id: isUuid(s.deckId) ? s.deckId : null,
+    deck_id: !reissueIds && isUuid(s.deckId) ? s.deckId : null,
     at: asStamp(s.at),
     reviewed: s.reviewed,
     seconds: s.seconds ?? 0,

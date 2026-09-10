@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -73,23 +74,6 @@ function fakeClient({ decks = [], cards = [], sessions = [], profile = null } = 
 let client
 let api
 
-/**
- * Signing out has to be something a test can do, so the mocked hook holds
- * React state and hands the setter out. Calling it with null is the same
- * re-render LibrarySync sees when a real session ends.
- */
-let setAuthUser
-vi.mock('./useAuth.js', async () => {
-  const { useState } = await import('react')
-  return {
-    useAuth: () => {
-      const [user, set] = useState({ id: USER })
-      setAuthUser = set
-      return { user, available: true }
-    },
-  }
-})
-
 vi.mock('./supabase.js', () => ({
   isConfigured: true,
   getSupabase: async () => client,
@@ -98,6 +82,8 @@ vi.mock('./supabase.js', () => ({
 const { AppProvider } = await import('./AppContext.jsx')
 const { useApp } = await import('./useApp.js')
 const { default: LibrarySync } = await import('./LibrarySync.jsx')
+const { AuthContext } = await import('./authContext.js')
+const { GUEST_KEY } = await import('./storageKeys.js')
 const { flushPendingSync } = await import('./pendingSync.js')
 
 /** Hands the store out so a test can change settings the way a reader would. */
@@ -106,12 +92,43 @@ function Harness() {
   return null
 }
 
+/*
+ * Signing in and out, from the one place the app reads it.
+ *
+ * The store keys its storage off this context and the sync keys its effects
+ * off the same one. Mocking `useAuth` for the sync alone would leave the two
+ * disagreeing about who is signed in — the sync pulling an account's library
+ * into the guest's key — which is a state the app cannot actually be in.
+ */
+let signInAs
+function Identity({ children }) {
+  const [user, setUser] = useState(null)
+  useEffect(() => {
+    signInAs = setUser
+  }, [])
+  return (
+    <AuthContext.Provider value={{ user, available: true, status: 'ready' }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+/** Mounts signed out and then signs in, which is the order a reader arrives in. */
+const mountSignedIn = async () => {
+  mount()
+  await act(async () => {
+    signInAs({ id: USER })
+  })
+}
+
 const mount = () =>
   render(
-    <AppProvider>
-      <LibrarySync />
-      <Harness />
-    </AppProvider>,
+    <Identity>
+      <AppProvider>
+        <LibrarySync />
+        <Harness />
+      </AppProvider>
+    </Identity>,
   )
 
 beforeEach(() => {
@@ -155,7 +172,7 @@ describe('carrying preferences to the account', () => {
     // the browser showed the reader's own settings — and signing in on a
     // second machine pulled those defaults back over them.
     client = account()
-    mount()
+    await mountSignedIn()
 
     await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
 
@@ -170,7 +187,7 @@ describe('carrying preferences to the account', () => {
 
   it('carries the theme, which lives beside the settings rather than in them', async () => {
     client = account()
-    mount()
+    await mountSignedIn()
     await waitFor(() => expect(api.decks).toHaveLength(1))
 
     await act(async () => {
@@ -187,64 +204,26 @@ describe('carrying preferences to the account', () => {
     mount()
     expect(client.built).toHaveLength(0)
   })
-})
 
-describe('the library it puts aside on the way in', () => {
-  const PRESYNC = 'gunit.state.presync'
-
-  const account = () =>
-    fakeClient({
-      decks: [
-        {
-          id: '95c84be2-9060-42c7-a072-9b7e7c7b5591',
-          user_id: USER,
-          title: 'From the account',
-          subject: 'Rome',
-          description: '',
-          studied_at: null,
-        },
-      ],
-      profile: null,
+  it('writes no preferences at all while signed out', async () => {
+    // The local-only path, which is most of this app's use. There is no
+    // account to carry them to and nothing should be attempted.
+    client = account()
+    mount()
+    await act(async () => {
+      api.updateSettings({ cardsPer: 44 })
     })
-
-  it('puts the browser own library aside when signing in', async () => {
-    client = account()
-    mount()
-
-    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
-    const kept = JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)
-    expect(kept.length).toBeGreaterThan(1)
-    expect(kept).not.toEqual(['From the account'])
-  })
-
-  it('leaves the slot alone on a reload while signed in', async () => {
-    // A reload arrives here exactly as a sign-in does: an account library to
-    // install. Stashing again puts the account's decks into the slot signing
-    // out reads from, and hands them back to the machine afterwards — the one
-    // thing releaseSyncedLibrary exists to prevent. A ref cannot see across a
-    // reload, so the stored library says which account it belongs to.
-    client = account()
-    const first = mount()
-    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
-    const mine = JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)
-
-    // Everything mounts afresh, reading the library back from storage.
-    first.unmount()
-    cleanup()
-    client = account()
-    mount()
-    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
-
-    expect(JSON.parse(localStorage.getItem(PRESYNC)).decks.map((d) => d.title)).toEqual(mine)
-  })
-
-  it('records which account the stored library belongs to', async () => {
-    client = account()
-    mount()
-    await waitFor(() => expect(api.syncedFor).toBe(USER))
-    expect(JSON.parse(localStorage.getItem('gunit.state.v2')).syncedFor).toBe(USER)
+    expect(client.executed).toHaveLength(0)
   })
 })
+
+/*
+ * The describe that stood here tested the single-slot handover: what was put
+ * aside on the way in, and whether a second pull or a reload overwrote it.
+ * There is no slot any more — the guest library and each account's have their
+ * own keys and are never copied into one another — so the questions it asked
+ * no longer have an answer. What replaced it is in identityStorage.test.jsx.
+ */
 
 describe('what the account hands back', () => {
   it('derives progress, which the database does not store', async () => {
@@ -261,7 +240,7 @@ describe('what the account hands back', () => {
       ],
       profile: null,
     })
-    mount()
+    await mountSignedIn()
 
     await waitFor(() => expect(api.decks).toHaveLength(1))
     const [deck] = api.decks
@@ -287,12 +266,20 @@ describe('signing out without reloading first', () => {
       profile: null,
     })
 
-  /** Signs in, waits for the pull, and returns the library that was put aside. */
+  /** Mounts signed out, signs in, and returns the guest library left behind. */
   const signedIn = async () => {
     client = account()
     mount()
+    // Signed out first, so there is a guest library to leave behind — which is
+    // how a reader arrives at a sign-in page in the first place.
+    await waitFor(() => expect(api.decks.length).toBeGreaterThan(0))
+    const guest = JSON.parse(localStorage.getItem(GUEST_KEY)).decks.map((d) => d.title)
+
+    await act(async () => {
+      signInAs({ id: USER })
+    })
     await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
-    return JSON.parse(localStorage.getItem('gunit.state.presync')).decks.map((d) => d.title)
+    return guest
   }
 
   it('sends a card added seconds earlier, instead of dropping it', async () => {
@@ -308,7 +295,7 @@ describe('signing out without reloading first', () => {
     // No waiting: this is a reader who adds a card and signs out at once.
     await act(async () => {
       await flushPendingSync()
-      setAuthUser(null)
+      signInAs(null)
     })
 
     const pushed = client.rpcPayloads.flatMap((p) => p.cards_upsert ?? [])
@@ -326,7 +313,7 @@ describe('signing out without reloading first', () => {
     })
     await act(async () => {
       await flushPendingSync()
-      setAuthUser(null)
+      signInAs(null)
     })
 
     const pushed = client.rpcPayloads.flatMap((p) => p.cards_upsert ?? [])
@@ -341,7 +328,7 @@ describe('signing out without reloading first', () => {
     })
     await act(async () => {
       await flushPendingSync()
-      setAuthUser(null)
+      signInAs(null)
     })
 
     const removed = client.rpcPayloads.flatMap((p) => p.cards_remove ?? [])
@@ -355,7 +342,7 @@ describe('signing out without reloading first', () => {
 
     await act(async () => {
       await flushPendingSync()
-      setAuthUser(null)
+      signInAs(null)
     })
 
     expect(client.rpcPayloads.length).toBe(before)
@@ -364,7 +351,7 @@ describe('signing out without reloading first', () => {
   it('has nothing to flush once signed out', async () => {
     await signedIn()
     await act(async () => {
-      setAuthUser(null)
+      signInAs(null)
     })
     await expect(flushPendingSync()).resolves.toEqual({ error: null })
   })

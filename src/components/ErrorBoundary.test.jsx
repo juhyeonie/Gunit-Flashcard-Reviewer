@@ -17,7 +17,9 @@ import ErrorBoundary from './ErrorBoundary.jsx'
  * everything still looks right on screen while the library is gone for good.
  */
 
-const STORAGE_KEY = 'gunit.state.v2'
+// The signed-out library. There is one of these per identity now, and the
+// reset takes all of them — see the second test below.
+const STORAGE_KEY = 'gunit.state.guest'
 const SALVAGE_KEY = 'gunit.state.recovered'
 
 const LIBRARY = JSON.stringify({ decks: [{ id: 'republic', title: 'Roman Republic' }] })
@@ -177,7 +179,44 @@ describe('resetting the saved data', () => {
     await reset(user)
 
     expect(localStorage.getItem(STORAGE_KEY)).toBe(null)
-    expect(localStorage.getItem(SALVAGE_KEY)).toBe(LIBRARY)
+    // The copy is keyed by where each library came from, because there is more
+    // than one of them now and a flat copy could not say which was which.
+    expect(JSON.parse(localStorage.getItem(SALVAGE_KEY))[STORAGE_KEY]).toBe(LIBRARY)
+  })
+
+  it('takes every library on the machine, not just the one in use', async () => {
+    // This component reads no context on purpose — the state a store would
+    // hand back is quite possibly what just threw — so it cannot know which
+    // identity is signed in. Clearing only one key would leave a reader still
+    // looking at the library that broke the page.
+    const user = userEvent.setup()
+    const account = 'gunit.state.user.686963f7-42a5-4f94-9225-52a8a0a4859a'
+    localStorage.setItem(STORAGE_KEY, LIBRARY)
+    localStorage.setItem(account, '{"decks":[{"id":"acc"}]}')
+    show()
+    await reset(user)
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(null)
+    expect(localStorage.getItem(account)).toBe(null)
+    const saved = JSON.parse(localStorage.getItem(SALVAGE_KEY))
+    expect(Object.keys(saved).sort()).toEqual([account, STORAGE_KEY].sort())
+  })
+
+  it('does not eat its own copy on a second reset', async () => {
+    // The salvage key is skipped when gathering libraries. Included, a second
+    // reset would copy the first copy over itself and then remove it.
+    const user = userEvent.setup()
+    localStorage.setItem(STORAGE_KEY, LIBRARY)
+    show()
+    await reset(user)
+    const first = localStorage.getItem(SALVAGE_KEY)
+
+    cleanup()
+    failing = true
+    show()
+    await reset(user)
+
+    expect(localStorage.getItem(SALVAGE_KEY)).toBe(first)
   })
 
   it('writes the copy first, so a failure part way keeps the decks', async () => {
@@ -198,7 +237,7 @@ describe('resetting the saved data', () => {
     await reset(user)
 
     expect(order).toEqual([`set ${SALVAGE_KEY}`, `remove ${STORAGE_KEY}`])
-    expect(setItem).toHaveBeenCalledWith(SALVAGE_KEY, LIBRARY)
+    expect(setItem).toHaveBeenCalledWith(SALVAGE_KEY, JSON.stringify({ [STORAGE_KEY]: LIBRARY }))
   })
 
   it('does not write an empty salvage when there was nothing stored', async () => {

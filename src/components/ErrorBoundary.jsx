@@ -12,7 +12,25 @@ import { Component } from 'react'
  */
 
 const SALVAGE_KEY = 'gunit.state.recovered'
-const STORAGE_KEY = 'gunit.state.v2'
+
+/*
+ * Every library this browser holds, not one key.
+ *
+ * There is a guest library and one per account signed in on this machine, and
+ * this component deliberately reads no context — the state a store would hand
+ * back is quite possibly what just threw — so it cannot know which of them is
+ * in use. It takes all of them.
+ *
+ * The salvage keys are skipped, or a second reset would overwrite the copy the
+ * first one made and the whole point of keeping it would be lost.
+ */
+const LIBRARY_PREFIX = 'gunit.state.'
+const NOT_A_LIBRARY = ['gunit.state.recovered', 'gunit.state.unreadable']
+
+const libraryKeys = () =>
+  Object.keys(localStorage).filter(
+    (k) => k.startsWith(LIBRARY_PREFIX) && !NOT_A_LIBRARY.some((skip) => k.startsWith(skip)),
+  )
 
 const btn =
   'inline-flex cursor-pointer items-center justify-center rounded-lg border px-4 py-2.5 ' +
@@ -45,9 +63,13 @@ export default class ErrorBoundary extends Component {
    */
   resetData = () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) localStorage.setItem(SALVAGE_KEY, raw)
-      localStorage.removeItem(STORAGE_KEY)
+      const keys = libraryKeys()
+      // Every copy written before anything is removed. Reversed, a failure
+      // part way through would clear libraries whose copy was never made.
+      const saved = {}
+      for (const key of keys) saved[key] = localStorage.getItem(key)
+      if (keys.length) localStorage.setItem(SALVAGE_KEY, JSON.stringify(saved))
+      for (const key of keys) localStorage.removeItem(key)
     } catch {
       // Storage unavailable; reloading is still worth a try.
     }

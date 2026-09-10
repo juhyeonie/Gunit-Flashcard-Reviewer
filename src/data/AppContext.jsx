@@ -1,32 +1,40 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { uid } from './seed.js'
 import { grade, newEntry } from './scheduler.js'
 import { MAX_SESSIONS, appendSession } from './activity.js'
 import { DEFAULT_STATE, normalizeState, parseStoredState, progressOf } from './normalize.js'
 import { AppContext } from './appContext.js'
+import { AuthContext } from './authContext.js'
+import { GUEST_KEY, SALVAGE_KEY, keyFor, migrateLegacyStorage } from './storageKeys.js'
 
-const STORAGE_KEY = 'gunit.state.v2'
-
-// Where an unreadable payload is parked. Overwriting it on the next save would
-// destroy the only copy of whatever the reader had.
-const SALVAGE_KEY = 'gunit.state.unreadable'
-
-// What this browser held before an account's library replaced it.
-const PRESYNC_KEY = 'gunit.state.presync'
-
-const load = () => {
+/**
+ * Reads the library at one key.
+ *
+ * An empty guest library seeds itself, because a first visit should have
+ * something to study. An empty *account* library does not — it means the
+ * account is new, or that this browser has not pulled it yet, and inventing
+ * six decks of Roman history in someone's account would be worse than a blank
+ * page.
+ */
+const load = (key) => {
   let raw = null
   try {
-    raw = localStorage.getItem(STORAGE_KEY)
+    raw = localStorage.getItem(key)
   } catch {
     // Storage unavailable (private mode, blocked cookies): run in memory.
     return normalizeState(DEFAULT_STATE)
   }
 
+  if (!raw) {
+    return key === GUEST_KEY
+      ? normalizeState(DEFAULT_STATE)
+      : normalizeState({ decks: [], sessions: [] })
+  }
+
   const { state, ok } = parseStoredState(raw)
-  if (!ok && raw) {
+  if (!ok) {
     try {
-      localStorage.setItem(SALVAGE_KEY, raw)
+      localStorage.setItem(`${SALVAGE_KEY}.${key}`, raw)
     } catch {
       // Nothing more to do; the app still starts.
     }
@@ -35,17 +43,64 @@ const load = () => {
 }
 
 export function AppProvider({ children }) {
-  const [state, setState] = useState(load)
+  /*
+   * Which library this browser is reading, and the only thing signing in or
+   * out changes.
+   *
+   * There is no swap and no stash any more. The guest library and each
+   * account's library have their own keys and simply sit there; changing
+   * identity changes which one is read. Nothing is copied on the way in and
+   * nothing is destroyed on the way out, so there is no moment at which a
+   * library can fall between the two.
+   */
+  /*
+   * Read straight from the context rather than through `useAuth`, which throws
+   * when there is no provider above it.
+   *
+   * The store must not require the auth layer to be mounted. Signing in is an
+   * optional extra in this app — a clone with no project never mounts a
+   * session at all — and a store that refused to render without one would make
+   * the local-only path depend on the thing it is supposed to be independent
+   * of. No provider simply means nobody is signed in, which is the truth.
+   */
+  const auth = useContext(AuthContext)
+  const storageKey = keyFor(auth?.user?.id ?? null)
+
+  // Once, before anything reads a key: move a browser off the single-key
+  // arrangement. Runs during the first render so the first read sees the
+  // result, and does nothing at all on a browser that has already been moved.
+  const migrated = useRef(false)
+  if (!migrated.current) {
+    migrated.current = true
+    migrateLegacyStorage()
+  }
+
+  const [state, setState] = useState(() => load(storageKey))
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
+  /*
+   * Following the key.
+   *
+   * Signing in or out swaps `storageKey`, and the library at the new key is
+   * what the app should now be showing. Written as a render-phase comparison
+   * rather than an effect so that no frame is ever painted with the previous
+   * identity's decks — a signed-out reader must never see a flash of the
+   * account's library, or the other way round.
+   */
+  const readingKey = useRef(storageKey)
+  if (readingKey.current !== storageKey) {
+    readingKey.current = storageKey
+    setState(load(storageKey))
+  }
+
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      localStorage.setItem(storageKey, JSON.stringify(state))
     } catch {
       // Persistence is best-effort; the app still works in memory.
     }
-  }, [state])
+  }, [state, storageKey])
 
   // The prototype themes off a data-theme attribute, and so do our tokens.
   useEffect(() => {
@@ -157,92 +212,27 @@ export function AppProvider({ children }) {
   }, [])
 
   /**
-   * Swaps the whole library for another one. Used only by the sync layer, when
-   * signing in hands this browser the account's library.
+   * Installs the library an account just handed over.
    *
-   * Whatever was here first is written to its own key rather than dropped. It
-   * is somebody's revision, and "you signed in and your decks went" is not a
-   * sentence this app should ever cause — the same reasoning as the salvage
-   * key for an unreadable payload.
+   * All this does now is put it in state, from where the persist effect writes
+   * it to that account's own key. There is nothing to stash and nothing to
+   * swap: the guest library is sitting untouched under its own key, and
+   * signing out reads it again.
+   *
+   * Progress is derived here rather than taken from the caller. It is never
+   * stored in the database — it is a function of the schedule, and a second
+   * copy could only disagree — so decks arriving from an account carry none.
+   * Installed raw, every page rendering `Math.round(deck.progress * 100)`
+   * showed NaN%.
    */
-  /**
-   * Swaps in an account's library, keeping what was here for the swap back.
-   *
-   * `stash` is how the caller says whether this is the first replacement of a
-   * sign-in. It has to, because the stash is a single slot: overwritten on a
-   * second call it holds the account's library rather than the browser's, and
-   * signing out then hands the account's decks straight back to the machine
-   * instead of taking them off it.
-   */
-  const replaceLibrary = useCallback(
-    ({ decks, sessions, settings, theme }, { stash = true, syncedFor = null } = {}) => {
-      setState((s) => {
-        try {
-          if (stash) localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
-        } catch {
-          // Storage full or refused; the swap still happens.
-        }
-        return {
-          ...s,
-          /*
-           * Progress derived here, not taken from the caller.
-           *
-           * It is never stored in the database — it is a function of the
-           * schedule and a second copy could only disagree — so the decks that
-           * come back from an account carry no `progress` at all. Installed
-           * raw, every page that renders `Math.round(deck.progress * 100)`
-           * showed NaN%, from signing in until the next reload put the state
-           * back through normalizeState.
-           */
-          decks: decks.map((deck) => ({ ...deck, progress: progressOf(deck) })),
-          sessions: sessions ?? s.sessions,
-          settings: settings ? { ...s.settings, ...settings } : s.settings,
-          theme: theme ?? s.theme,
-          syncedFor,
-        }
-      })
-    },
-    [],
-  )
-
-  /**
-   * Hands this browser back the library it had before an account's arrived.
-   *
-   * Signing out used to leave the account's decks sitting in localStorage. On
-   * a shared laptop or a library machine the next person opened Gunit and
-   * found somebody else's revision, which is the wrong default for an app
-   * students use on borrowed computers.
-   *
-   * Nothing is lost by it: the account's library is in Postgres, and what
-   * comes back is what this browser was holding before it signed in — kept by
-   * `replaceLibrary` for exactly this. The two swap places rather than one
-   * overwriting the other.
-   */
-  const releaseSyncedLibrary = useCallback(() => {
-    let before = null
-    try {
-      const raw = localStorage.getItem(PRESYNC_KEY)
-      if (raw) before = normalizeState(JSON.parse(raw))
-    } catch {
-      // Unreadable or refused: an empty library is still better than someone
-      // else's, and theirs is safe in their account either way.
-    }
-
-    setState((s) => {
-      try {
-        localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
-      } catch {
-        // As above.
-      }
-      return {
-        ...s,
-        decks: before?.decks ?? [],
-        sessions: before?.sessions ?? [],
-        settings: before?.settings ?? s.settings,
-        // What is here now is the browser's own again, not an account's.
-        syncedFor: null,
-      }
-    })
+  const installLibrary = useCallback(({ decks, sessions, settings, theme }) => {
+    setState((s) => ({
+      ...s,
+      decks: decks.map((deck) => ({ ...deck, progress: progressOf(deck) })),
+      sessions: sessions ?? s.sessions,
+      settings: settings ? { ...s.settings, ...settings } : s.settings,
+      theme: theme ?? s.theme,
+    }))
   }, [])
 
   const updateDeck = useCallback((id, patch) => {
@@ -411,7 +401,6 @@ export function AppProvider({ children }) {
     () => ({
       decks: state.decks,
       sessions: state.sessions,
-      syncedFor: state.syncedFor,
       theme: state.theme,
       settings: state.settings,
       toast,
@@ -421,8 +410,7 @@ export function AppProvider({ children }) {
       addDeck,
       importDeck,
       restoreLibrary,
-      replaceLibrary,
-      releaseSyncedLibrary,
+      installLibrary,
       updateDeck,
       removeDeck,
       addCards,
@@ -437,7 +425,6 @@ export function AppProvider({ children }) {
     [
       state.decks,
       state.sessions,
-      state.syncedFor,
       state.theme,
       state.settings,
       toast,
@@ -447,8 +434,7 @@ export function AppProvider({ children }) {
       addDeck,
       importDeck,
       restoreLibrary,
-      replaceLibrary,
-      releaseSyncedLibrary,
+      installLibrary,
       updateDeck,
       removeDeck,
       addCards,

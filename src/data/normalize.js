@@ -36,13 +36,6 @@ export const DEFAULT_STATE = {
   // daily goal — all of which were hardcoded before this existed.
   sessions: [],
   settings: DEFAULT_SETTINGS,
-  /*
-   * Which account this stored library belongs to, or null for the browser's
-   * own. It is the only way a pull can tell a handover from a reload: both
-   * arrive with an account library to install, but only the first should put
-   * the browser's own library aside for the swap back.
-   */
-  syncedFor: null,
 }
 
 /**
@@ -147,10 +140,6 @@ export function normalizeState(state, now = Date.now()) {
     settings: { ...DEFAULT_SETTINGS, ...(source.settings ?? {}) },
     sessions: Array.isArray(source.sessions) ? source.sessions.filter(isSession) : [],
     decks: decks.map((d) => reviveDeck(d, now)).filter(Boolean),
-    // Carried explicitly, because this function returns a fixed shape and
-    // anything not named here is dropped — which is precisely what happens
-    // across the reload this field exists to survive.
-    syncedFor: typeof source.syncedFor === 'string' ? source.syncedFor : null,
   }
 }
 

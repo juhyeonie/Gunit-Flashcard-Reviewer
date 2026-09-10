@@ -5,6 +5,7 @@ import { AuthProvider } from '../src/data/AuthProvider.jsx'
 import { useApp } from '../src/data/useApp.js'
 import Toast from '../src/components/Toast.jsx'
 import { DEFAULT_SETTINGS } from '../src/data/normalize.js'
+import { GUEST_KEY } from '../src/data/storageKeys.js'
 
 /**
  * Rendering a page the way the app does: inside the store and inside a router,
@@ -15,7 +16,9 @@ import { DEFAULT_SETTINGS } from '../src/data/normalize.js'
  * written back — grading a card is only real if it survives.
  */
 
-export const KEY = 'gunit.state.v2'
+// The signed-out library. These suites render nobody in particular, so
+// this is the key the store reads.
+export const KEY = GUEST_KEY
 
 /** A card, with an id a schedule can be keyed by. */
 export const card = (n) => ({
