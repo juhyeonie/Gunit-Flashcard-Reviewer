@@ -25,7 +25,15 @@ export const DEFAULT_SETTINGS = {
   cardsPer: 20,
   autoReveal: false,
   shuffleFirst: false,
-  name: 'Mara Kessler',
+  /*
+   * Nobody's name, because nobody has given one yet.
+   *
+   * This was 'Mara Kessler' — a name from the prototype's mockups, which meant
+   * every new reader was greeted by a stranger and found her in their own
+   * settings. A blank is honest: the greeting drops the name rather than
+   * inventing one, and the field is empty until somebody fills it in.
+   */
+  name: '',
   goalMinutes: 20,
 }
 
@@ -131,13 +139,25 @@ const isSession = (s) => s && typeof s === 'object' && typeof s.at === 'number'
  * Always returns renderable state. Decks are revived one at a time so a single
  * bad entry costs only itself, never the whole library.
  */
+/*
+ * The mock name, cleared once on the way in.
+ *
+ * Every browser that ran an earlier version has 'Mara Kessler' stored, so
+ * changing the default alone would fix this for nobody who has already opened
+ * Gunit. It is only ever cleared when it matches exactly, and it was never
+ * typed by anyone — it arrived as a default. Somebody who really is called
+ * that can put it back, once.
+ */
+const MOCK_NAME = 'Mara Kessler'
+const forgetMockName = (settings) => (settings?.name === MOCK_NAME ? { name: '' } : {})
+
 export function normalizeState(state, now = Date.now()) {
   const source = state && typeof state === 'object' ? state : {}
   const decks = Array.isArray(source.decks) ? source.decks : DEFAULT_STATE.decks
 
   return {
     theme: source.theme === 'dark' ? 'dark' : 'light',
-    settings: { ...DEFAULT_SETTINGS, ...(source.settings ?? {}) },
+    settings: { ...DEFAULT_SETTINGS, ...(source.settings ?? {}), ...forgetMockName(source.settings) },
     sessions: Array.isArray(source.sessions) ? source.sessions.filter(isSession) : [],
     decks: decks.map((d) => reviveDeck(d, now)).filter(Boolean),
   }
