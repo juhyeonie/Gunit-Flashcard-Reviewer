@@ -1,5 +1,7 @@
 # Gunit
 
+[![CI](https://github.com/juhyeonie/Gunit-Flashcard-Reviewer/actions/workflows/ci.yml/badge.svg)](https://github.com/juhyeonie/Gunit-Flashcard-Reviewer/actions/workflows/ci.yml)
+
 A flashcard reviewer: build decks by hand or from your own course material, study
 them on a spaced-repetition schedule, and quiz yourself.
 
@@ -308,6 +310,13 @@ single deck offered to the restore button is named as such rather than
 rejected as a stranger.
 
 ## Tests
+
+Every push and pull request runs lint, the whole suite and a production build
+on GitHub Actions — `.github/workflows/ci.yml`, about a minute. It calls the
+same npm scripts you would, so what CI checks and what you check cannot drift
+apart. The build is there deliberately and is not redundant: the tests import
+modules directly, and it is the only step that proves Vite can still resolve,
+transform and bundle the app, OCR assets included.
 
 `npm test` runs everything. Most of it is the pure modules under `src/data` —
 scheduling, activity, quizzes, the library filters, the readers and the card

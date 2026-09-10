@@ -1,0 +1,57 @@
+# Runs the checks that were, until now, only run by whoever remembered to.
+#
+# Everything here is a command already in package.json, so what CI does and
+# what you do before pushing cannot drift apart. The whole thing takes about a
+# minute, which is short enough to run on every push rather than nightly.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run pointless. Cancelling it
+# frees the runner and stops a stale red cross sitting on an updated branch —
+# except on main, where every commit's result is worth keeping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the major version the app is developed against. Pinned
+          # rather than "latest", so a new Node release is something this
+          # project adopts deliberately instead of discovering on a Tuesday.
+          node-version: '24'
+          cache: npm
+
+      # `ci`, not `install`: it installs exactly what the lockfile says and
+      # fails if package.json and the lockfile disagree, which is the point of
+      # having one.
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # The suite is ~700 tests across 35 files, each in its own worker. It has
+      # its own timeouts configured in vite.config.js for exactly this reason:
+      # a shared runner is slower than a laptop, and a test that fails because
+      # the machine was busy teaches people to ignore red.
+      - name: Test
+        run: npm run test:run
+
+      # Last, and not redundant. The tests import modules directly; this is the
+      # only thing that proves Vite can still resolve, transform and bundle the
+      # app — including the OCR assets that `prebuild` copies out of
+      # node_modules, which nothing else here touches.
+      - name: Build
+        run: npm run build
