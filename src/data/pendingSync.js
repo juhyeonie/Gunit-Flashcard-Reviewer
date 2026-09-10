@@ -20,11 +20,16 @@
  */
 
 let pending = null
+let outstanding = null
 
-export function registerPendingSync(flush) {
+export function registerPendingSync(flush, hasOutstanding) {
   pending = flush
+  outstanding = hasOutstanding ?? null
   return () => {
-    if (pending === flush) pending = null
+    if (pending === flush) {
+      pending = null
+      outstanding = null
+    }
   }
 }
 
@@ -38,3 +43,18 @@ export function registerPendingSync(flush) {
 export async function flushPendingSync() {
   return pending ? pending() : { error: null }
 }
+
+/**
+ * Whether anything is known to have not reached the account yet.
+ *
+ * Asked when a session ends without going through the sign-out button —
+ * expired, revoked, cleared in another tab — because then there is no valid
+ * token left and nothing can be flushed. The account's library is normally
+ * taken off the machine at that point, and this is the one reason not to: if
+ * the last change never went up, the copy about to be removed is the only one
+ * that has it.
+ *
+ * Nothing registered means nothing is outstanding, which is true of a
+ * signed-out browser and of one with no project configured.
+ */
+export const hasOutstandingChanges = () => (outstanding ? outstanding() : false)

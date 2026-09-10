@@ -70,6 +70,15 @@ export default function LibrarySync() {
   const pushTimer = useRef(null)
   const busy = useRef(false)
   const complained = useRef(false)
+  /*
+   * Whether the last diff this worked out is still sitting on this device.
+   *
+   * Read when a session ends without a sign-out, where nothing can be pushed
+   * because there is no token left. Set from the push itself rather than
+   * recomputed on demand: by the time anyone asks, the store has already
+   * swapped to the guest library and there is nothing left to compare against.
+   */
+  const unsent = useRef(false)
   const alive = useRef(true)
   // Who was signed in last time this ran, so signing out is distinguishable
   // from having never signed in.
@@ -218,10 +227,12 @@ export default function LibrarySync() {
       return { error }
     }
     synced.current = next
+    unsent.current = false
     return { error: null }
   }, [available, say])
 
-  useEffect(() => registerPendingSync(flushNow), [flushNow])
+  const outstanding = useCallback(() => unsent.current, [])
+  useEffect(() => registerPendingSync(flushNow, outstanding), [flushNow, outstanding])
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {
@@ -233,7 +244,11 @@ export default function LibrarySync() {
 
       const next = toRows({ decks, sessions }, userId)
       const change = changesBetween(synced.current, next)
-      if (isEmptyChange(change)) return
+      if (isEmptyChange(change)) {
+        unsent.current = false
+        return
+      }
+      unsent.current = true
 
       busy.current = true
       const supabase = await getSupabase()
@@ -248,6 +263,7 @@ export default function LibrarySync() {
         return
       }
       synced.current = next
+      unsent.current = false
       complained.current = false
     }, QUIET_MS)
 
