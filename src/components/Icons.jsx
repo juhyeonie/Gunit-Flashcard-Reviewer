@@ -32,3 +32,31 @@ export function EditButton({ className = '', size = 26, ...props }) {
     </button>
   )
 }
+
+/**
+ * The password reveal, as one icon that changes rather than two that swap.
+ *
+ * `currentColor` throughout so it inherits whatever the button beside it is
+ * doing, and no title: the button that holds it carries the accessible name,
+ * and a title here would announce twice.
+ */
+export function EyeIcon({ shown = false, size = 16 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M1.5 10S4.6 4.5 10 4.5 18.5 10 18.5 10 15.4 15.5 10 15.5 1.5 10 1.5 10Z" />
+      <circle cx="10" cy="10" r="2.75" />
+      {shown && <path d="M3 17 17 3" />}
+    </svg>
+  )
+}
