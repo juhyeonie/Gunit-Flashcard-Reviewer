@@ -66,7 +66,9 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
   const goal = settings.goalMinutes
   const goalPct = goal ? Math.min(100, Math.round((doneToday / goal) * 100)) : 0
   const peak = Math.max(1, ...week.map((d) => d.minutes))
-  const firstName = settings.name.split(' ')[0]
+  // Blank until somebody says otherwise, so the greeting has to work without
+  // it rather than address an empty space.
+  const firstName = settings.name.trim().split(' ')[0]
   // Null until this reader has finished a session to estimate from.
   const estimate = estimateFor(resumeDue, sessions)
 
@@ -82,7 +84,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
         <div className="max-w-[600px]">
           <div className="kicker mb-4">{today()}</div>
           <h1 className="m-0 mb-3 font-serif text-[34px] leading-[1.04] tracking-[-0.02em] sm:text-[46px]">
-            {greeting()}, {firstName}.
+            {firstName ? `${greeting()}, ${firstName}.` : `${greeting()}.`}
           </h1>
           {resume && (
             <p className="m-0 text-[16px] leading-[1.6] text-ink-2 text-pretty">

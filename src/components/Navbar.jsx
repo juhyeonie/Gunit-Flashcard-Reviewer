@@ -3,9 +3,12 @@ import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
 import { NAV } from './navItems.js'
 
-const initialsOf = (name) =>
+/** Empty when there is no name, which is the ordinary state of a new reader. */
+const initialsOf = (name = '') =>
   name
-    .split(' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
@@ -55,9 +58,13 @@ export function TopNav() {
       */}
       <div className="flex shrink-0 items-center gap-2.5">
         <div className="flex items-center gap-[9px] rounded-full border border-line bg-surface py-1 pr-3 pl-1">
-          <span className="grid h-7 w-7 place-items-center rounded-full border border-accent-line bg-accent-soft text-[11px] leading-none font-semibold text-accent">
-            {initialsOf(settings.name)}
-          </span>
+          {/* Dropped rather than drawn empty: a blank disc reads as a missing
+              avatar, and there is nothing missing. */}
+          {initialsOf(settings.name) && (
+            <span className="grid h-7 w-7 place-items-center rounded-full border border-accent-line bg-accent-soft text-[11px] leading-none font-semibold text-accent">
+              {initialsOf(settings.name)}
+            </span>
+          )}
           <span className="kicker !tracking-[0.1em] whitespace-nowrap">
             {days ? `${days} day streak` : 'No streak yet'}
           </span>

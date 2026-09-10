@@ -217,6 +217,7 @@ export default function Settings() {
           <input
             value={draft.name}
             aria-label="Name"
+            placeholder="Not set"
             onChange={(e) => set({ name: e.target.value })}
             className={textInput}
           />
