@@ -11,7 +11,7 @@ import ImportFileModal from './components/ImportFileModal.jsx'
 import CardModal from './components/CardModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
-import Dashboard from './pages/Dashboard.jsx'
+import Home from './pages/Home.jsx'
 import Decks from './pages/Decks.jsx'
 import DeckDetail from './pages/DeckDetail.jsx'
 import Review from './pages/Review.jsx'
@@ -93,7 +93,7 @@ function Shell() {
           <Route
             path="/"
             element={
-              <Dashboard
+              <Home
                 onNewDeck={openNewDeck}
                 onEditDeck={openEditDeck}
                 onImport={() => openImport(null)}
