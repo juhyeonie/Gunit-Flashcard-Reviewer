@@ -41,7 +41,7 @@ export default function LibrarySync() {
    * The id only changes when the account does.
    */
   const userId = user?.id ?? null
-  const { decks, sessions, settings, theme, replaceLibrary, releaseSyncedLibrary, say } =
+  const { decks, sessions, settings, theme, syncedFor, replaceLibrary, releaseSyncedLibrary, say } =
     useApp()
 
   /*
@@ -70,6 +70,11 @@ export default function LibrarySync() {
    * A second call is not hypothetical. React's StrictMode runs every effect
    * twice in development, and the second run finds the library already
    * uploaded and takes the account-wins branch.
+   *
+   * This covers a second run within one mount. A reload is the other half and
+   * a ref cannot see across it — that is what the stored `syncedFor` is for,
+   * read below. Both are needed: the ref catches two runs racing before any
+   * state has been written, the stored marker catches a fresh mount.
    */
   const stashed = useRef(false)
 
@@ -117,6 +122,15 @@ export default function LibrarySync() {
 
     wasSignedInAs.current = userId
 
+    /*
+     * Whether this browser is holding its own library or already this
+     * account's. A reload while signed in arrives here exactly as a fresh
+     * sign-in does — an account library to install — and stashing again would
+     * put the account's decks into the slot signing out reads from, leaving
+     * them on the machine.
+     */
+    const handingOver = syncedFor !== userId
+
     let cancelled = false
 
     const pull = async () => {
@@ -153,7 +167,10 @@ export default function LibrarySync() {
         synced.current = rows
         // Ids were minted during the upload; local state has to adopt them or
         // the next push would upload the same library a second time.
-        replaceLibrary(fromRows(rows), { stash: !stashed.current })
+        replaceLibrary(fromRows(rows), {
+          stash: handingOver && !stashed.current,
+          syncedFor: userId,
+        })
         stashed.current = true
         say(`Uploaded ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'}`)
         return
@@ -163,7 +180,10 @@ export default function LibrarySync() {
       synced.current = toRows(fromRows(rows), userId)
 
       const profile = profileRes.data ? profileToSettings(profileRes.data) : {}
-      replaceLibrary({ ...fromRows(rows), ...profile }, { stash: !stashed.current })
+      replaceLibrary(
+        { ...fromRows(rows), ...profile },
+        { stash: handingOver && !stashed.current, syncedFor: userId },
+      )
       stashed.current = true
       say(`Signed in — ${deckRes.data.length} ${deckRes.data.length === 1 ? 'deck' : 'decks'}`)
     }
@@ -173,7 +193,9 @@ export default function LibrarySync() {
       cancelled = true
     }
     // Deliberately keyed on the account alone. Including the library would
-    // re-pull on every edit, and pulling is what the push below is for.
+    // re-pull on every edit, and pulling is what the push below is for, and
+    // `syncedFor` is read here but written by this same effect — listing it
+    // would re-run the pull in response to its own result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [available, userId, replaceLibrary, releaseSyncedLibrary, say, trouble])
 

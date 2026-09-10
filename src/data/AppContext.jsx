@@ -174,22 +174,36 @@ export function AppProvider({ children }) {
    * signing out then hands the account's decks straight back to the machine
    * instead of taking them off it.
    */
-  const replaceLibrary = useCallback(({ decks, sessions, settings, theme }, { stash = true } = {}) => {
-    setState((s) => {
-      try {
-        if (stash) localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
-      } catch {
-        // Storage full or refused; the swap still happens.
-      }
-      return {
-        ...s,
-        decks,
-        sessions: sessions ?? s.sessions,
-        settings: settings ? { ...s.settings, ...settings } : s.settings,
-        theme: theme ?? s.theme,
-      }
-    })
-  }, [])
+  const replaceLibrary = useCallback(
+    ({ decks, sessions, settings, theme }, { stash = true, syncedFor = null } = {}) => {
+      setState((s) => {
+        try {
+          if (stash) localStorage.setItem(PRESYNC_KEY, JSON.stringify(s))
+        } catch {
+          // Storage full or refused; the swap still happens.
+        }
+        return {
+          ...s,
+          /*
+           * Progress derived here, not taken from the caller.
+           *
+           * It is never stored in the database — it is a function of the
+           * schedule and a second copy could only disagree — so the decks that
+           * come back from an account carry no `progress` at all. Installed
+           * raw, every page that renders `Math.round(deck.progress * 100)`
+           * showed NaN%, from signing in until the next reload put the state
+           * back through normalizeState.
+           */
+          decks: decks.map((deck) => ({ ...deck, progress: progressOf(deck) })),
+          sessions: sessions ?? s.sessions,
+          settings: settings ? { ...s.settings, ...settings } : s.settings,
+          theme: theme ?? s.theme,
+          syncedFor,
+        }
+      })
+    },
+    [],
+  )
 
   /**
    * Hands this browser back the library it had before an account's arrived.
@@ -225,6 +239,8 @@ export function AppProvider({ children }) {
         decks: before?.decks ?? [],
         sessions: before?.sessions ?? [],
         settings: before?.settings ?? s.settings,
+        // What is here now is the browser's own again, not an account's.
+        syncedFor: null,
       }
     })
   }, [])
@@ -395,6 +411,7 @@ export function AppProvider({ children }) {
     () => ({
       decks: state.decks,
       sessions: state.sessions,
+      syncedFor: state.syncedFor,
       theme: state.theme,
       settings: state.settings,
       toast,
@@ -420,6 +437,7 @@ export function AppProvider({ children }) {
     [
       state.decks,
       state.sessions,
+      state.syncedFor,
       state.theme,
       state.settings,
       toast,
