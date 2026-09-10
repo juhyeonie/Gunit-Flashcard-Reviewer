@@ -24,11 +24,22 @@ export function TopNav() {
       className="sticky top-0 z-20 hidden h-[70px] items-center justify-between gap-5 border-b border-line-soft px-6 backdrop-blur-[14px] backdrop-saturate-150 sm:flex"
       style={{ background: 'var(--glass)' }}
     >
-      <Link to="/" className="flex shrink-0 items-center gap-[11px]">
+      {/*
+        The two sides share the leftover space equally so the pill between them
+        lands on the middle of the bar.
+
+        `justify-between` alone does not do that. It puts the gaps between the
+        three, so the middle one is centred only when the outer two happen to
+        be the same width — and they never are here: a logo on one side, a
+        streak that reads "No streak yet" or "12 day streak" on the other. The
+        pill sat 55px left of centre, which is half the difference between
+        them, and moved every time the streak's wording changed.
+      */}
+      <Link to="/" className="flex flex-1 shrink-0 items-center gap-[11px]">
         <img src="/assets/gunit-logo.png" alt="Gunit" className="block h-10 w-auto" />
       </Link>
 
-      <div className="flex gap-[3px] overflow-auto rounded-full border border-line-soft bg-raised p-1">
+      <div className="flex shrink-0 gap-[3px] overflow-auto rounded-full border border-line-soft bg-raised p-1">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -56,7 +67,7 @@ export function TopNav() {
         nav is the wrong one — it is for going somewhere, and everything else
         in this bar says where you are or what you have done.
       */}
-      <div className="flex shrink-0 items-center gap-2.5">
+      <div className="flex flex-1 shrink-0 items-center justify-end gap-2.5">
         <div className="flex items-center gap-[9px] rounded-full border border-line bg-surface py-1 pr-3 pl-1">
           {/* Dropped rather than drawn empty: a blank disc reads as a missing
               avatar, and there is nothing missing. */}
