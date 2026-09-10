@@ -105,7 +105,12 @@ describe('importing a deck from a file', () => {
 
     await waitFor(() => expect(stored().decks[0].title).toBe('Late Antiquity'))
     expect(stored().decks[0].cards).toHaveLength(2)
-    expect(screen.getByTestId('pathname').textContent).toMatch(/^\/decks\/.+/)
+    // `findBy`, not `getBy`. Storing the deck and navigating to it are two
+    // separate effects, and waiting for the first says nothing about the
+    // second: under the load of the whole suite the write lands first and the
+    // route has not changed yet. Asserted synchronously this failed about one
+    // full run in seven, and never once when this file ran on its own.
+    expect((await screen.findByTestId('pathname')).textContent).toMatch(/^\/decks\/.+/)
   })
 
   it('gives the arriving cards ids of this library, and keeps their scheduling', async () => {
