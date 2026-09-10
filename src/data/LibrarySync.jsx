@@ -58,6 +58,20 @@ export default function LibrarySync() {
   // Who was signed in last time this ran, so signing out is distinguishable
   // from having never signed in.
   const wasSignedInAs = useRef(null)
+  /*
+   * Whether this sign-in has already put its library aside.
+   *
+   * `replaceLibrary` stashes whatever is in local storage before overwriting
+   * it, and signing out hands that stash back. Called a second time while
+   * signed in it stashed the account's library over the browser's own, so
+   * signing out returned the account's decks and left them on the machine —
+   * the exact thing releaseSyncedLibrary exists to prevent.
+   *
+   * A second call is not hypothetical. React's StrictMode runs every effect
+   * twice in development, and the second run finds the library already
+   * uploaded and takes the account-wins branch.
+   */
+  const stashed = useRef(false)
 
   useEffect(() => {
     alive.current = true
@@ -94,6 +108,7 @@ export default function LibrarySync() {
       // do not stay behind on the machine.
       if (wasSignedInAs.current) {
         wasSignedInAs.current = null
+        stashed.current = false
         releaseSyncedLibrary()
         say('Signed out — your own decks are back')
       }
@@ -138,7 +153,8 @@ export default function LibrarySync() {
         synced.current = rows
         // Ids were minted during the upload; local state has to adopt them or
         // the next push would upload the same library a second time.
-        replaceLibrary(fromRows(rows))
+        replaceLibrary(fromRows(rows), { stash: !stashed.current })
+        stashed.current = true
         say(`Uploaded ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'}`)
         return
       }
@@ -147,7 +163,8 @@ export default function LibrarySync() {
       synced.current = toRows(fromRows(rows), userId)
 
       const profile = profileRes.data ? profileToSettings(profileRes.data) : {}
-      replaceLibrary({ ...fromRows(rows), ...profile })
+      replaceLibrary({ ...fromRows(rows), ...profile }, { stash: !stashed.current })
+      stashed.current = true
       say(`Signed in — ${deckRes.data.length} ${deckRes.data.length === 1 ? 'deck' : 'decks'}`)
     }
 
@@ -191,13 +208,27 @@ export default function LibrarySync() {
     return () => clearTimeout(pushTimer.current)
   }, [available, userId, decks, sessions, trouble])
 
-  /** Preferences are small and change rarely; no diffing earns its keep. */
+  /**
+   * Preferences are small and change rarely; no diffing earns its keep.
+   *
+   * Awaited, and that is the whole point. A PostgREST query builder is a lazy
+   * thenable: `from(...).update(...).eq(...)` builds a request and sends
+   * nothing until something calls `then` on it. Written without the await this
+   * silently did nothing at all — the row kept its defaults while the browser
+   * showed the reader's own settings, and signing in on a second machine
+   * pulled those defaults back over them.
+   */
   useEffect(() => {
     if (!available || !userId || !synced.current) return
-    getSupabase().then((supabase) => {
-      supabase?.from('profiles').update(settingsToProfile(settings, theme)).eq('id', userId)
+    getSupabase().then(async (supabase) => {
+      if (!supabase) return
+      const { error } = await supabase
+        .from('profiles')
+        .update(settingsToProfile(settings, theme))
+        .eq('id', userId)
+      if (error) trouble('Your preferences are saved on this device but not to your account')
     })
-  }, [available, userId, settings, theme])
+  }, [available, userId, settings, theme, trouble])
 
   return null
 }
