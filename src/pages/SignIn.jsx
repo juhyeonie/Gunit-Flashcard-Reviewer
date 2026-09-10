@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { EyeIcon } from '../components/Icons.jsx'
+import CreatorCredit from '../components/CreatorCredit.jsx'
 import { useAuth } from '../data/useAuth.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
@@ -97,7 +98,16 @@ function Centred({ children }) {
     // rather than 420 minus its own padding, and still has room to breathe on
     // a phone.
     <div className="rise-in flex w-full justify-center px-4 py-14 sm:py-20">
-      <div className="flex w-full max-w-[420px] flex-col items-center gap-9">{children}</div>
+      <div className="flex w-full max-w-[420px] flex-col items-center gap-9">
+        {children}
+        {/*
+          Here rather than in each mode, so signing in, making an account and
+          asking for a reset link all carry it identically — they are one page
+          wearing three sets of words, and this is the part of the shell they
+          share.
+        */}
+        <CreatorCredit />
+      </div>
     </div>
   )
 }
