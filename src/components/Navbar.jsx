@@ -13,7 +13,7 @@ const initialsOf = (name) =>
 
 /** Desktop and tablet: sticky glass bar with a pill nav group. */
 export function TopNav() {
-  const { settings, sessions, theme, toggleTheme } = useApp()
+  const { settings, sessions } = useApp()
   const days = streak(sessions)
 
   return (
@@ -44,14 +44,16 @@ export function TopNav() {
         ))}
       </div>
 
+      {/*
+        No theme toggle here.
+
+        It was a second control for a setting that already has one, on
+        Settings under Appearance, where the rest of the preferences are. Two
+        places to change the same thing is two places to look for it, and the
+        nav is the wrong one — it is for going somewhere, and everything else
+        in this bar says where you are or what you have done.
+      */}
       <div className="flex shrink-0 items-center gap-2.5">
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="kicker cursor-pointer rounded-md border border-line bg-surface px-2.5 py-[7px] transition-colors hover:border-ink-3 hover:text-ink"
-        >
-          {theme === 'light' ? 'Dark' : 'Light'}
-        </button>
         <div className="flex items-center gap-[9px] rounded-full border border-line bg-surface py-1 pr-3 pl-1">
           <span className="grid h-7 w-7 place-items-center rounded-full border border-accent-line bg-accent-soft text-[11px] leading-none font-semibold text-accent">
             {initialsOf(settings.name)}
