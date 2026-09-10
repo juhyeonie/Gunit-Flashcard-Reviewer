@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -354,5 +355,127 @@ describe('signing out without reloading first', () => {
       signInAs(null)
     })
     await expect(flushPendingSync()).resolves.toEqual({ error: null })
+  })
+})
+
+describe('offering the guest library to a new account', () => {
+  /** An account with nothing in it, which is what signing up produces. */
+  const emptyAccount = () => fakeClient({ profile: null })
+
+  const signIn = async () => {
+    mount()
+    await waitFor(() => expect(api.decks.length).toBeGreaterThan(0))
+    const guest = api.decks.length
+    await act(async () => {
+      signInAs({ id: USER })
+    })
+    return guest
+  }
+
+  it('asks rather than copying them in by itself', async () => {
+    // Copying decks into an account is not a thing to do quietly on a shared
+    // browser: what is on screen when you sign up is not always yours, and
+    // once it is in an account it is visible from every machine that account
+    // signs in on.
+    client = emptyAccount()
+    const guest = await signIn()
+
+    // Asserted through the dialog's accessible name, which is what a screen
+    // reader announces when it opens.
+    expect(await screen.findByRole('dialog', { name: new RegExp(`Bring your ${guest} decks`) })).toBeTruthy()
+    // Nothing has gone up while the question is on screen.
+    expect(client.rpcPayloads).toHaveLength(0)
+  })
+
+  it('installs the account’s own library underneath the question', async () => {
+    // The offer is not a gate. An empty account is an empty library, and that
+    // is what the reader is looking at while they decide.
+    client = emptyAccount()
+    await signIn()
+    expect(api.decks).toEqual([])
+  })
+
+  it('copies them in when accepted, and leaves the guest library alone', async () => {
+    client = emptyAccount()
+    const guest = await signIn()
+    const before = localStorage.getItem(GUEST_KEY)
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Bring them in' }))
+    })
+
+    const pushed = client.rpcPayloads.flatMap((p) => p.decks_upsert ?? [])
+    expect(pushed).toHaveLength(guest)
+    expect(api.decks).toHaveLength(guest)
+    expect(localStorage.getItem(GUEST_KEY)).toBe(before)
+  })
+
+  it('mints fresh ids on the way in', async () => {
+    // A uuid in the guest library means some account uploaded it once, quite
+    // possibly a different one on this browser. Offered back under the same
+    // ids the upsert reaches for rows this user does not own, and row level
+    // security refuses the whole change set.
+    client = emptyAccount()
+    await signIn()
+    const guestIds = JSON.parse(localStorage.getItem(GUEST_KEY)).decks.map((d) => d.id)
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Bring them in' }))
+    })
+
+    const pushed = client.rpcPayloads.flatMap((p) => p.decks_upsert ?? [])
+    for (const deck of pushed) expect(guestIds).not.toContain(deck.id)
+  })
+
+  it('sends nothing when declined', async () => {
+    client = emptyAccount()
+    await signIn()
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    })
+
+    expect(client.rpcPayloads).toHaveLength(0)
+    expect(api.decks).toEqual([])
+    expect(screen.queryByRole('dialog')).toBe(null)
+  })
+
+  it('does not ask the same account twice', async () => {
+    // Otherwise the question returns on every sign-in for as long as the
+    // account stays empty, which is nagging rather than asking.
+    client = emptyAccount()
+    await signIn()
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    })
+
+    cleanup()
+    client = emptyAccount()
+    await signIn()
+
+    expect(screen.queryByRole('dialog')).toBe(null)
+  })
+
+  it('does not ask when the account already has decks', async () => {
+    client = fakeClient({
+      decks: [
+        { id: '95c84be2-9060-42c7-a072-9b7e7c7b5591', user_id: USER, title: 'From the account', subject: 'Rome', description: '', studied_at: null },
+      ],
+      profile: null,
+    })
+    await signIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+    expect(screen.queryByRole('dialog')).toBe(null)
+  })
+
+  it('does not ask when there is nothing to offer', async () => {
+    localStorage.setItem(GUEST_KEY, JSON.stringify({ decks: [], sessions: [] }))
+    client = emptyAccount()
+    mount()
+    await act(async () => {
+      signInAs({ id: USER })
+    })
+    await waitFor(() => expect(api.decks).toEqual([]))
+    expect(screen.queryByRole('dialog')).toBe(null)
   })
 })
