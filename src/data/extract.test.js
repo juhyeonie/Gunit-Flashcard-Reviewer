@@ -14,11 +14,17 @@ import {
 
 /*
  * Starting a PDF.js worker in Node takes seconds, and more of them when the
- * rest of the suite is competing for the machine. The 5s default passes alone
- * and fails intermittently in a full run, so the tests that spin one up say
- * how long they actually need.
+ * rest of the suite is competing for the machine, so the tests that spin one
+ * up say how long they actually need.
+ *
+ * This used to read 20s, against a 5s default. The default is 20s now — see
+ * the note in vite.config.js — which would leave this saying nothing at all.
+ * These are still the heaviest tests in the suite by a wide margin: with three
+ * full runs deliberately competing, this file's "reads a real PDF end to end"
+ * took 25.8s while every other test in the suite came in under the general
+ * budget. Double it is.
  */
-const WORKER = 20_000
+const WORKER = 45_000
 
 /** A real File, so the code under test uses the same API the browser gives it. */
 const fileOf = (name, contents = '') => new File([contents], name)
