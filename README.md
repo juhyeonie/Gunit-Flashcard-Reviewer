@@ -222,6 +222,63 @@ why the app keeps working from `localStorage` rather than depending on the
 network. And the free plan has **no automatic backups**, which is why the
 export below matters more, not less.
 
+## Deploying it
+
+`vercel.json` is here because a single-page app on a static host needs one
+thing the dev server does for free:
+
+```json
+"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+```
+
+Every route in this app is client-side. Without that rule a direct request to
+`/decks/republic` or `/reset-password` is a request for a file that does not
+exist, and the host answers 404 — so refreshing anywhere but the home page
+fails, shared links fail, and the password reset link is dead on arrival at the
+one moment somebody needs it. `npm run preview` will not show you this: Vite's
+preview server does the fallback itself, which is exactly why it is easy to
+ship without.
+
+It does not shadow the real files. Vercel checks the filesystem before applying
+rewrites, so `/assets/...` and `/tesseract/...` are served as themselves and
+only unmatched paths fall through to `index.html`.
+
+The cache headers follow what is actually true of each directory. Vite puts a
+content hash in every `/assets` filename, so those can be immutable for a year
+— a changed file is a changed name. The OCR assets under `/tesseract` are
+copied out of `node_modules` under fixed names, so a dependency upgrade changes
+their contents without changing their URLs: a week, revalidating in the
+background, rather than immutable. `index.html` is never cached, or a deploy
+would not be picked up.
+
+### Before the first deploy
+
+**Set the environment variables in the host, not just in `.env`.** Vite inlines
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` at build time, so they have to
+be present when Vercel builds — not merely available at runtime. Missing, the
+build silently succeeds and ships an app with no accounts. Only the anon key
+belongs there.
+
+**Add the deployed origin to Supabase.** Authentication → URL Configuration →
+Redirect URLs needs `https://your-domain/reset-password`. Supabase matches
+origins exactly, so the `localhost` entry does nothing for production, and it
+rejects a bad origin *after* the email has gone out.
+
+**Point Resend at the real domain** if one is verified, rather than
+`onboarding@resend.dev`, which only delivers to the address the Resend account
+was opened with.
+
+### Two things to know rather than fix
+
+Asset paths are absolute, so the app has to be served from a domain root. A
+subpath deployment — a GitHub Pages project site, say — needs `base` set in
+`vite.config.js`.
+
+And a free Supabase project **pauses after seven days of inactivity**. A
+deployed but unused copy will need restoring by hand. Studying still works
+while it is down, because the library is read from this browser; syncing is
+what stops.
+
 ## Taking a deck with you
 
 A library otherwise lives in one browser and nowhere else. **Export deck** on a
