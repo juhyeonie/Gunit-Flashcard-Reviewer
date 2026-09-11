@@ -2,6 +2,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
 import { NAV } from './navItems.js'
+import { DecksIcon, HomeIcon, SettingsIcon } from './Icons.jsx'
 
 /** Empty when there is no name, which is the ordinary state of a new reader. */
 const initialsOf = (name = '') =>
@@ -86,25 +87,74 @@ export function TopNav() {
 }
 
 /** Phone: sticky bottom tab bar, active tab marked by a top rule. */
+const ICONS = { home: HomeIcon, decks: DecksIcon, settings: SettingsIcon }
+
+/**
+ * Phone: a tab bar along the bottom, where a thumb already is.
+ *
+ * Three things it did not do before, and the first two are not decoration.
+ *
+ * The tabs were 38 pixels tall. Apple and Google both publish 44 as the
+ * smallest a target should be, and the difference is felt by anyone using this
+ * one-handed on a bus. They are 56 now, which also gives the labels room to
+ * stop being 10px.
+ *
+ * And it sat flush against the bottom of the screen, so on any phone with a
+ * home indicator the labels were underneath the gesture bar. The safe-area
+ * inset is what the browser offers for exactly this; it is zero everywhere
+ * else, so it costs nothing on a device that does not need it.
+ *
+ * The inactive tabs are text-ink-2, not the text-ink-3 this app usually uses
+ * for things that recede. At ten pixels that grey measures 3.99:1 against the
+ * background, under the 4.5:1 WCAG AA asks for, and a tab bar is not a place
+ * to be subtle at the cost of being legible. The active tab is told apart by
+ * hue and by the mark above it, not by the other two being faint.
+ *
+ * Icons beside the labels rather than instead of them. A tab bar of words is
+ * slower to read at a glance than a shape, and a bar of unlabelled shapes is a
+ * guessing game — both together is the arrangement that has won.
+ */
 export function BottomNav() {
   return (
-    <nav className="sticky bottom-0 z-20 flex border-t border-line bg-paper sm:hidden">
-      {NAV.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) =>
-            `flex flex-1 cursor-pointer flex-col items-center gap-1.5 border-t-2 px-1 pt-3 pb-3.5 ${
-              isActive ? 'border-ink text-ink' : 'border-transparent text-ink-3'
-            }`
-          }
-        >
-          <span className="font-mono text-[10px] leading-none font-medium tracking-[0.06em] uppercase">
-            {item.short}
-          </span>
-        </NavLink>
-      ))}
+    <nav
+      className="sticky bottom-0 z-20 flex border-t border-line-soft pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] backdrop-saturate-150 sm:hidden"
+      style={{ background: 'var(--glass)' }}
+    >
+      {NAV.map((item) => {
+        const Icon = ICONS[item.icon]
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `relative flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 px-1 transition-colors ${
+                isActive ? 'text-accent' : 'text-ink-2'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {/*
+                  A mark above the active tab as well as the colour. Colour on
+                  its own is not a state anyone can see in greyscale, and
+                  NavLink's aria-current only speaks to a screen reader.
+                */}
+                <span
+                  aria-hidden="true"
+                  className={`absolute top-0 h-[2px] w-7 rounded-b-full transition-colors ${
+                    isActive ? 'bg-accent' : 'bg-transparent'
+                  }`}
+                />
+                <Icon />
+                <span className="font-mono text-[10px] leading-none font-medium tracking-[0.06em] uppercase">
+                  {item.short}
+                </span>
+              </>
+            )}
+          </NavLink>
+        )
+      })}
     </nav>
   )
 }

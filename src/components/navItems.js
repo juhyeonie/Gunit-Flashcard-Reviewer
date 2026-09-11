@@ -6,7 +6,7 @@
  * for every edit anyone makes.
  */
 export const NAV = [
-  { to: '/', label: 'Home', short: 'Home', end: true },
-  { to: '/decks', label: 'My decks', short: 'Decks' },
-  { to: '/settings', label: 'Settings', short: 'Settings' },
+  { to: '/', label: 'Home', short: 'Home', icon: 'home', end: true },
+  { to: '/decks', label: 'My decks', short: 'Decks', icon: 'decks' },
+  { to: '/settings', label: 'Settings', short: 'Settings', icon: 'settings' },
 ]
