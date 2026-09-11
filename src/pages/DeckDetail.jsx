@@ -149,12 +149,17 @@ export default function DeckDetail({
                 ⋮
               </button>
               {/*
-                Right-anchored on wide screens so the panel opens back under the
-                title rather than across the study and add buttons, and
-                left-anchored on narrow ones where anchoring right would run it
-                off the left edge — the same reasoning as the two menus opposite.
+                Right-anchored at every width, unlike the two menus opposite.
+
+                Those sit at the left of their row and have room to open
+                rightwards on a narrow screen, so `responsive` suits them. This
+                one does not: the title beside it carries `min-w-0` and takes
+                whatever space is left, which pins these three buttons against
+                the right edge at every width. Anchored left there, a 250px
+                panel opened 204px past the edge of a 375px screen. The card
+                menus further down have always used `right` for the same reason.
               */}
-              <Menu open={deckMenu} onClose={() => setDeckMenu(false)} align="responsive" width={250}>
+              <Menu open={deckMenu} onClose={() => setDeckMenu(false)} align="right" width={250}>
                 <MenuItem
                   title="Reset progress"
                   hint="Every card new again. The cards themselves stay."
@@ -215,7 +220,18 @@ export default function DeckDetail({
                 ▾
               </span>
             </Button>
-            <Menu open={addMenu} onClose={() => setAddMenu(false)} width={240} align="responsive">
+            {/*
+              Right-anchored for the same reason as the deck menu above: this
+              button sits far enough along the row that a 240px panel opened
+              leftwards ran 44px off a 375px screen. Right-anchored it starts
+              at 61, and on a wide screen nothing changes — `responsive` was
+              already right-anchoring it there.
+
+              "Study this deck", opposite, keeps `responsive`. It is the first
+              button in the row, so anchoring it right would put its panel at
+              -59 instead. The two are not the same case.
+            */}
+            <Menu open={addMenu} onClose={() => setAddMenu(false)} width={240} align="right">
               <MenuItem
                 title="Write your own"
                 hint="Type a question and answer by hand."
