@@ -315,3 +315,55 @@ describe('resetting a deck', () => {
     expect(stored().decks[0].schedule.c0).toBeTruthy()
   })
 })
+
+describe('where the header menus open', () => {
+  /**
+   * The panel Menu renders, found by the classes it always carries.
+   *
+   * jsdom has no layout engine, so none of this can be measured here — what
+   * is asserted is the anchoring that decides it. On a 375px screen the deck
+   * menu opened 204px past the right edge and the add-cards menu 44px past,
+   * because both were anchored to their own left edge on narrow screens while
+   * sitting near the right of the row.
+   */
+  const panel = () =>
+    document.querySelector('div.rise-in.absolute') ??
+    [...document.querySelectorAll('div')].find(
+      (d) => d.className.includes('rise-in') && d.className.includes('absolute'),
+    )
+
+  const openMenu = async (name) => {
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(name) }))
+    return panel()
+  }
+
+  beforeEach(() => seed({ decks: [deck({ count: 2 })] }))
+
+  it('opens the deck menu leftwards, since its button is at the right edge', async () => {
+    open(props())
+    const p = await openMenu('Deck options')
+    expect(p.className).toContain('right-0')
+    expect(p.className).not.toContain('left-0')
+  })
+
+  it('opens "Add cards" leftwards for the same reason', async () => {
+    open(props())
+    const p = await openMenu('Add cards')
+    expect(p.className).toContain('right-0')
+    expect(p.className).not.toContain('left-0')
+  })
+
+  it('leaves "Study this deck" opening rightwards, because it is first in the row', async () => {
+    // Anchored right, its panel would start at -59 on a 375px screen. The two
+    // cases genuinely differ, which is why they do not share a setting.
+    open(props())
+    const p = await openMenu('Study this deck')
+    expect(p.className).toContain('left-0')
+  })
+
+  it('opens the card menus leftwards, which they always have', async () => {
+    open(props())
+    await userEvent.click(screen.getAllByRole('button', { name: 'Card options' })[0])
+    expect(panel().className).toContain('right-0')
+  })
+})
