@@ -4,7 +4,7 @@ import { overall } from './ocr.js'
 /**
  * Only the progress arithmetic is testable here. The engine itself is
  * WebAssembly loaded into a browser worker from files this app serves, so
- * recognition is verified by running it — see the OCR notes in the README.
+ * recognition is verified by running it — see the OCR notes in docs/reference.md.
  */
 describe('overall', () => {
   it('is the fraction of one image when there is only one', () => {
