@@ -9,7 +9,18 @@
   --color-line-soft: oklch(0.932 0.007 85);
   --color-ink: oklch(0.245 0.012 60);
   --color-ink-2: oklch(0.4 0.011 65);
-  --color-ink-3: oklch(0.585 0.01 70);
+  /*
+   * 0.525, not the 0.585 this was. At 0.585 it measured 3.99:1 against paper
+   * and 3.58:1 against frame — under the 4.5:1 WCAG AA asks of text this size,
+   * and ink-3 carries the kickers, the hints under every settings row, the
+   * card counts and the "cards" in "12 cards". Sixteen distinct failures
+   * across five pages, all of them this one value.
+   *
+   * 0.525 is the lightest that clears 4.5 on the darkest background it is ever
+   * set against. The dark theme's ink-3 already passed at 4.66 and is
+   * untouched.
+   */
+  --color-ink-3: oklch(0.525 0.01 70);
   --color-accent: oklch(0.455 0.058 130);
   --color-accent-2: oklch(0.545 0.062 130);
   --color-accent-soft: oklch(0.945 0.022 130);
