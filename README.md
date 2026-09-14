@@ -1,32 +1,31 @@
 # Gunit
 
-[![CI](https://img.shields.io/github/actions/workflow/status/juhyeonie/Gunit-Flashcard-Reviewer/ci.yml?branch=main&label=CI)](https://github.com/juhyeonie/Gunit-Flashcard-Reviewer/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/juhyeonie/Gunit-Flashcard-Reviewer/ci.yml?branch=main\&label=CI)](https://github.com/juhyeonie/Gunit-Flashcard-Reviewer/actions/workflows/ci.yml)
 ![React](https://img.shields.io/badge/React-19-149ECA)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4)
 ![Supabase](https://img.shields.io/badge/Supabase-optional-3ECF8E)
 
-A simple flashcard reviewer for studying course materials. Create decks, import
-files, review with spaced repetition, and quiz yourself.
+A simple flashcard reviewer for studying course materials.
 
-**[Try it →](https://gunit-flashcard-reviewer.vercel.app)**
+Create decks, import study materials, review with spaced repetition, and test yourself with quizzes.
 
 ## Features
 
-- Flashcard decks
-- File importing — PDF, Word, PowerPoint, text
-- OCR for scanned materials
-- Spaced repetition
-- Quiz mode
-- Progress tracking
-- Deck backup & restore
-- Optional account sync
+* Flashcard decks
+* File importing — PDF, Word, PowerPoint, and text
+* OCR for scanned materials
+* Spaced repetition
+* Quiz mode
+* Progress tracking
+* Deck backup and restore
+* Optional account sync
 
-## Tech stack
+## Tech Stack
 
 React · Vite · Tailwind CSS · Supabase
 
-## Getting started
+## Getting Started
 
 ```bash
 git clone https://github.com/juhyeonie/Gunit-Flashcard-Reviewer.git
@@ -35,17 +34,19 @@ npm install
 npm run dev
 ```
 
-That's the whole thing — no account, no `.env`, no database. Decks live in the
-browser. Adding a Supabase project turns on sign-in and syncing across machines;
-see [the reference](docs/reference.md) for that, and for how each part works.
+Gunit works without an account, `.env` file, or database. Your decks are stored locally in the browser.
 
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Dev server on 5174 |
-| `npm run build` | Production bundle into `dist/` |
-| `npm test` | Vitest, watch mode |
-| `npm run lint` | ESLint |
+For account sign-in and syncing across devices, you can connect a Supabase project. See [`docs/reference.md`](docs/reference.md) for setup and technical details.
+
+## Scripts
+
+| Script          | Description                  |
+| --------------- | ---------------------------- |
+| `npm run dev`   | Start the development server |
+| `npm run build` | Build the production bundle  |
+| `npm test`      | Run tests                    |
+| `npm run lint`  | Run ESLint                   |
 
 ---
 
-Designed & developed by **Justine Andrie C. Pelgone**
+Designed and developed by **Justine Andrie C. Pelgone**
