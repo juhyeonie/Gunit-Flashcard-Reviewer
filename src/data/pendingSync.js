@@ -54,7 +54,11 @@ export async function flushPendingSync() {
  * the last change never went up, the copy about to be removed is the only one
  * that has it.
  *
+ * Takes the account being left, because by the time this is asked the store
+ * has already swapped to the guest library and nothing left in React knows
+ * whose session just ended. The answer is per account.
+ *
  * Nothing registered means nothing is outstanding, which is true of a
  * signed-out browser and of one with no project configured.
  */
-export const hasOutstandingChanges = () => (outstanding ? outstanding() : false)
+export const hasOutstandingChanges = (userId) => (outstanding ? outstanding(userId) : false)

@@ -129,6 +129,59 @@ export function rememberDeclinedImport(userId) {
 }
 
 /**
+ * Whether this browser is holding a change the account has not confirmed.
+ *
+ * A push waits 1200ms for the library to sit still, so that grading five cards
+ * is one request rather than five. Close the tab inside that beat and the
+ * request is never made — and the change, which is safely in local storage,
+ * was then thrown away by the next sign-in, because the pull installs the
+ * account's copy over whatever is here.
+ *
+ * So the wait is recorded rather than only timed. This is set the moment the
+ * library changes, before any waiting, and cleared only by a push the database
+ * confirmed. While it is set, the pull carries this browser's copy up instead
+ * of writing over it.
+ *
+ * It is allowed to be wrong in one direction only. A change that lands exactly
+ * as a push succeeds can leave this set with nothing to send, which costs one
+ * empty comparison on the next sign-in. Clearing it early would cost the
+ * change itself, so nothing here is optimised in that direction.
+ *
+ * Per account and per browser: it describes this machine's copy, and another
+ * machine's copy is not its business.
+ */
+const unsentKey = (userId) => `gunit.sync.unsent.${userId}`
+
+export function markUnsent(userId) {
+  if (!userId) return
+  try {
+    localStorage.setItem(unsentKey(userId), 'yes')
+  } catch {
+    // A browser that refuses storage has no local library to protect: the one
+    // copy of everything is already the account's.
+  }
+}
+
+export function clearUnsent(userId) {
+  if (!userId) return
+  try {
+    localStorage.removeItem(unsentKey(userId))
+  } catch {
+    // Left set, which is the safe direction: the next sign-in sends a copy of
+    // something the account already has.
+  }
+}
+
+export function hasUnsent(userId) {
+  if (!userId) return false
+  try {
+    return localStorage.getItem(unsentKey(userId)) === 'yes'
+  } catch {
+    return false
+  }
+}
+
+/**
  * Takes an account's library off this machine.
  *
  * Called on an explicit sign-out, and only once whatever was queued has gone

@@ -72,7 +72,7 @@ export function AuthProvider({ children }) {
          * failed, the change is still outstanding and this leaves the copy
          * exactly as that path did.
          */
-        if (leaving && !next && !hasOutstandingChanges()) forgetAccountLibrary(leaving)
+        if (leaving && !next && !hasOutstandingChanges(leaving)) forgetAccountLibrary(leaving)
       })
       unsubscribe = () => data.subscription.unsubscribe()
     })

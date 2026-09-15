@@ -60,12 +60,29 @@ function fakeClient({ decks = [], cards = [], sessions = [], profile = null } = 
     rpcPayloads: [],
     async rpc(_name, { payload }) {
       client.rpcPayloads.push(payload)
-      // The real function writes, so the next select sees what was pushed.
-      // Without this the upload path and the pull path cannot follow one
-      // another, which is exactly the sequence that goes wrong.
-      rows.decks = [...rows.decks, ...(payload.decks_upsert ?? [])]
-      rows.cards = [...rows.cards, ...(payload.cards_upsert ?? [])]
-      rows.sessions = [...rows.sessions, ...(payload.sessions_insert ?? [])]
+      /*
+       * The real function writes, so the next select sees what was pushed.
+       * Without this the upload path and the pull path cannot follow one
+       * another, which is exactly the sequence that goes wrong.
+       *
+       * Upserted by id, the way `sync_library` does it — `on conflict (id) do
+       * update`. Appending instead would hand a second select two rows with
+       * one id, which no database would, and a test written against that
+       * would be testing the stand-in.
+       */
+      const upsert = (was, put) => {
+        const by = new Map(was.map((r) => [r.id, r]))
+        for (const row of put) by.set(row.id, { ...by.get(row.id), ...row })
+        return [...by.values()]
+      }
+      const drop = (was, ids) => was.filter((r) => !ids.includes(r.id))
+
+      rows.decks = upsert(rows.decks, payload.decks_upsert ?? [])
+      rows.cards = upsert(rows.cards, payload.cards_upsert ?? [])
+      // Sessions are append-only and the real one is `on conflict do nothing`.
+      rows.sessions = upsert(rows.sessions, payload.sessions_insert ?? [])
+      rows.cards = drop(rows.cards, payload.cards_remove ?? [])
+      rows.decks = drop(rows.decks, payload.decks_remove ?? [])
       return { error: null }
     },
   }
@@ -84,7 +101,7 @@ const { AppProvider } = await import('./AppContext.jsx')
 const { useApp } = await import('./useApp.js')
 const { default: LibrarySync } = await import('./LibrarySync.jsx')
 const { AuthContext } = await import('./authContext.js')
-const { GUEST_KEY } = await import('./storageKeys.js')
+const { GUEST_KEY, hasUnsent, userKey } = await import('./storageKeys.js')
 const { flushPendingSync } = await import('./pendingSync.js')
 
 /** Hands the store out so a test can change settings the way a reader would. */
@@ -477,5 +494,238 @@ describe('offering the guest library to a new account', () => {
     })
     await waitFor(() => expect(api.decks).toEqual([]))
     expect(screen.queryByRole('dialog')).toBe(null)
+  })
+})
+
+/**
+ * The beat between a change and the request that carries it.
+ *
+ * Pushes wait 1200ms so that grading five cards is one request. Close the tab
+ * inside that beat and no request is ever made — and the change, which is
+ * safely in local storage, was then written over by the next sign-in, because
+ * the pull installs the account's copy on arrival. Local storage held the only
+ * copy, and the pull is what destroyed it.
+ *
+ * Two halves fix it, and both are here: leaving the page ends the wait early,
+ * and a mark in storage covers the cases where nothing can be sent at all — a
+ * killed request, a flat battery, a network that was never there.
+ */
+describe('a change the page was closed on top of', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+  const CARD = 'aaaaaaaa-0000-4000-8000-000000000001'
+
+  const deckRow = (id = DECK, title = 'From the account') => ({
+    id,
+    user_id: USER,
+    title,
+    subject: 'Rome',
+    description: '',
+    studied_at: null,
+  })
+
+  const account = () =>
+    fakeClient({
+      decks: [deckRow()],
+      cards: [
+        {
+          id: CARD,
+          deck_id: DECK,
+          user_id: USER,
+          front: 'Q1',
+          back: 'A1',
+          position: 0,
+          due: null,
+          interval: 0,
+          ease: 2.5,
+          reps: 0,
+          lapses: 0,
+          last_grade: null,
+          suspended: false,
+        },
+      ],
+      profile: null,
+    })
+
+  const settled = () =>
+    waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+
+  const pushedCards = () =>
+    client.rpcPayloads.flatMap((p) => p.cards_upsert ?? []).map((c) => c.front)
+
+  /** A change made, and the page gone before the beat is up. */
+  const changeThenClose = async () => {
+    client = account()
+    await mountSignedIn()
+    await settled()
+
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Added in the last second', back: 'And never sent' }])
+    })
+    expect(client.rpcPayloads).toHaveLength(0)
+
+    cleanup()
+  }
+
+  it('is carried up by the next sign-in rather than written over', async () => {
+    await changeThenClose()
+
+    // Reopened: the same browser and the same storage, with a fresh client, as
+    // a real page load would have.
+    client = account()
+    await mountSignedIn()
+
+    await waitFor(() => expect(pushedCards()).toContain('Added in the last second'))
+    await waitFor(() =>
+      expect(api.decks[0].cards.map((c) => c.front)).toContain('Added in the last second'),
+    )
+  })
+
+  it('never deletes what another machine added while this one was away', async () => {
+    // The carry is upserts with nothing removed, and this is why. A plain
+    // difference against the rows just fetched would read every deck this
+    // browser has not seen as one it had deleted, and tidy them away.
+    await changeThenClose()
+
+    client = fakeClient({
+      decks: [deckRow(), deckRow('7a3dd1c0-1d0c-4c1e-9d9a-9a6a6a1f0b21', 'Added on the phone')],
+      cards: [],
+      profile: null,
+    })
+    await mountSignedIn()
+
+    await waitFor(() => expect(client.rpcPayloads.length).toBeGreaterThan(0))
+    expect(client.rpcPayloads.flatMap((p) => p.decks_remove ?? [])).toEqual([])
+    await waitFor(() =>
+      expect(api.decks.map((d) => d.title).sort()).toEqual([
+        'Added on the phone',
+        'From the account',
+      ]),
+    )
+  })
+
+  it('keeps the change here when the carry itself fails', async () => {
+    // Nothing is installed over it and the mark stays set, so the next sign-in
+    // tries again. Installing the account's copy after a failed carry would
+    // lose the change on the one path that exists to save it.
+    await changeThenClose()
+
+    client = account()
+    client.rpc = async () => ({ error: new Error('offline') })
+    await mountSignedIn()
+
+    await waitFor(() =>
+      expect(api.decks[0].cards.map((c) => c.front)).toContain('Added in the last second'),
+    )
+    expect(hasUnsent(USER)).toBe(true)
+  })
+
+  it('marks the wait in storage, under a key of its own', async () => {
+    client = account()
+    await mountSignedIn()
+    await settled()
+
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Mid-beat', back: 'x' }])
+    })
+
+    // The mark is what outlives the page. A timer does not.
+    expect(localStorage.getItem(`gunit.sync.unsent.${USER}`)).toBe('yes')
+    // And it sits beside the library rather than inside it, so a library
+    // written by any other path cannot quietly clear it.
+    expect(localStorage.getItem(userKey(USER))).not.toContain('unsent')
+  })
+
+  it('forgets the mark once the account has confirmed the change', async () => {
+    client = account()
+    await mountSignedIn()
+    await settled()
+
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Waited it out', back: 'x' }])
+    })
+
+    // The beat is 1200ms, so this outwaits the default.
+    await waitFor(() => expect(pushedCards()).toContain('Waited it out'), { timeout: 5000 })
+    await waitFor(() => expect(hasUnsent(USER)).toBe(false))
+  })
+})
+
+describe('leaving the page', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+
+  const account = () =>
+    fakeClient({
+      decks: [
+        {
+          id: DECK,
+          user_id: USER,
+          title: 'From the account',
+          subject: 'Rome',
+          description: '',
+          studied_at: null,
+        },
+      ],
+      profile: null,
+    })
+
+  const hide = async (state = 'hidden') => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: state })
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+  }
+
+  afterEach(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  })
+
+  const ready = async () => {
+    client = account()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+  }
+
+  const pushedCards = () =>
+    client.rpcPayloads.flatMap((p) => p.cards_upsert ?? []).map((c) => c.front)
+
+  it('sends what the beat was still sitting on, without waiting it out', async () => {
+    // On a phone this is how the app is normally left: the tab is not closed,
+    // it is switched away from and discarded some time later.
+    await ready()
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Added then switched away', back: 'x' }])
+    })
+    expect(client.rpcPayloads).toHaveLength(0)
+
+    await hide()
+
+    await waitFor(() => expect(pushedCards()).toContain('Added then switched away'))
+  })
+
+  it('sends on a closed tab too, which reports itself differently', async () => {
+    await ready()
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Added then closed', back: 'x' }])
+    })
+
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    await waitFor(() => expect(pushedCards()).toContain('Added then closed'))
+  })
+
+  it('sends nothing when the page comes back into view', async () => {
+    // visibilitychange fires both ways. Coming back is not leaving, and a
+    // request per tab switch would be a request per tab switch.
+    await ready()
+    await hide('visible')
+    expect(client.rpcPayloads).toHaveLength(0)
+  })
+
+  it('sends nothing when there is nothing to send', async () => {
+    await ready()
+    await hide()
+    expect(client.rpcPayloads).toHaveLength(0)
   })
 })
