@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Button from './Button.jsx'
 
@@ -38,6 +38,7 @@ export default function Modal({
 }) {
   const dialogRef = useRef(null)
   const returnFocusTo = useRef(null)
+  const titleId = useId()
 
   /**
    * Everything that has to be undone in a fixed order lives in one effect:
@@ -135,7 +136,15 @@ export default function Modal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        /*
+         * Named by the heading rather than by a copy of it.
+         *
+         * `aria-label` said the right words and left the dialog with no
+         * heading at all, so a reader moving by headings — the ordinary way
+         * to get around a page — found nothing here. Pointing at the title
+         * means one string does both jobs and they cannot drift apart.
+         */
+        aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
         style={{ maxWidth }}
@@ -152,7 +161,17 @@ export default function Modal({
         </button>
 
         <div className="kicker mb-3">{kicker}</div>
-        <div className="mb-2.5 pr-10 font-serif text-[26px] leading-[1.15] text-pretty">{title}</div>
+        {/*
+          h2 because the page behind still has its h1, and this is a section
+          of the same document rather than a new one. Sized by class, so the
+          element carries the meaning and nothing about the look changes.
+        */}
+        <h2
+          id={titleId}
+          className="mt-0 mb-2.5 pr-10 font-serif text-[26px] leading-[1.15] font-normal text-pretty"
+        >
+          {title}
+        </h2>
         {body && <p className="mb-[22px] text-sm text-ink-2 text-pretty">{body}</p>}
 
         {children}

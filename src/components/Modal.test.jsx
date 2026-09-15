@@ -160,3 +160,74 @@ describe('when it is not open', () => {
     expect(document.getElementById('root').inert).toBeFalsy()
   })
 })
+
+/**
+ * The title, which said the right words in the wrong element.
+ *
+ * `aria-label` put the words on the dialog and left the page with no heading
+ * in it. Moving by headings is how a screen reader user gets around a page —
+ * often the first thing they try — and every dialog in this app answered that
+ * with nothing at all.
+ */
+describe('the title', () => {
+  it('is a heading, so it can be navigated to', () => {
+    open()
+    expect(screen.getByRole('heading', { name: 'Import a file' })).toBeTruthy()
+  })
+
+  it('is the second level, under the page it opened over', () => {
+    // The page behind keeps its h1. A dialog is a section of the same
+    // document, not a document of its own.
+    open()
+    expect(screen.getByRole('heading', { name: 'Import a file' }).tagName).toBe('H2')
+  })
+
+  it('names the dialog by pointing at that heading, not by copying it', () => {
+    // One string doing both jobs. Two would be two things to keep in step.
+    open()
+    const dialog = screen.getByRole('dialog', { name: 'Import a file' })
+    const heading = screen.getByRole('heading', { name: 'Import a file' })
+    expect(dialog.getAttribute('aria-labelledby')).toBe(heading.id)
+    expect(dialog.getAttribute('aria-label')).toBe(null)
+  })
+
+  it('gives each dialog its own id, so two cannot claim one name', () => {
+    // A fixed id would work right up until a second dialog existed, and then
+    // point both names at whichever heading the document happened to hold
+    // first. useId is what keeps that from being a question.
+    render(
+      <>
+        <Modal open onClose={vi.fn()} title="Delete deck?" confirmLabel="Delete">
+          <p>This cannot be undone.</p>
+        </Modal>
+        <Modal open onClose={vi.fn()} title="Reset progress?" confirmLabel="Reset">
+          <p>Every card new again.</p>
+        </Modal>
+      </>,
+    )
+
+    const ids = screen.getAllByRole('heading').map((h) => h.id)
+    expect(ids).toHaveLength(2)
+    expect(ids.every(Boolean)).toBe(true)
+    expect(new Set(ids).size).toBe(2)
+
+    // And each dialog is named by its own, not by the other's.
+    for (const name of ['Delete deck?', 'Reset progress?']) {
+      const dialog = screen.getByRole('dialog', { name })
+      expect(dialog.getAttribute('aria-labelledby')).toBe(
+        screen.getByRole('heading', { name }).id,
+      )
+    }
+  })
+
+  it('still looks like the title it was, rather than a browser heading', () => {
+    // The element carries the meaning; the classes carry the look. A heading
+    // that arrived bold and spaced would be a visible change nobody asked for.
+    open()
+    const heading = screen.getByRole('heading', { name: 'Import a file' })
+    expect(heading.className).toMatch(/font-serif/)
+    expect(heading.className).toMatch(/text-\[26px\]/)
+    expect(heading.className).toMatch(/font-normal/)
+    expect(heading.className).toMatch(/mt-0/)
+  })
+})
