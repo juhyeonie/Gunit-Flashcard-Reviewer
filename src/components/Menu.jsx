@@ -15,7 +15,22 @@ export default function Menu({ open, onClose, align = 'right', width = 230, chil
   useEffect(() => {
     if (!open) return undefined
     const onDown = (e) => {
-      if (!ref.current?.contains(e.target)) onClose?.()
+      /*
+       * "Outside" means outside the wrapper, not outside the panel.
+       *
+       * A panel positioned `absolute` is measured against the nearest
+       * positioned ancestor, and every caller makes that a `relative` wrapper
+       * holding the button that opens it. So the trigger is always a sibling
+       * of this element, and counting a press on it as outside is what made
+       * the deck kebab impossible to close: this fired on pointerdown and set
+       * the menu shut, then the trigger's own click ran a moment later and
+       * toggled it straight back open. Two presses, still open.
+       *
+       * Reading the wrapper instead leaves the trigger to close the menu the
+       * way it opened it.
+       */
+      const anchor = ref.current?.parentElement ?? ref.current
+      if (!anchor?.contains(e.target)) onClose?.()
     }
     const onKey = (e) => {
       if (e.key === 'Escape') onClose?.()
