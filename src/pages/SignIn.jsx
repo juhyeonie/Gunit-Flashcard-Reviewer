@@ -5,6 +5,7 @@ import { EyeIcon } from '../components/Icons.jsx'
 import CreatorCredit from '../components/CreatorCredit.jsx'
 import { useAuth } from '../data/useAuth.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import Spinner from '../components/Spinner.jsx'
 
 /**
  * One page for the three ways in: signing in, signing up, and asking for a
@@ -337,6 +338,7 @@ export default function SignIn() {
             </div>
 
             <Button type="submit" variant="accent" disabled={busy} className="mt-1 w-full">
+              {busy && <Spinner />}
               {busy ? copy.busy : copy.action}
             </Button>
           </form>

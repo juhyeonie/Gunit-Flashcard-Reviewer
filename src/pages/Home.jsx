@@ -1,6 +1,7 @@
 import { useAuth } from '../data/useAuth.js'
 import Dashboard from './Dashboard.jsx'
 import Landing from './Landing.jsx'
+import { PageLoading } from '../components/Spinner.jsx'
 
 /**
  * What `/` is, which depends on who is asking.
@@ -22,10 +23,15 @@ import Landing from './Landing.jsx'
  * who this is. Answering during that moment means showing one page and then
  * replacing it — every returning reader would watch the landing page flash
  * past on the way to their decks. A blank beat is the better of the two.
+ *
+ * Blank for a beat, that is, not indefinitely. The restore is usually local and
+ * instant, but on a cold load it also fetches the account client, and on a
+ * slow phone that is long enough to look broken. PageLoading keeps the quick
+ * case blank and shows a spinner only once the wait is long enough to notice.
  */
 export default function Home(props) {
   const { available, status, user } = useAuth()
   if (!available) return <Dashboard {...props} />
-  if (status === 'loading') return null
+  if (status === 'loading') return <PageLoading />
   return user ? <Dashboard {...props} /> : <Landing />
 }

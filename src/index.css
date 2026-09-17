@@ -43,6 +43,7 @@
   --shadow-sh3: 0 30px 70px -30px oklch(0.245 0.012 60 / 0.32);
 
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 /* The glass nav needs the paper colour at partial alpha, which can't live in
@@ -150,6 +151,31 @@ select {
   animation: toastIn 0.2s var(--ease-out-quint) both;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Held back, then faded in: for a loading indicator that should not appear at
+   all when the wait is short. See PageLoading. A pure fade, because a spinner
+   that also slides into place is movement with nothing to explain. */
+.reveal-late {
+  animation: fadeIn 0.2s var(--ease-out-quint) 0.4s both;
+}
+
+@keyframes breathe {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+
 /* The mono, letterspaced, uppercase label that headlines nearly every block in
    the prototype. Frequent enough to earn a class rather than five utilities. */
 .kicker {
@@ -179,5 +205,17 @@ select {
   * {
     transition-duration: 120ms !important;
     animation-duration: 160ms !important;
+  }
+
+  /*
+   * The rule above shortens every animation to 160ms, which is right for an
+   * entrance and exactly wrong for a spinner: an infinite turn at 160ms is
+   * six rotations a second, far more motion than the one it replaced. So the
+   * spinner stops turning here and breathes instead — still visibly working,
+   * with nothing moving across the screen. A class outranks `*`, so this wins
+   * although both are important.
+   */
+  .spinner {
+    animation: breathe 1.2s var(--ease-in-out-quart) infinite alternate !important;
   }
 }
