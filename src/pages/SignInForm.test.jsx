@@ -65,6 +65,11 @@ describe('signing in', () => {
     expect(await screen.findByTestId('elsewhere')).toBeTruthy()
   })
 
+  it('shows no spinner before anything has been asked', () => {
+    open()
+    expect(screen.getByRole('button', { name: 'Sign in' }).querySelector('.spinner')).toBe(null)
+  })
+
   it('says "Signing in…" and refuses a second press while it waits', async () => {
     // Two presses is two sign-in attempts, and on a slow connection that is
     // exactly what an impatient reader does.
@@ -79,6 +84,9 @@ describe('signing in', () => {
 
     const button = await screen.findByRole('button', { name: 'Signing in…' })
     expect(button.disabled).toBe(true)
+    // Turning while it waits, and silent about it: the name above is still
+    // exactly the words, so the spinner adds nothing a screen reader hears.
+    expect(button.querySelector('.spinner')).not.toBe(null)
     await user.click(button)
     expect(auth.signIn).toHaveBeenCalledTimes(1)
 

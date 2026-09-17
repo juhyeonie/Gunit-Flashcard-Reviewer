@@ -6,6 +6,7 @@ import { useApp } from '../data/useApp.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { useAuth } from '../data/useAuth.js'
 import { fromLibraryTransfer, libraryFileName, toLibraryTransfer } from '../data/transfer.js'
+import Spinner from '../components/Spinner.jsx'
 
 function Row({ label, hint, children }) {
   return (
@@ -330,7 +331,16 @@ export default function Settings() {
         kicker="Signing out"
         title="Sign out of Gunit?"
         body="Your decks stay in your account and come back when you sign in. This browser returns to its own library, and the account's copy is taken off this machine — so studying offline here will need a sign-in first."
-        confirmLabel={signingOut ? 'Signing out…' : 'Sign out'}
+        confirmLabel={
+          signingOut ? (
+            <>
+              <Spinner />
+              Signing out…
+            </>
+          ) : (
+            'Sign out'
+          )
+        }
         confirmDisabled={signingOut}
         cancelLabel="Stay signed in"
         onConfirm={leave}

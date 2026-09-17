@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import Field from '../components/Field.jsx'
 import { useAuth } from '../data/useAuth.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import Spinner from '../components/Spinner.jsx'
 
 /**
  * Where a reset link lands.
@@ -57,7 +58,8 @@ export default function ResetPassword() {
   // link being exchanged rather than anything being wrong.
   if (status === 'loading') {
     return (
-      <div className="rise-in mx-auto max-w-[460px] py-24 text-center">
+      <div className="rise-in mx-auto flex max-w-[460px] items-center justify-center gap-2.5 py-24">
+        <Spinner className="text-ink-3" />
         <p className="m-0 text-[15px] text-ink-2">Checking your link…</p>
       </div>
     )
@@ -115,6 +117,7 @@ export default function ResetPassword() {
         </div>
 
         <Button type="submit" disabled={busy} className="mt-1">
+          {busy && <Spinner />}
           {busy ? 'Saving…' : 'Save password'}
         </Button>
       </form>

@@ -3,6 +3,7 @@ import Modal from './Modal.jsx'
 import Field from './Field.jsx'
 import { combineText, extractText, readWithOcr } from '../data/extract.js'
 import { SEPARATORS, parseCards } from '../data/parse.js'
+import Spinner from './Spinner.jsx'
 
 const ACCEPT =
   '.pdf,.pptx,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,application/pdf,' +
@@ -303,6 +304,11 @@ export default function ImportFileModal({
                     {f.size}
                     {f.status === 'reading' &&
                       (f.pct === undefined ? ' · Reading…' : ` · Recognising… ${f.pct}%`)}
+                    {/* A long read looks the same as a stuck one in text alone.
+                        The OCR button carries its own when there is one. */}
+                    {f.status === 'reading' && !f.ocr && (
+                      <Spinner size={10} className="ml-1.5 align-[-1px]" />
+                    )}
                     {f.status === 'ok' &&
                       ` · ${f.words.toLocaleString()} words${f.viaOcr ? ', read by OCR' : ''}`}
                     {f.status === 'ok' && f.note && ` · ${f.note}`}
@@ -334,7 +340,14 @@ export default function ImportFileModal({
                     }
                     className="shrink-0 cursor-pointer rounded-[20px] border border-line bg-transparent px-3 py-1.5 text-xs leading-none font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:border-line aria-disabled:hover:text-ink-2"
                   >
-                    {f.status === 'reading' ? 'Reading…' : 'Read with OCR'}
+                    {f.status === 'reading' ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Spinner size={10} />
+                        Reading…
+                      </span>
+                    ) : (
+                      'Read with OCR'
+                    )}
                   </button>
                 )}
 

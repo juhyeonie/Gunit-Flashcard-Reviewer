@@ -81,9 +81,19 @@ describe('who gets what at /', () => {
     // Answering now means showing one page and replacing it a moment later:
     // every returning reader would watch the landing page flash past on the
     // way to their own decks.
-    const { container } = open(auth({ status: 'loading' }))
+    open(auth({ status: 'loading' }))
     expect(onLanding()).toBe(null)
-    expect(container.textContent).toBe('')
+    expect(screen.queryByRole('link', { name: /All decks|My decks/i })).toBe(null)
+  })
+
+  it('says it is loading, but holds the spinner back for a quick restore', () => {
+    // Usually the restore is local and instant, and a spinner that flashes
+    // for a frame reads as a glitch. The words are there at once for a screen
+    // reader; the drawing only appears if the wait is long enough to notice.
+    open(auth({ status: 'loading' }))
+    const status = screen.getByRole('status')
+    expect(status.textContent).toBe('Loading')
+    expect(status.querySelector('.reveal-late .spinner')).not.toBe(null)
   })
 })
 
