@@ -1,4 +1,4 @@
-import { DECKS, uid } from './seed.js'
+import { DECKS, EXAMPLE_DECK, RETIRED_DEFAULT_DECKS, uid } from './seed.js'
 import { grade, isSuspended } from './scheduler.js'
 import { parseLegacyStudied } from './activity.js'
 
@@ -71,7 +71,7 @@ export const progressOf = (deck) => {
  * and every deck carries a schedule map.
  *
  * Three older shapes are migrated in place:
- *   - a bare `progress` number (the seed decks) becomes concrete "good" grades
+ *   - a bare `progress` number (the old default decks) becomes concrete "good" grades
  *   - a flat `outcomes` map becomes real schedule entries with due dates
  *   - a `studied` phrase ("2 hours ago") becomes a `studiedAt` timestamp
  *
@@ -162,6 +162,105 @@ export function normalizeState(state, now = Date.now()) {
     decks: decks.map((d) => reviveDeck(d, now)).filter(Boolean),
   }
 }
+
+/*
+ * Retiring the six decks every visitor used to start with.
+ *
+ * Changing the default only changes what an empty browser is given. Every
+ * browser that opened an earlier version already has the six stored, and
+ * stored decks are what the app reads — so without this, nobody who had ever
+ * visited would see the change.
+ *
+ * The hard part is not removing them; it is being sure a deck is still the
+ * default and not somebody's work. A reader may have studied one, renamed it,
+ * added their own cards to it. Those are theirs now and are kept. Only a deck
+ * that is exactly what was handed out — same words, same cards, and no study
+ * of any kind — is taken away.
+ */
+
+const sameCards = (cards, original) =>
+  cards.length === original.length &&
+  cards.every((c, i) => c.front === original[i].front && c.back === original[i].back)
+
+/**
+ * Whether a stored schedule is still the one the default was born with.
+ *
+ * The old decks carried a made-up `progress`, which normalizeDeck turned into
+ * one "good" grade on each of the first N cards. Anything a reader does leaves
+ * a different shape: a second review raises `reps`, "again" records a lapse, a
+ * newly studied card adds an entry, suspending sets a flag, and a reset clears
+ * the lot. Grades are saved as they happen rather than at the end of a
+ * session, so this is the check that catches a review abandoned half way.
+ */
+const untouchedSchedule = (deck, original) => {
+  const knownCount = Math.round((original.progress ?? 0) * original.cards.length)
+  const expected = deck.cards.slice(0, knownCount).map((c) => c.id)
+  const entries = Object.entries(deck.schedule ?? {})
+
+  return (
+    entries.length === expected.length &&
+    entries.every(
+      ([cardId, e]) =>
+        expected.includes(cardId) &&
+        e?.last === 'good' &&
+        e.reps === 1 &&
+        e.lapses === 0 &&
+        !e.suspended,
+    )
+  )
+}
+
+const RETIRED = new Map(RETIRED_DEFAULT_DECKS.map((d) => [d.id, d]))
+
+export const isRetiredDefault = (deck, sessions = []) => {
+  const original = RETIRED.get(deck?.id)
+  if (!original) return false
+  return (
+    deck.title === original.title &&
+    deck.subject === original.subject &&
+    deck.desc === original.desc &&
+    sameCards(deck.cards, original.cards) &&
+    untouchedSchedule(deck, original) &&
+    !sessions.some((s) => s.deckId === deck.id)
+  )
+}
+
+/**
+ * Takes the untouched old defaults out of a guest library, and puts the
+ * example deck in their place.
+ *
+ * The example is added only in the same pass that removed something, which is
+ * what makes this safe to run on every load: once the old decks are gone there
+ * is nothing left to match, so a reader who later deletes the example deck
+ * does not find it back the next day.
+ *
+ * Pure, and for the guest library only. An account's decks carry database
+ * ids and can never match these, but the caller does not rely on that.
+ */
+export function retireDefaultDecks(state, now = Date.now()) {
+  const kept = state.decks.filter((d) => !isRetiredDefault(d, state.sessions))
+  if (kept.length === state.decks.length) return state
+
+  const hasExample = kept.some((d) => d.id === EXAMPLE_DECK.id)
+  return {
+    ...state,
+    decks: hasExample ? kept : [normalizeDeck(EXAMPLE_DECK, now), ...kept],
+  }
+}
+
+/**
+ * Whether a deck is the example exactly as it was handed out.
+ *
+ * Studying it does not count as changing it: progress on a tutorial is not
+ * something anyone needs carried into an account. Editing its words or its
+ * cards does, because then some of it is the reader's.
+ */
+export const isUntouchedExample = (deck) =>
+  deck?.id === EXAMPLE_DECK.id &&
+  deck.title === EXAMPLE_DECK.title &&
+  deck.subject === EXAMPLE_DECK.subject &&
+  deck.desc === EXAMPLE_DECK.desc &&
+  sameCards(deck.cards, EXAMPLE_DECK.cards)
 
 /**
  * Parses a stored payload.

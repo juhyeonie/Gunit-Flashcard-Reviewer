@@ -2,7 +2,13 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import { uid } from './seed.js'
 import { grade, newEntry } from './scheduler.js'
 import { MAX_SESSIONS, appendSession } from './activity.js'
-import { DEFAULT_STATE, normalizeState, parseStoredState, progressOf } from './normalize.js'
+import {
+  DEFAULT_STATE,
+  normalizeState,
+  parseStoredState,
+  progressOf,
+  retireDefaultDecks,
+} from './normalize.js'
 import { AppContext } from './appContext.js'
 import { AuthContext } from './authContext.js'
 import { GUEST_KEY, SALVAGE_KEY, keyFor, migrateLegacyStorage } from './storageKeys.js'
@@ -10,11 +16,15 @@ import { GUEST_KEY, SALVAGE_KEY, keyFor, migrateLegacyStorage } from './storageK
 /**
  * Reads the library at one key.
  *
- * An empty guest library seeds itself, because a first visit should have
- * something to study. An empty *account* library does not — it means the
- * account is new, or that this browser has not pulled it yet, and inventing
- * six decks of Roman history in someone's account would be worse than a blank
+ * An empty guest library seeds itself with the example deck, because a first
+ * visit should have something to study. An empty *account* library does not —
+ * it means the account is new, or that this browser has not pulled it yet,
+ * and putting a tutorial into someone's account would be worse than a blank
  * page.
+ *
+ * A guest library that already exists has the old six defaults retired from
+ * it, where nobody has touched them. Accounts are never passed through that:
+ * what is in an account is the reader's, whatever it looks like.
  */
 const load = (key) => {
   let raw = null
@@ -39,7 +49,9 @@ const load = (key) => {
       // Nothing more to do; the app still starts.
     }
   }
-  return state
+  // Written back by the persist effect on the first render, so this happens
+  // once per browser rather than on every load.
+  return key === GUEST_KEY ? retireDefaultDecks(state) : state
 }
 
 export function AppProvider({ children }) {

@@ -31,6 +31,29 @@ const store = () => renderHook(() => useApp(), { wrapper })
 /** The one seeded deck these tests work against. */
 const first = (result) => result.current.decks[0]
 
+/**
+ * A library of two decks, for the tests that need a bystander.
+ *
+ * The default library is a single example deck, so "leaves the other deck
+ * alone" needs an other deck written in on purpose — and one with history of
+ * its own, so that leaving it alone is something that could visibly fail.
+ */
+const twoDecks = () => {
+  const cards = (prefix) =>
+    [1, 2, 3].map((n) => ({ id: `${prefix}${n}`, front: `${prefix} question ${n}`, back: `${prefix} answer ${n}` }))
+  const graded = { last: 'good', due: Date.now() + 86_400_000, interval: 1440, ease: 2.5, reps: 1, lapses: 0 }
+  localStorage.setItem(
+    KEY,
+    JSON.stringify({
+      decks: [
+        { id: 'target', title: 'Target', subject: 'Test', desc: '', cards: cards('t'), schedule: {} },
+        { id: 'bystander', title: 'Bystander', subject: 'Test', desc: '', cards: cards('b'), schedule: { b1: graded, b2: graded } },
+      ],
+      sessions: [],
+    }),
+  )
+}
+
 beforeEach(() => {
   localStorage.clear()
 })
@@ -414,6 +437,7 @@ describe('taking a grade back', () => {
   })
 
   it('leaves other decks alone', () => {
+    twoDecks()
     const { result } = store()
     const [deck, other] = result.current.decks
     const snapshot = JSON.stringify(other)
@@ -522,9 +546,12 @@ describe('resetting a deck', () => {
   })
 
   it('touches no other deck', () => {
+    twoDecks()
     const { result } = store()
     const [target, other] = result.current.decks
     const before = other.schedule
+    // A bystander with nothing to lose would pass this whatever reset did.
+    expect(Object.keys(before)).toHaveLength(2)
 
     act(() => result.current.resetDeck(target.id))
     expect(result.current.decks.find((d) => d.id === other.id).schedule).toEqual(before)
