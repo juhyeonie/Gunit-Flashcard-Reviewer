@@ -102,6 +102,7 @@ const { useApp } = await import('./useApp.js')
 const { default: LibrarySync } = await import('./LibrarySync.jsx')
 const { AuthContext } = await import('./authContext.js')
 const { GUEST_KEY, hasUnsent, userKey } = await import('./storageKeys.js')
+const { EXAMPLE_DECK } = await import('./seed.js')
 const { flushPendingSync } = await import('./pendingSync.js')
 
 /** Hands the store out so a test can change settings the way a reader would. */
@@ -379,6 +380,30 @@ describe('offering the guest library to a new account', () => {
   /** An account with nothing in it, which is what signing up produces. */
   const emptyAccount = () => fakeClient({ profile: null })
 
+  /*
+   * Decks the visitor made before signing up — which is what the offer is
+   * for. The default library used to stand in for these, but the default is
+   * now one example deck, and that is deliberately never offered.
+   */
+  const ownDeck = (id, title) => ({
+    id,
+    title,
+    subject: 'Biology',
+    desc: '',
+    cards: [
+      { id: `${id}-1`, front: `${title}: first`, back: 'One' },
+      { id: `${id}-2`, front: `${title}: second`, back: 'Two' },
+    ],
+    schedule: {},
+  })
+
+  beforeEach(() => {
+    localStorage.setItem(
+      GUEST_KEY,
+      JSON.stringify({ decks: [ownDeck('cells', 'Cells'), ownDeck('genes', 'Genes')], sessions: [] }),
+    )
+  })
+
   const signIn = async () => {
     mount()
     await waitFor(() => expect(api.decks.length).toBeGreaterThan(0))
@@ -494,6 +519,54 @@ describe('offering the guest library to a new account', () => {
     })
     await waitFor(() => expect(api.decks).toEqual([]))
     expect(screen.queryByRole('dialog')).toBe(null)
+  })
+
+  it('does not offer the example deck, which is a tutorial rather than their work', async () => {
+    // A first-time visitor who signs up straight away has only the example.
+    // Asking to copy it would put a tutorial into their account on every
+    // machine they ever sign in on.
+    localStorage.removeItem(GUEST_KEY)
+    client = emptyAccount()
+    mount()
+    await waitFor(() => expect(api.decks.map((d) => d.id)).toEqual([EXAMPLE_DECK.id]))
+
+    await act(async () => {
+      signInAs({ id: USER })
+    })
+    await waitFor(() => expect(api.decks).toEqual([]))
+    expect(screen.queryByRole('dialog')).toBe(null)
+    expect(client.rpcPayloads).toHaveLength(0)
+  })
+
+  it('offers only their own decks when the example sits beside them', async () => {
+    const example = { ...EXAMPLE_DECK, schedule: {} }
+    localStorage.setItem(
+      GUEST_KEY,
+      JSON.stringify({ decks: [example, ownDeck('cells', 'Cells')], sessions: [] }),
+    )
+    client = emptyAccount()
+    await signIn()
+
+    expect(await screen.findByRole('dialog', { name: 'Bring your deck into this account?' })).toBeTruthy()
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Bring them in' }))
+    })
+    const pushed = client.rpcPayloads.flatMap((p) => p.decks_upsert ?? []).map((d) => d.title)
+    expect(pushed).toEqual(['Cells'])
+  })
+
+  it('offers the example once the reader has made it their own', async () => {
+    // Cards they wrote into it are theirs, and would otherwise be left behind.
+    const edited = {
+      ...EXAMPLE_DECK,
+      schedule: {},
+      cards: [...EXAMPLE_DECK.cards, { id: 'mine', front: 'A card I wrote', back: 'Mine' }],
+    }
+    localStorage.setItem(GUEST_KEY, JSON.stringify({ decks: [edited], sessions: [] }))
+    client = emptyAccount()
+    await signIn()
+
+    expect(await screen.findByRole('dialog', { name: 'Bring your deck into this account?' })).toBeTruthy()
   })
 })
 

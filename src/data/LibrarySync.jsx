@@ -12,7 +12,7 @@ import {
   rememberDeclinedImport,
   userKey,
 } from './storageKeys.js'
-import { parseStoredState } from './normalize.js'
+import { isUntouchedExample, parseStoredState } from './normalize.js'
 import Modal from '../components/Modal.jsx'
 import {
   changesBetween,
@@ -56,7 +56,19 @@ function readLibrary(key) {
   }
 }
 
-const readGuestLibrary = () => readLibrary(GUEST_KEY)
+/**
+ * The guest's own decks — the ones worth offering to an account.
+ *
+ * The example deck is left out while it is still exactly as it was handed
+ * out. It is a tutorial, not the reader's work, and "Bring your deck into this
+ * account?" about a deck they never wrote would put it in their account on
+ * every machine they sign in on. Once they have edited it, some of it is
+ * theirs, and it is offered like anything else.
+ */
+const readGuestLibrary = () => {
+  const guest = readLibrary(GUEST_KEY)
+  return { ...guest, decks: guest.decks.filter((d) => !isUntouchedExample(d)) }
+}
 
 /** How long the library has to sit still before a push is worth making. */
 const QUIET_MS = 1200

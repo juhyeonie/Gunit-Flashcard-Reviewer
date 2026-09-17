@@ -1,12 +1,49 @@
 /**
- * Seed content ported verbatim from the Claude Design prototype
- * ("Flashcard Reviewer.dc.html"). Shapes:
+ * What a signed-out visitor starts with.
  *
- *   Deck = { id, title, subject, desc, studied, progress (0..1), cards: Card[] }
- *   Card = { front, back }
+ *   Deck = { id, title, subject, desc, cards: Card[] }
+ *   Card = { id, front, back }
+ *
+ * One deck, and it is about Gunit itself. A first visit should show what
+ * reviewing is like, and a deck whose cards explain the thing you are doing
+ * while you do it teaches that faster than six decks on Roman history did.
+ *
+ * It starts genuinely new: no invented progress and no "studied 2 hours ago",
+ * so every card is ready to review and the dashboard tells the truth from the
+ * first visit.
+ *
+ * Only the guest library is ever given this. An account starts empty — see
+ * `load` in AppContext.
  */
+export const EXAMPLE_DECK = {
+  id: 'example',
+  title: 'How Gunit works',
+  subject: 'Getting started',
+  desc: 'An example deck. Study it to see how reviewing works, then make one of your own.',
+  cards: [
+    { id: 'example-1', front: 'What is a deck in Gunit?', back: 'A set of question-and-answer cards on one subject. Write the cards yourself, or import them from a file.' },
+    { id: 'example-2', front: 'How do you review a card?', back: 'Read the question and try to recall the answer. Then reveal it and grade how well you remembered.' },
+    { id: 'example-3', front: 'What do the three grades mean?', back: 'Again: you forgot it. Good: you remembered it. Easy: you knew it straight away.' },
+    { id: 'example-4', front: 'What is spaced repetition?', back: 'A schedule that brings each card back just before you would forget it. The better you know a card, the longer it waits.' },
+    { id: 'example-5', front: 'What happens when you grade a card “Again”?', back: 'It comes back in about ten minutes. Good waits days, and Easy waits longer still.' },
+    { id: 'example-6', front: 'Which files can Gunit turn into cards?', back: 'PDF, Word, PowerPoint and plain text. Scanned pages can be read with OCR.' },
+    { id: 'example-7', front: 'What is quiz mode?', back: 'A multiple-choice test built from a deck’s own cards. Any deck with four or more cards can be quizzed.' },
+    { id: 'example-8', front: 'Do you need an account to use Gunit?', back: 'No. Decks are saved in this browser. An account is optional and keeps them the same on every device you sign in on.' },
+  ],
+}
 
-export const DECKS = [
+export const DECKS = [EXAMPLE_DECK]
+
+/**
+ * The six decks every visitor used to start with, ported verbatim from the
+ * Claude Design prototype ("Flashcard Reviewer.dc.html").
+ *
+ * No longer given to anyone. They are kept because browsers that ran an
+ * earlier version still hold them, and recognising one exactly — see
+ * `retireDefaultDecks` in normalize.js — is the only safe way to tell a
+ * default nobody touched from a deck somebody has made their own.
+ */
+export const RETIRED_DEFAULT_DECKS = [
   { id:'republic', title:'Roman Republic: Institutions', subject:'Ancient Rome', desc:'Magistracies, assemblies and the unwritten rules that held the Republic together.', studied:'2 hours ago', progress:0.62, cards:[
     { front:'What were the two annually elected chief magistrates of the Republic?', back:'The consuls — two held office together for a single year, each able to veto the other.' },
     { front:'What was the cursus honorum?', back:'The ladder of public office — quaestor, aedile, praetor, consul — through which a senator advanced.' },
@@ -87,7 +124,7 @@ export const DRAFTED = [
   { front:'What did Diocletian\u2019s reform do to the provinces?', back:'It roughly doubled their number and grouped them into dioceses under vicarii.' }
 ];
 
-export const HUES = { republic: 132, punic: 248, emperors: 302, latin: 62, city: 196, late: 22 }
+export const HUES = { example: 132, republic: 132, punic: 248, emperors: 302, latin: 62, city: 196, late: 22 }
 
 export const hueOf = (deck) =>
   HUES[deck.id] !== undefined
