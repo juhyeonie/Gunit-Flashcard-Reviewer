@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import DeckCard from '../components/DeckCard.jsx'
+import Mascot from '../components/Mascot.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/useApp.js'
 import { accentOf } from '../data/seed.js'
@@ -279,6 +280,7 @@ export default function Dashboard({ onNewDeck, onEditDeck, onImport }) {
           </ul>
         ) : (
           <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-6 py-[76px] text-center">
+            <Mascot pose="studying" size={100} className="mb-1" />
             <div className="font-serif text-[26px] leading-[1.2]">Nothing to study yet</div>
             <p className="m-0 max-w-[360px] text-sm text-ink-3 text-pretty">
               Write your first deck by hand, or import your notes and split them into cards.

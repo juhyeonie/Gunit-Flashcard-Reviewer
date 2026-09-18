@@ -1,0 +1,52 @@
+{
+    "studying":  {
+                     "width":  302,
+                     "height":  296,
+                     "ground":  {
+                                    "left":  0.0497,
+                                    "top":  0.8547,
+                                    "width":  0.9238,
+                                    "height":  0.1182
+                                }
+                 },
+    "thinking":  {
+                     "width":  323,
+                     "height":  277,
+                     "ground":  {
+                                    "left":  0.0248,
+                                    "top":  0.8484,
+                                    "width":  0.9536,
+                                    "height":  0.1264
+                                }
+                 },
+    "correct":  {
+                    "width":  306,
+                    "height":  274,
+                    "ground":  {
+                                   "left":  0.1569,
+                                   "top":  0.8467,
+                                   "width":  0.719,
+                                   "height":  0.1241
+                               }
+                },
+    "resting":  {
+                    "width":  346,
+                    "height":  265,
+                    "ground":  {
+                                   "left":  0.026,
+                                   "top":  0.8377,
+                                   "width":  0.9509,
+                                   "height":  0.1321
+                               }
+                },
+    "celebrate":  {
+                      "width":  381,
+                      "height":  302,
+                      "ground":  {
+                                     "left":  0.2257,
+                                     "top":  0.8609,
+                                     "width":  0.7113,
+                                     "height":  0.1159
+                                 }
+                  }
+}

@@ -9,6 +9,8 @@ import { MIN_QUIZ_CARDS, canQuiz } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { formatRelative } from '../data/activity.js'
 import { fileNameFor, toTransfer } from '../data/transfer.js'
+import MissingDeck from '../components/MissingDeck.jsx'
+import Mascot from '../components/Mascot.jsx'
 
 export default function DeckDetail({
   onEditDeck,
@@ -29,16 +31,7 @@ export default function DeckDetail({
   const [deckMenu, setDeckMenu] = useState(false)
   const [cardMenu, setCardMenu] = useState(null)
 
-  if (!deck) {
-    return (
-      <div className="mx-auto max-w-xl py-20 text-center">
-        <div className="font-serif text-2xl">That deck no longer exists.</div>
-        <Button as={Link} to="/decks" className="mt-5">
-          All decks
-        </Button>
-      </div>
-    )
-  }
+  if (!deck) return <MissingDeck />
 
   const hasCards = deck.cards.length > 0
   const due = dueCount(deck)
@@ -347,6 +340,7 @@ export default function DeckDetail({
         </ul>
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
+          <Mascot pose="thinking" size={92} className="mb-1" />
           <div className="font-serif text-[24px] leading-[1.2]">No cards yet</div>
           <p className="m-0 max-w-[360px] text-sm text-ink-3 text-pretty">
             Write the first card by hand, or upload a reading and let the deck fill itself.

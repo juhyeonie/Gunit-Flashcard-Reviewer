@@ -4,6 +4,8 @@ import Button from '../components/Button.jsx'
 import { useApp } from '../data/useApp.js'
 import { MIN_QUIZ_CARDS, buildQuestions, verdictFor } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import MissingDeck from '../components/MissingDeck.jsx'
+import Mascot from '../components/Mascot.jsx'
 
 export default function Quiz() {
   const { id } = useParams()
@@ -24,16 +26,7 @@ export default function Quiz() {
   // once; useRef(Date.now()) would re-read it on every render.
   const [startedAt, setStartedAt] = useState(() => Date.now())
 
-  if (!deck) {
-    return (
-      <div className="mx-auto max-w-xl py-20 text-center">
-        <div className="font-serif text-2xl">That deck no longer exists.</div>
-        <Button as={Link} to="/decks" className="mt-5">
-          All decks
-        </Button>
-      </div>
-    )
-  }
+  if (!deck) return <MissingDeck />
 
   // Fewer than four cards cannot make a real question: the answer would sit
   // among one or two options, and picking it would still grade the card and
@@ -96,6 +89,11 @@ export default function Quiz() {
     return (
       <div className="rise-in mx-auto max-w-[760px]">
         <div className="flex flex-col items-center gap-[26px] py-10 text-center">
+          {/*
+            Pleased at a pass, back to the book below one — which is what the
+            verdict underneath says too.
+          */}
+          <Mascot pose={score / questions.length >= 0.5 ? 'correct' : 'studying'} size={104} />
           <div className="kicker">Quiz complete</div>
           <div className="flex items-baseline gap-1.5">
             <span className="font-serif text-[64px] leading-none font-light tracking-[-0.02em] sm:text-[84px]">

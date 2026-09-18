@@ -5,6 +5,8 @@ import { useApp } from '../data/useApp.js'
 import { entryFor, formatInterval, preview } from '../data/scheduler.js'
 import { nextDueLabel, openingQueue, shuffle, summarise } from '../data/session.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import MissingDeck from '../components/MissingDeck.jsx'
+import Mascot from '../components/Mascot.jsx'
 
 const NAV_HINTS = [
   { key: 'Space', label: 'flip', w: 'auto' },
@@ -224,21 +226,17 @@ export default function Review() {
     return () => clearTimeout(revealTimer.current)
   }, [settings.autoReveal, flipped, idx])
 
-  if (!deck) {
-    return (
-      <div className="mx-auto max-w-xl py-20 text-center">
-        <div className="font-serif text-2xl">That deck no longer exists.</div>
-        <Button as={Link} to="/decks" className="mt-5">
-          All decks
-        </Button>
-      </div>
-    )
-  }
+  if (!deck) return <MissingDeck />
 
   if (!order.length) {
     const waiting = nextDueLabel(deck, mountedAt)
     return (
       <div className="rise-in mx-auto flex max-w-[520px] flex-col items-center gap-4 py-24 text-center">
+        {/*
+          Asleep when nothing is due: the reference names this pose "Review
+          later", which is exactly what the page is saying.
+        */}
+        <Mascot pose={deck.cards.length ? 'resting' : 'thinking'} size={112} className="mb-1" />
         <div className="kicker text-accent">{deck.cards.length ? 'All caught up' : 'Empty deck'}</div>
         <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
           {deck.cards.length ? 'Nothing is due right now' : 'No cards yet'}

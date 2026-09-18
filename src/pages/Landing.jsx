@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import CreatorCredit from '../components/CreatorCredit.jsx'
+import Mascot from '../components/Mascot.jsx'
 
 /**
  * What somebody sees at `/` before they have signed in.
@@ -37,6 +38,12 @@ export default function Landing() {
           <img src="/assets/gunit-logo.png" alt="Gunit" className="block h-11 w-auto" />
           <p className="kicker m-0 !tracking-[0.14em] text-ink-3">Your study space</p>
         </div>
+
+        {/*
+          The mascot, below the wordmark rather than beside it: the logo is
+          the brand, and the panda is who you will be studying with.
+        */}
+        <Mascot pose="studying" size={108} narrowSize={76} className="-mb-3 max-sm:-mt-3" />
 
         <header className="text-center">
           <h1 className="m-0 mb-3 font-serif text-[32px] leading-[1.1] tracking-[-0.02em] text-pretty sm:text-[38px]">
