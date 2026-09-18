@@ -18,11 +18,19 @@ const SOURCES = [
  * Mounted only while open, and keyed by the deck being edited, so the draft
  * starts fresh from useState rather than being reset by an effect.
  */
-export default function DeckModal({ mode = 'create', deck, onClose, onSave, onDelete, onRequestImport }) {
+export default function DeckModal({
+  mode = 'create',
+  deck,
+  folders = [],
+  onClose,
+  onSave,
+  onDelete,
+  onRequestImport,
+}) {
   const [draft, setDraft] = useState(() =>
     mode === 'edit' && deck
-      ? { title: deck.title, subject: deck.subject, desc: deck.desc }
-      : { title: '', subject: '', desc: '' },
+      ? { title: deck.title, subject: deck.subject, desc: deck.desc, folderId: deck.folderId ?? null }
+      : { title: '', subject: '', desc: '', folderId: null },
   )
   const [source, setSource] = useState('write')
 
@@ -89,6 +97,31 @@ export default function DeckModal({ mode = 'create', deck, onClose, onSave, onDe
           onChange={set('desc')}
           placeholder="What this deck covers"
         />
+        {/*
+          Only once there is a folder to choose. A field whose one option is
+          "No folder" asks a question nobody can answer, and the modal stays
+          exactly as it was for anyone who never makes one.
+        */}
+        {folders.length > 0 && (
+          <Field
+            id="deck-folder"
+            label="Folder"
+            optional
+            as="select"
+            value={draft.folderId ?? ''}
+            onChange={(e) => setDraft((d) => ({ ...d, folderId: e.target.value || null }))}
+            className="cursor-pointer"
+          >
+            <option value="">No folder</option>
+            {[...folders]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+          </Field>
+        )}
       </div>
 
       {!isEdit && (

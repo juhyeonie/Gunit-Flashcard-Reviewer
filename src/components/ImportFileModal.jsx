@@ -175,6 +175,8 @@ export default function ImportFileModal({
         title: draft.title,
         subject: draft.subject || 'General',
         desc: draft.desc,
+        // Chosen in Create a deck before switching to import, and kept.
+        folderId: initialDraft?.folderId ?? null,
       }).id
     }
 

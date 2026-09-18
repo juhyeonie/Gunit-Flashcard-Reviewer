@@ -269,7 +269,7 @@ describe('restoring a backup', () => {
     act(() => {
       report = result.current.restoreLibrary(backup())
     })
-    expect(report).toEqual({ decks: 2, sessions: 1 })
+    expect(report).toEqual({ decks: 2, sessions: 1, folders: 0 })
   })
 
   it('brings the review history with each card', () => {

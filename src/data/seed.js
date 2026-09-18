@@ -150,4 +150,17 @@ export const badgeFor = (deck) => {
 
 export const SUBJECT_SUGGESTIONS = ['Ancient Rome', 'Roman law']
 
-export const uid = () => Math.random().toString(36).slice(2, 10)
+/*
+ * Every id the app mints is a uuid.
+ *
+ * It used to be eight random characters, which is fine in a browser and not
+ * what Postgres stores. The sync turned each one into a uuid on the way out —
+ * a fresh one on every push, because nothing kept the mapping — so for a
+ * signed-in reader, a deck made since the last sign-in was deleted and
+ * re-created under a new id on every sync, its cards re-sent with it, and each
+ * study session logged here was inserted again every time, a new row each push.
+ *
+ * A uuid from birth is already the id the database will hold, so the sync
+ * keeps it and there is nothing to re-mint.
+ */
+export { newId as uid } from './sync.js'

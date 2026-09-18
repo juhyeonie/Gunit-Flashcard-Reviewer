@@ -67,6 +67,19 @@ export function toRows(state, userId, { reissueIds = false } = {}) {
   const decks = []
   const cards = []
 
+  /*
+   * Folders first, so each deck can be pointed at its folder's row id. When
+   * ids are reissued the mapping is what keeps a deck in the folder it was in:
+   * the folder gets a new id, and so does every reference to it.
+   */
+  const folderIds = new Map()
+  const folders = []
+  for (const folder of state.folders ?? []) {
+    const id = !reissueIds && isUuid(folder.id) ? folder.id : newId()
+    folderIds.set(folder.id, id)
+    folders.push({ id, user_id: userId, name: text(folder.name, 'Folder') || 'Folder' })
+  }
+
   for (const deck of state.decks ?? []) {
     const deckId = !reissueIds && isUuid(deck.id) ? deck.id : newId()
     decks.push({
@@ -76,6 +89,9 @@ export function toRows(state, userId, { reissueIds = false } = {}) {
       subject: text(deck.subject, 'General') || 'General',
       description: text(deck.desc),
       studied_at: asStamp(deck.studiedAt),
+      // A folder this library does not hold is no folder: the deck goes up
+      // ungrouped rather than pointing the account at a row that is not there.
+      folder_id: folderIds.get(deck.folderId) ?? null,
     })
 
     deck.cards.forEach((card, position) => {
@@ -109,7 +125,7 @@ export function toRows(state, userId, { reissueIds = false } = {}) {
     seconds: s.seconds ?? 0,
   }))
 
-  return { decks, cards, sessions }
+  return { folders, decks, cards, sessions }
 }
 
 /**
@@ -118,8 +134,9 @@ export function toRows(state, userId, { reissueIds = false } = {}) {
  * Progress is not read back. It is derived from the schedule wherever it is
  * needed, and a stored copy would only be a second opinion.
  */
-export function fromRows({ decks = [], cards = [], sessions = [] }) {
+export function fromRows({ decks = [], cards = [], sessions = [], folders = [] }) {
   const byDeck = new Map(decks.map((d) => [d.id, []]))
+  const folderIds = new Set(folders.map((f) => f.id))
   for (const card of cards) {
     if (byDeck.has(card.deck_id)) byDeck.get(card.deck_id).push(card)
   }
@@ -154,6 +171,7 @@ export function fromRows({ decks = [], cards = [], sessions = [] }) {
         title: deck.title,
         subject: deck.subject,
         desc: deck.description ?? '',
+        folderId: deck.folder_id && folderIds.has(deck.folder_id) ? deck.folder_id : null,
         studiedAt: asMillis(deck.studied_at),
         cards: rows.map((r) => ({ id: r.id, front: r.front, back: r.back })),
         schedule,
@@ -163,6 +181,7 @@ export function fromRows({ decks = [], cards = [], sessions = [] }) {
       .map((s) => ({ id: s.id, at: asMillis(s.at), deckId: s.deck_id, reviewed: s.reviewed, seconds: s.seconds }))
       .filter((s) => s.at !== null)
       .sort((a, b) => a.at - b.at),
+    folders: folders.map((f) => ({ id: f.id, name: f.name })),
   }
 }
 
@@ -201,7 +220,10 @@ const sameRow = (a, b) => JSON.stringify(a) === JSON.stringify(b)
  * as well would be a second round trip saying the same thing.
  */
 export function changesBetween(before, after) {
-  const index = (rows) => new Map(rows.map((r) => [r.id, r]))
+  const index = (rows) => new Map((rows ?? []).map((r) => [r.id, r]))
+
+  const folderWas = index(before.folders)
+  const folderNow = index(after.folders)
 
   const deckWas = index(before.decks)
   const deckNow = index(after.decks)
@@ -213,6 +235,10 @@ export function changesBetween(before, after) {
   const goneDeckIds = new Set(goneDecks)
 
   return {
+    folders: {
+      upsert: (after.folders ?? []).filter((f) => !sameRow(folderWas.get(f.id), f)),
+      remove: [...folderWas.keys()].filter((id) => !folderNow.has(id)),
+    },
     decks: {
       upsert: after.decks.filter((d) => !sameRow(deckWas.get(d.id), d)),
       remove: goneDecks,
@@ -230,6 +256,8 @@ export function changesBetween(before, after) {
 
 /** Whether a change set would send anything at all. */
 export const isEmptyChange = (change) =>
+  !(change.folders?.upsert.length ?? 0) &&
+  !(change.folders?.remove.length ?? 0) &&
   !change.decks.upsert.length &&
   !change.decks.remove.length &&
   !change.cards.upsert.length &&
@@ -243,6 +271,8 @@ export const isEmptyChange = (change) =>
  * `jsonb_to_recordset` reads one array per table and nothing else.
  */
 export const toPayload = (change) => ({
+  folders_upsert: change.folders?.upsert ?? [],
+  folders_remove: change.folders?.remove ?? [],
   decks_upsert: change.decks.upsert,
   cards_upsert: change.cards.upsert,
   sessions_insert: change.sessions.insert,

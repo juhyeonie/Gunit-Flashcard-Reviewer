@@ -99,3 +99,12 @@ export function SettingsIcon() {
     </svg>
   )
 }
+
+/** A folder, drawn in the same line as the tab bar's marks. */
+export function FolderIcon({ size = 16 }) {
+  return (
+    <svg {...mark} width={size} height={size}>
+      <path d="M2.5 5.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2H16a1.5 1.5 0 0 1 1.5 1.5v7.5A1.5 1.5 0 0 1 16 16.5H4A1.5 1.5 0 0 1 2.5 15Z" />
+    </svg>
+  )
+}

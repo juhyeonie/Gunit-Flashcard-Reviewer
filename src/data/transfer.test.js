@@ -358,3 +358,69 @@ describe('suspension in a file', () => {
     expect(library.decks[0].cards[0].scheduling.suspended).toBe(true)
   })
 })
+
+describe('folders in a library backup', () => {
+  const state = () => ({
+    folders: [
+      { id: 'f1', name: 'Biology' },
+      { id: 'f2', name: 'Chemistry' },
+    ],
+    decks: [
+      { id: 'a', title: 'Cells', subject: 'Bio', desc: '', folderId: 'f1', cards: [{ id: 'c', front: 'Q', back: 'A' }], schedule: {} },
+      { id: 'b', title: 'Loose', subject: 'Misc', desc: '', folderId: null, cards: [], schedule: {} },
+      // Pointing at a folder the library no longer has.
+      { id: 'c', title: 'Stray', subject: 'Misc', desc: '', folderId: 'gone', cards: [], schedule: {} },
+    ],
+    sessions: [],
+  })
+
+  it('lists the folders and names each deck’s folder', () => {
+    const file = toLibraryTransfer(state(), { now: NOW })
+    expect(file.folders).toEqual([
+      { id: 'f1', name: 'Biology' },
+      { id: 'f2', name: 'Chemistry' },
+    ])
+    expect(file.decks.map((d) => d.folder)).toEqual(['f1', null, null])
+  })
+
+  it('stays version 1, so an older build still restores every deck', () => {
+    // Folders are an addition such a build can ignore, not a change it cannot
+    // read. Bumping the version would make it refuse the whole file.
+    expect(toLibraryTransfer(state(), { now: NOW }).version).toBe(1)
+  })
+
+  it('survives a round trip', () => {
+    const { library, error } = fromLibraryTransfer(JSON.stringify(toLibraryTransfer(state(), { now: NOW })))
+    expect(error).toBe(null)
+    expect(library.folders.map((f) => f.name)).toEqual(['Biology', 'Chemistry'])
+    expect(library.decks.map((d) => d.folder)).toEqual(['f1', null, null])
+  })
+
+  it('reads a backup from before folders, with every deck ungrouped', () => {
+    const old = toLibraryTransfer({ decks: state().decks, sessions: [] }, { now: NOW })
+    delete old.folders
+    for (const d of old.decks) delete d.folder
+    const { library } = fromLibraryTransfer(old)
+    expect(library.folders).toEqual([])
+    expect(library.decks.every((d) => d.folder === null)).toBe(true)
+  })
+
+  it('ungroups a deck naming a folder the file does not list', () => {
+    const file = toLibraryTransfer(state(), { now: NOW })
+    file.decks[0].folder = 'not-listed'
+    const { library } = fromLibraryTransfer(file)
+    expect(library.decks[0].folder).toBe(null)
+  })
+
+  it('drops a folder with no name, or a repeated id', () => {
+    const file = toLibraryTransfer(state(), { now: NOW })
+    file.folders.push({ id: 'blank', name: '  ' }, { id: 'f1', name: 'Duplicate' }, null)
+    const { library } = fromLibraryTransfer(file)
+    expect(library.folders.map((f) => f.id)).toEqual(['f1', 'f2'])
+  })
+
+  it('leaves a single exported deck without a folder', () => {
+    // Shared with someone else, where it was filed means nothing.
+    expect(toTransfer(state().decks[0], { now: NOW })).not.toHaveProperty('folder')
+  })
+})
