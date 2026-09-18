@@ -1,9 +1,11 @@
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import MissingDeck from '../components/MissingDeck.jsx'
+import Mascot from '../components/Mascot.jsx'
 
 export default function Summary() {
   const { id } = useParams()
@@ -15,16 +17,7 @@ export default function Summary() {
   // page that actually rendered.
   useDocumentTitle(typeof state?.reviewed === 'number' ? 'Session complete' : 'Nothing to report')
 
-  if (!deck) {
-    return (
-      <div className="mx-auto max-w-xl py-20 text-center">
-        <div className="font-serif text-2xl">That deck no longer exists.</div>
-        <Button as={Link} to="/decks" className="mt-5">
-          All decks
-        </Button>
-      </div>
-    )
-  }
+  if (!deck) return <MissingDeck />
 
   /*
    * The counts arrive with the navigation, not from the deck, because they
@@ -59,7 +52,8 @@ export default function Summary() {
 
   return (
     <div className="rise-in mx-auto flex max-w-[660px] flex-col gap-8">
-      <div className="text-center">
+      <div className="flex flex-col items-center text-center">
+        {session && <Mascot pose="celebrate" size={112} className="mb-5" />}
         <div className="kicker mb-4 text-accent">
           {session ? 'Session complete' : 'Nothing to report'}
         </div>

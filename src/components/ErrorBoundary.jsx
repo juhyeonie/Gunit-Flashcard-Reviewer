@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import Mascot from './Mascot.jsx'
 
 /**
  * Catches render and lifecycle errors so a crash shows something a reader can
@@ -86,6 +87,11 @@ export default class ErrorBoundary extends Component {
         role="alert"
         className="rise-in mx-auto flex max-w-[520px] flex-col items-center gap-4 px-4 py-24 text-center"
       >
+        {/*
+          Puzzled rather than alarmed: the words below say the decks are safe,
+          and the panda should not contradict them.
+        */}
+        <Mascot pose="thinking" size={96} className="mb-1" />
         <div className="kicker text-err">Something broke</div>
         <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
           This page stopped working

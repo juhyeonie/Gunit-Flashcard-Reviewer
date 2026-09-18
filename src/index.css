@@ -50,6 +50,8 @@
    the --color-* namespace without Tailwind generating a bogus utility. */
 :root {
   --glass: oklch(0.982 0.006 85 / 0.82);
+  /* The mascot's ground shadow: the reference sheet's own #EBE2D2. */
+  --mascot-ground: oklch(0.915 0.02 80);
 }
 
 [data-theme="dark"] {
@@ -79,6 +81,8 @@
   --shadow-sh3: 0 28px 64px -28px oklch(0 0 0 / 0.8);
 
   --glass: oklch(0.142 0.006 260 / 0.84);
+  /* A light shadow reads as a puddle on a dark page, so here it is a shade. */
+  --mascot-ground: oklch(0 0 0 / 0.32);
 }
 
 html,
@@ -174,6 +178,23 @@ select {
   to {
     opacity: 0.3;
   }
+}
+
+.mascot {
+  width: var(--mascot-width);
+}
+
+/* Tailwind's sm breakpoint: below it, the phone size where one was given. */
+@media (max-width: 39.999rem) {
+  .mascot {
+    width: var(--mascot-width-narrow);
+  }
+}
+
+/* Soft-edged like the reference's, rather than a hard ellipse. */
+.mascot-ground {
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--mascot-ground) 62%, transparent);
 }
 
 /* The mono, letterspaced, uppercase label that headlines nearly every block in
