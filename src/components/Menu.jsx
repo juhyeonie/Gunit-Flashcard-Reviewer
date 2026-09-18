@@ -60,7 +60,7 @@ export function MenuItem({ title, hint, danger = false, ...props }) {
   return (
     <button
       type="button"
-      className={`flex cursor-pointer flex-col gap-[3px] rounded-[5px] border-0 bg-transparent p-[11px] text-left transition-colors ${
+      className={`flex cursor-pointer flex-col gap-[3px] rounded-[5px] border-0 bg-transparent p-[11px] text-left transition-colors disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent ${
         danger ? 'hover:bg-err-soft' : 'hover:bg-raised'
       }`}
       {...props}
