@@ -60,7 +60,10 @@ function Shell() {
     return () => clearTimeout(id)
   }, [pathname])
 
-  const openNewDeck = () => setModal({ kind: 'deck-new' })
+  // A folder id when started from inside a folder; anything else (a click
+  // event, nothing) means no folder.
+  const openNewDeck = (folderId) =>
+    setModal({ kind: 'deck-new', folderId: typeof folderId === 'string' ? folderId : null })
   const openEditDeck = (deck) => setModal({ kind: 'deck-edit', deck })
   const openNewCard = (deck) => setModal({ kind: 'card-new', deck })
   const openEditCard = (deck, index, card) => setModal({ kind: 'card-edit', deck, index, card })
@@ -147,6 +150,7 @@ function Shell() {
           mode={modal.kind === 'deck-edit' ? 'edit' : 'create'}
           deck={modal.deck}
           folders={folders}
+          initialFolderId={modal.folderId}
           onClose={close}
           onSave={(draft) => {
             if (modal.kind === 'deck-edit') {

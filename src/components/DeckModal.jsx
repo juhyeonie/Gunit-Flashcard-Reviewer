@@ -22,6 +22,7 @@ export default function DeckModal({
   mode = 'create',
   deck,
   folders = [],
+  initialFolderId = null,
   onClose,
   onSave,
   onDelete,
@@ -30,7 +31,7 @@ export default function DeckModal({
   const [draft, setDraft] = useState(() =>
     mode === 'edit' && deck
       ? { title: deck.title, subject: deck.subject, desc: deck.desc, folderId: deck.folderId ?? null }
-      : { title: '', subject: '', desc: '', folderId: null },
+      : { title: '', subject: '', desc: '', folderId: initialFolderId ?? null },
   )
   const [source, setSource] = useState('write')
 

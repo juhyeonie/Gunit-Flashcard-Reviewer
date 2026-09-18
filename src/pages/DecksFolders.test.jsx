@@ -94,10 +94,13 @@ describe('a library with folders', () => {
     expect(within(section('Chemistry')).getByText('0 decks')).toBeTruthy()
   })
 
-  it('shows an empty folder rather than hiding it', () => {
+  it('shows an empty folder rather than hiding it, with the ways to fill it', () => {
     withFolders()
     open()
-    expect(within(section('Chemistry')).getByText(/No decks in this folder yet/)).toBeTruthy()
+    const chemistry = section('Chemistry')
+    expect(within(chemistry).getByText('Nothing filed here yet.')).toBeTruthy()
+    expect(within(chemistry).getByRole('button', { name: 'Add decks' })).toBeTruthy()
+    expect(within(chemistry).getByRole('button', { name: 'New deck here' })).toBeTruthy()
   })
 
   it('shows a deck whose folder is gone under Ungrouped', () => {
@@ -206,5 +209,167 @@ describe('deleting a folder', () => {
     expect(titlesIn(section('Ungrouped')).sort()).toEqual(['Cells', 'Genes', 'Loose ends'])
     expect(stored().decks).toHaveLength(3)
     expect(stored().decks.every((d) => d.folderId === null)).toBe(true)
+  })
+})
+
+describe('filling a folder several decks at a time', () => {
+  /** The menu's item, not the button an empty folder shows under its header. */
+  const addItem = () =>
+    screen.getAllByRole('button', { name: /^Add decks/ }).find((b) => !b.closest('[id$="-decks"]'))
+
+  const openAdd = async (name = 'Chemistry') => {
+    await userEvent.click(screen.getByRole('button', { name: `Folder options for ${name}` }))
+    await userEvent.click(addItem())
+    return screen.getByRole('dialog', { name: `Add decks to “${name}”` })
+  }
+
+  it('lists every deck not already there, and says where each one is now', async () => {
+    withFolders()
+    open()
+    const dialog = await openAdd()
+    const rows = within(dialog).getAllByRole('checkbox').map((c) => c.closest('label').textContent)
+    expect(rows).toEqual([
+      expect.stringMatching(/^Cells.*in Biology$/),
+      expect.stringMatching(/^Genes.*in Biology$/),
+      expect.stringMatching(/^Loose ends.*ungrouped$/),
+    ])
+  })
+
+  it('files every deck ticked, in one go', async () => {
+    withFolders()
+    open()
+    const dialog = await openAdd()
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Genes/ }))
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Loose ends/ }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add 2 decks' }))
+
+    expect(titlesIn(section('Chemistry')).sort()).toEqual(['Genes', 'Loose ends'])
+    // Moved, not copied: Genes has left Biology.
+    expect(titlesIn(section('Biology'))).toEqual(['Cells'])
+    expect(stored().decks).toHaveLength(3)
+  })
+
+  it('adds nothing until a deck is ticked', async () => {
+    withFolders()
+    open()
+    const dialog = await openAdd()
+    expect(within(dialog).getByRole('button', { name: 'Add decks' }).disabled).toBe(true)
+  })
+
+  it('offers a filter once the list is long', async () => {
+    library({
+      folders: [{ id: BIO, name: 'Biology' }],
+      decks: Array.from({ length: 10 }, (_, i) => ({ ...deck({ id: `d${i}`, title: `Deck ${i}` }), folderId: null })),
+    })
+    open()
+    const dialog = await openAdd('Biology')
+    await userEvent.type(within(dialog).getByRole('searchbox', { name: 'Find a deck' }), 'Deck 7')
+    expect(within(dialog).getAllByRole('checkbox')).toHaveLength(1)
+  })
+
+  it('is greyed out in the menu when every deck is already in the folder', async () => {
+    library({ folders: [{ id: BIO, name: 'Biology' }], decks: [{ ...deck(), folderId: BIO }] })
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'Folder options for Biology' }))
+    expect(addItem().disabled).toBe(true)
+  })
+
+  it('opens straight after a folder is made, so it does not start empty', async () => {
+    withFolders()
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'New folder' }))
+    await userEvent.type(screen.getByLabelText(/Folder name/), 'Physics')
+    await userEvent.click(screen.getByRole('button', { name: 'Create folder' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Add decks to “Physics”' })
+    // And it can be skipped: it is an offer, not a step.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Skip for now' }))
+    expect(screen.queryByRole('dialog')).toBe(null)
+    expect(section('Physics')).toBeTruthy()
+  })
+
+  it('does not open after making a folder when there are no decks to put in it', async () => {
+    library({ folders: [], decks: [] })
+    open()
+    await userEvent.click(screen.getByRole('button', { name: 'New folder' }))
+    await userEvent.type(screen.getByLabelText(/Folder name/), 'Physics')
+    await userEvent.click(screen.getByRole('button', { name: 'Create folder' }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.queryByRole('dialog')).toBe(null)
+  })
+
+  it('is reachable from an empty folder too', async () => {
+    withFolders()
+    open()
+    await userEvent.click(within(section('Chemistry')).getByRole('button', { name: 'Add decks' }))
+    expect(screen.getByRole('dialog', { name: 'Add decks to “Chemistry”' })).toBeTruthy()
+  })
+})
+
+describe('starting a deck inside a folder', () => {
+  it('asks for a new deck with that folder chosen', async () => {
+    withFolders()
+    const onNewDeck = vi.fn()
+    renderRoute('/decks', '/decks', <Decks onNewDeck={onNewDeck} onEditDeck={vi.fn()} />)
+    await userEvent.click(within(section('Chemistry')).getByRole('button', { name: 'New deck here' }))
+    expect(onNewDeck).toHaveBeenCalledWith(CHEM)
+  })
+
+  it('asks for one with no folder from the header', async () => {
+    withFolders()
+    const onNewDeck = vi.fn()
+    renderRoute('/decks', '/decks', <Decks onNewDeck={onNewDeck} onEditDeck={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'New deck' }))
+    // Called with nothing — not with the click event, which is not a folder.
+    expect(onNewDeck).toHaveBeenCalledWith()
+  })
+})
+
+describe('the folder header', () => {
+  it('is a heading holding the button, so it can be navigated to as a heading', () => {
+    withFolders()
+    open()
+    const heading = screen.getByRole('heading', { level: 2, name: 'Biology' })
+    expect(within(heading).getByRole('button', { expanded: true })).toBeTruthy()
+  })
+
+  it('says how many cards are waiting inside', () => {
+    library({
+      folders: [{ id: BIO, name: 'Biology' }],
+      decks: [{ ...deck({ id: 'cells', title: 'Cells', count: 3 }), folderId: BIO }],
+    })
+    open()
+    // Three new cards, all due — said on the folder, not only on the card.
+    const onHeader = within(section('Biology'))
+      .getAllByText(/3 due/)
+      .filter((el) => !el.closest('article'))
+    expect(onHeader).toHaveLength(1)
+  })
+
+  it('stays folded after the page is left and come back to', async () => {
+    withFolders()
+    open()
+    await userEvent.click(within(section('Biology')).getByRole('button', { expanded: true }))
+    cleanup()
+
+    open()
+    const toggle = within(section('Biology')).getByRole('button', { name: 'Biology' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('opens a folded folder while a search finds something in it', async () => {
+    withFolders()
+    open()
+    await userEvent.click(within(section('Biology')).getByRole('button', { expanded: true }))
+    await userEvent.type(screen.getByLabelText('Search decks and cards'), 'Cells')
+    const toggle = within(section('Biology')).getByRole('button', { name: 'Biology' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(titlesIn(section('Biology'))).toEqual(['Cells'])
+  })
+
+  it('keeps "New folder" as the button’s name when the label is hidden on a phone', () => {
+    withFolders()
+    open()
+    expect(screen.getByRole('button', { name: 'New folder' }).textContent).toBe('New folder')
   })
 })

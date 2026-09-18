@@ -61,6 +61,15 @@ describe('the folder field in Create a deck', () => {
     expect(p.onSave).toHaveBeenCalledWith(expect.objectContaining({ title: 'Cells', folderId: 'f-bio' }))
   })
 
+  it('arrives with the folder chosen when started from inside one', async () => {
+    const p = create({ initialFolderId: 'f-chem' })
+    expect(screen.getByLabelText(/Folder/).value).toBe('f-chem')
+    await userEvent.type(screen.getByLabelText(/Deck name/), 'Bonds')
+    await userEvent.type(screen.getByLabelText(/Subject/), 'Chemistry')
+    await userEvent.click(screen.getByRole('button', { name: 'Create deck' }))
+    expect(p.onSave).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'f-chem' }))
+  })
+
   it('creates it ungrouped when no folder is chosen', async () => {
     const p = create()
     await userEvent.type(screen.getByLabelText(/Deck name/), 'Cells')

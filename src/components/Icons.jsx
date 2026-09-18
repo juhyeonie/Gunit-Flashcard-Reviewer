@@ -108,3 +108,12 @@ export function FolderIcon({ size = 16 }) {
     </svg>
   )
 }
+
+/** A disclosure chevron, pointing down when what it controls is open. */
+export function ChevronIcon({ size = 14 }) {
+  return (
+    <svg {...mark} width={size} height={size}>
+      <path d="m5 7.5 5 5 5-5" />
+    </svg>
+  )
+}
