@@ -27,11 +27,11 @@ const USER = '686963f7-42a5-4f94-9225-52a8a0a4859a'
  * So this records building and executing separately. A test that only checked
  * `update` was called would pass against the bug.
  */
-function fakeClient({ decks = [], cards = [], sessions = [], profile = null } = {}) {
+function fakeClient({ decks = [], cards = [], sessions = [], folders = [], profile = null } = {}) {
   const built = []
   const executed = []
 
-  const rows = { decks, cards, sessions }
+  const rows = { decks, cards, sessions, folders }
 
   const client = {
     built,
@@ -77,12 +77,21 @@ function fakeClient({ decks = [], cards = [], sessions = [], profile = null } = 
       }
       const drop = (was, ids) => was.filter((r) => !ids.includes(r.id))
 
-      rows.decks = upsert(rows.decks, payload.decks_upsert ?? [])
+      // Folders first, as in 0004, so a deck can be filed in a new one.
+      rows.folders = upsert(rows.folders, payload.folders_upsert ?? [])
+      // A deck is only filed in a folder that exists; otherwise ungrouped.
+      const filed = (d) =>
+        'folder_id' in d && !rows.folders.some((f) => f.id === d.folder_id) ? { ...d, folder_id: null } : d
+      rows.decks = upsert(rows.decks, (payload.decks_upsert ?? []).map(filed))
       rows.cards = upsert(rows.cards, payload.cards_upsert ?? [])
       // Sessions are append-only and the real one is `on conflict do nothing`.
       rows.sessions = upsert(rows.sessions, payload.sessions_insert ?? [])
       rows.cards = drop(rows.cards, payload.cards_remove ?? [])
       rows.decks = drop(rows.decks, payload.decks_remove ?? [])
+      // Last, and `on delete set null (folder_id)`: the decks stay, ungrouped.
+      const goneFolders = payload.folders_remove ?? []
+      rows.folders = drop(rows.folders, goneFolders)
+      rows.decks = rows.decks.map((d) => (goneFolders.includes(d.folder_id) ? { ...d, folder_id: null } : d))
       return { error: null }
     },
   }
@@ -883,5 +892,192 @@ describe('what a second push sends', () => {
     // account holds, so the link survives the trip.
     const [logged] = client.rpcPayloads.flatMap((p) => p.sessions_insert ?? [])
     expect(logged.deck_id).toBe(DECK)
+  })
+})
+
+/**
+ * Folders through the account: pulled in, pushed out, and left alone by the
+ * things that must not touch them — a token refresh, a sign-out.
+ */
+describe('folders and the account', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+  const FOLDER = 'f0f0f0f0-1111-4111-8111-111111111111'
+
+  const account = ({ filed = true } = {}) =>
+    fakeClient({
+      folders: [{ id: FOLDER, user_id: USER, name: 'Biology' }],
+      decks: [
+        {
+          id: DECK,
+          user_id: USER,
+          title: 'Cells',
+          subject: 'Biology',
+          description: '',
+          studied_at: null,
+          folder_id: filed ? FOLDER : null,
+        },
+      ],
+      profile: null,
+    })
+
+  const ready = async (options) => {
+    client = account(options)
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['Cells']))
+  }
+
+  const lastPayloads = (from) => client.rpcPayloads.slice(from)
+
+  it('pulls the folders and where each deck is filed', async () => {
+    await ready()
+    expect(api.folders).toEqual([{ id: FOLDER, name: 'Biology' }])
+    expect(api.decks[0].folderId).toBe(FOLDER)
+  })
+
+  it('pushes a new folder, and a deck moved into it', async () => {
+    await ready({ filed: false })
+    let made
+    await act(async () => {
+      made = api.createFolder('Chemistry')
+    })
+    await act(async () => {
+      api.moveDeckToFolder(DECK, made.id)
+    })
+
+    await waitFor(
+      () => {
+        const folders = client.rpcPayloads.flatMap((p) => p.folders_upsert ?? [])
+        const decks = client.rpcPayloads.flatMap((p) => p.decks_upsert ?? [])
+        expect(folders.map((f) => f.name)).toContain('Chemistry')
+        expect(decks.at(-1).folder_id).toBe(made.id)
+      },
+      { timeout: 5000 },
+    )
+  })
+
+  it('pushes a rename as one folder row', async () => {
+    await ready()
+    const from = client.rpcPayloads.length
+    await act(async () => {
+      api.renameFolder(FOLDER, 'Biology 101')
+    })
+    await waitFor(() => expect(lastPayloads(from).length).toBeGreaterThan(0), { timeout: 5000 })
+    const sent = lastPayloads(from)
+    expect(sent.flatMap((p) => p.folders_upsert)).toEqual([{ id: FOLDER, user_id: USER, name: 'Biology 101' }])
+    expect(sent.flatMap((p) => p.decks_upsert)).toEqual([])
+  })
+
+  it('deletes a folder in the account without deleting its deck', async () => {
+    await ready()
+    await act(async () => {
+      api.deleteFolder(FOLDER)
+    })
+    await waitFor(
+      () => expect(client.rpcPayloads.flatMap((p) => p.folders_remove ?? [])).toEqual([FOLDER]),
+      { timeout: 5000 },
+    )
+    expect(client.rpcPayloads.flatMap((p) => p.decks_remove ?? [])).toEqual([])
+
+    // Read back as a fresh sign-in would: the deck is there, ungrouped.
+    cleanup()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['Cells']))
+    expect(api.folders).toEqual([])
+    expect(api.decks[0].folderId).toBe(null)
+  })
+
+  it('is left alone by a token refresh', async () => {
+    // Supabase hands out a fresh user object every hour. Keyed on that object,
+    // the sync would read the whole account again and install it — over any
+    // folder change of this browser's that had not gone up yet.
+    await ready()
+    const reads = []
+    const from = client.from.bind(client)
+    client.from = (table) => {
+      reads.push(table)
+      return from(table)
+    }
+
+    await act(async () => {
+      api.renameFolder(FOLDER, 'Renamed here')
+    })
+    await act(async () => {
+      signInAs({ id: USER, refreshed: true })
+    })
+    // Long enough for a pull to have started and finished, had one been asked for.
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(reads.filter((t) => t === 'folders' || t === 'decks')).toEqual([])
+    expect(api.folders[0].name).toBe('Renamed here')
+  })
+
+  it('keeps an unsent folder change even if the account is read again', async () => {
+    // The second line of defence, for a sign-in that really is a new one: a
+    // change made here and not yet sent goes up before anything is installed.
+    await ready()
+    await act(async () => {
+      api.renameFolder(FOLDER, 'Renamed here')
+    })
+    cleanup()
+
+    client = account()
+    await mountSignedIn()
+    await waitFor(() => expect(api.folders[0]?.name).toBe('Renamed here'))
+  })
+
+  it('keeps the account’s folders apart from the guest library across a sign-out', async () => {
+    await ready()
+    await act(async () => {
+      await flushPendingSync()
+      signInAs(null)
+    })
+    // Signed out: the guest library, which has no folders of the account's.
+    await waitFor(() => expect(api.folders.some((f) => f.id === FOLDER)).toBe(false))
+
+    // And back in: the account's folders, filed as they were.
+    client = account()
+    await act(async () => {
+      signInAs({ id: USER })
+    })
+    await waitFor(() => expect(api.folders).toEqual([{ id: FOLDER, name: 'Biology' }]))
+    expect(api.decks.find((d) => d.id === DECK).folderId).toBe(FOLDER)
+  })
+
+  it('brings a guest’s folders into a new account, still holding their decks', async () => {
+    localStorage.setItem(
+      GUEST_KEY,
+      JSON.stringify({
+        folders: [{ id: 'guest-folder', name: 'Revision' }],
+        decks: [
+          {
+            id: 'guest-deck',
+            title: 'Mine',
+            subject: 'S',
+            desc: '',
+            folderId: 'guest-folder',
+            cards: [{ id: 'g1', front: 'Q', back: 'A' }],
+            schedule: {},
+          },
+        ],
+        sessions: [],
+      }),
+    )
+    client = fakeClient({ profile: null })
+    mount()
+    await waitFor(() => expect(api.decks.length).toBeGreaterThan(0))
+    await act(async () => {
+      signInAs({ id: USER })
+    })
+    await act(async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'Bring them in' }))
+    })
+
+    const [folder] = client.rpcPayloads.flatMap((p) => p.folders_upsert ?? [])
+    const [deck] = client.rpcPayloads.flatMap((p) => p.decks_upsert ?? [])
+    expect(folder.name).toBe('Revision')
+    // New ids for the account, and the deck follows its folder to the new one.
+    expect(folder.id).not.toBe('guest-folder')
+    expect(deck.folder_id).toBe(folder.id)
+    await waitFor(() => expect(api.decks[0].folderId).toBe(folder.id))
   })
 })

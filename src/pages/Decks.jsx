@@ -2,13 +2,20 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import DeckCard from '../components/DeckCard.jsx'
+import FolderModal from '../components/FolderModal.jsx'
+import ConfirmModal from '../components/ConfirmModal.jsx'
+import Menu, { MenuItem } from '../components/Menu.jsx'
+import { FolderIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/useApp.js'
 import { FILTERS, SORTS, filterAndSortDecks } from '../data/library.js'
 import { fromTransfer } from '../data/transfer.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 
+/** "1 deck", "3 decks". */
+const deckCount = (n) => `${n} ${n === 1 ? 'deck' : 'decks'}`
+
 export default function Decks({ onNewDeck, onEditDeck }) {
-  const { decks, importDeck, say } = useApp()
+  const { decks, folders, importDeck, createFolder, renameFolder, deleteFolder, say } = useApp()
   const navigate = useNavigate()
   const fileRef = useRef(null)
   useDocumentTitle('My decks')
@@ -42,6 +49,61 @@ export default function Decks({ onNewDeck, onEditDeck }) {
     [decks, search, filter, sort],
   )
 
+  /*
+   * The same filtered, sorted rows, split by folder. Nothing is copied into a
+   * folder: each deck names its folder, and is shown once, under it.
+   *
+   * A deck naming a folder that is not there counts as ungrouped here too.
+   * The store already clears those on load, but a page should not depend on
+   * that to show every deck somewhere.
+   */
+  const sortedFolders = useMemo(
+    () => [...folders].sort((a, b) => a.name.localeCompare(b.name)),
+    [folders],
+  )
+  const groups = useMemo(() => {
+    const known = new Set(folders.map((f) => f.id))
+    const inFolder = new Map(folders.map((f) => [f.id, []]))
+    const ungrouped = []
+    for (const deck of rows) {
+      if (deck.folderId && known.has(deck.folderId)) inFolder.get(deck.folderId).push(deck)
+      else ungrouped.push(deck)
+    }
+    return { inFolder, ungrouped }
+  }, [rows, folders])
+
+  /** Every deck in each folder, ignoring the search, for counts and the delete warning. */
+  const totals = useMemo(() => {
+    const count = new Map()
+    for (const deck of decks) if (deck.folderId) count.set(deck.folderId, (count.get(deck.folderId) ?? 0) + 1)
+    return count
+  }, [decks])
+
+  const narrowing = Boolean(search.trim()) || filter !== 'All decks'
+
+  // Which folder dialog is open, if any. One at a time, like the app's own.
+  const [folderDialog, setFolderDialog] = useState(null)
+  const [folderMenu, setFolderMenu] = useState(null)
+  const [collapsed, setCollapsed] = useState(() => new Set())
+  const toggle = (id) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const grid = (list) => (
+    <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-[repeat(auto-fill,minmax(310px,1fr))]">
+      {list.map((deck) => (
+        <li key={deck.id} className="contents">
+          {/* Under a folder or "Ungrouped" h2 here, so h3 — no level is skipped. */}
+          <DeckCard deck={deck} headingLevel={3} onEdit={onEditDeck} />
+        </li>
+      ))}
+    </ul>
+  )
+
   return (
     <div className="rise-in mx-auto flex max-w-[1080px] flex-col gap-[26px]">
       <header className="flex flex-wrap items-end justify-between gap-5">
@@ -52,6 +114,10 @@ export default function Decks({ onNewDeck, onEditDeck }) {
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setFolderDialog({ kind: 'create' })}>
+            <FolderIcon />
+            New folder
+          </Button>
           <Button variant="outline" onClick={() => fileRef.current?.click()}>
             Import deck
           </Button>
@@ -119,7 +185,8 @@ export default function Decks({ onNewDeck, onEditDeck }) {
         </select>
       </div>
 
-      {rows.length ? (
+      {rows.length && !folders.length ? (
+        // No folders: the library exactly as it has always been.
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(310px,1fr))]">
           {rows.map((deck) => (
             <li key={deck.id} className="contents">
@@ -128,6 +195,119 @@ export default function Decks({ onNewDeck, onEditDeck }) {
             </li>
           ))}
         </ul>
+      ) : folders.length && (rows.length || !narrowing) ? (
+        <div className="flex flex-col gap-9">
+          <div className="flex flex-col gap-7" aria-label="Folders" role="group">
+            <div className="kicker !tracking-[0.12em]">Folders</div>
+            {sortedFolders.map((folder) => {
+              const inside = groups.inFolder.get(folder.id) ?? []
+              // While searching, a folder with nothing matching says nothing.
+              if (narrowing && !inside.length) return null
+              const open = !collapsed.has(folder.id)
+              const headingId = `folder-${folder.id}`
+              const total = totals.get(folder.id) ?? 0
+              return (
+                <section key={folder.id} aria-labelledby={headingId} className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2.5 border-b border-line-soft pb-3">
+                    <button
+                      type="button"
+                      onClick={() => toggle(folder.id)}
+                      aria-expanded={open}
+                      aria-controls={`${headingId}-decks`}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink"
+                    >
+                      <span className="shrink-0 text-ink-2">
+                        <FolderIcon size={18} />
+                      </span>
+                      <h2
+                        id={headingId}
+                        // Truncated on a narrow screen; the whole name on hover.
+                        title={folder.name}
+                        className="m-0 truncate font-serif text-[22px] leading-[1.2] font-normal"
+                      >
+                        {folder.name}
+                      </h2>
+                      <span className="shrink-0 font-mono text-[11px] leading-none font-medium tracking-[0.04em] text-ink-3">
+                        {deckCount(total)}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="ml-auto shrink-0 text-[10px] text-ink-3 transition-transform duration-150"
+                        style={{ transform: open ? 'rotate(180deg)' : 'none' }}
+                      >
+                        ▾
+                      </span>
+                    </button>
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setFolderMenu(folderMenu === folder.id ? null : folder.id)}
+                        aria-label={`Folder options for ${folder.name}`}
+                        aria-expanded={folderMenu === folder.id}
+                        aria-haspopup="true"
+                        className={`grid h-7 w-7 cursor-pointer place-items-center rounded-[5px] border bg-transparent text-sm leading-none font-medium text-ink-3 transition-colors hover:border-ink-3 hover:text-ink ${
+                          folderMenu === folder.id ? 'border-ink-3 bg-raised' : 'border-line'
+                        }`}
+                      >
+                        ⋮
+                      </button>
+                      <Menu
+                        open={folderMenu === folder.id}
+                        onClose={() => setFolderMenu(null)}
+                        align="right"
+                        width={230}
+                      >
+                        <MenuItem
+                          title="Rename folder"
+                          onClick={() => {
+                            setFolderMenu(null)
+                            setFolderDialog({ kind: 'rename', folder })
+                          }}
+                        />
+                        <MenuItem
+                          title="Delete folder"
+                          hint="Its decks move to Ungrouped."
+                          danger
+                          onClick={() => {
+                            setFolderMenu(null)
+                            setFolderDialog({ kind: 'delete', folder })
+                          }}
+                        />
+                      </Menu>
+                    </div>
+                  </div>
+                  <div id={`${headingId}-decks`} hidden={!open}>
+                    {inside.length ? (
+                      grid(inside)
+                    ) : (
+                      <p className="m-0 rounded-[10px] border border-dashed border-line px-5 py-6 text-center text-sm text-ink-3">
+                        No decks in this folder yet. Move one here from its edit dialog or its
+                        deck page.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+
+          {groups.ungrouped.length > 0 && (
+            <section aria-labelledby="folder-ungrouped" className="flex flex-col gap-4">
+              <div className="flex items-center gap-2.5 border-b border-line-soft pb-3">
+                <h2
+                  id="folder-ungrouped"
+                  className="m-0 font-serif text-[22px] leading-[1.2] font-normal text-ink-2"
+                >
+                  Ungrouped
+                </h2>
+                <span className="font-mono text-[11px] leading-none font-medium tracking-[0.04em] text-ink-3">
+                  {deckCount(groups.ungrouped.length)}
+                </span>
+              </div>
+              {grid(groups.ungrouped)}
+            </section>
+          )}
+        </div>
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
           <div className="font-serif text-[24px] leading-[1.2]">
@@ -152,6 +332,44 @@ export default function Decks({ onNewDeck, onEditDeck }) {
           </Button>
         </div>
       )}
+
+      {(folderDialog?.kind === 'create' || folderDialog?.kind === 'rename') && (
+        <FolderModal
+          key={folderDialog.folder ? `rename-${folderDialog.folder.id}` : 'create'}
+          mode={folderDialog.kind}
+          folder={folderDialog.folder}
+          folders={folders}
+          onClose={() => setFolderDialog(null)}
+          onSave={(name) => {
+            if (folderDialog.kind === 'rename') {
+              renameFolder(folderDialog.folder.id, name)
+              say(`Renamed to “${name}”`)
+            } else {
+              createFolder(name)
+              say(`Created “${name}”`)
+            }
+          }}
+        />
+      )}
+
+      <ConfirmModal
+        open={folderDialog?.kind === 'delete'}
+        kicker="Delete folder"
+        title={`Delete “${folderDialog?.folder?.name ?? ''}”?`}
+        body={(() => {
+          const n = totals.get(folderDialog?.folder?.id) ?? 0
+          return n
+            ? `Its ${deckCount(n)} ${n === 1 ? 'moves' : 'move'} to Ungrouped. No decks or cards are deleted.`
+            : 'It is empty. No decks or cards are deleted.'
+        })()}
+        confirmLabel="Delete folder"
+        onClose={() => setFolderDialog(null)}
+        onConfirm={() => {
+          const { id, name } = folderDialog.folder
+          deleteFolder(id)
+          say(`Deleted “${name}” — its decks are in Ungrouped`)
+        }}
+      />
     </div>
   )
 }

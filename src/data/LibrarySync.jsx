@@ -84,7 +84,7 @@ export default function LibrarySync() {
    * changes when the account does.
    */
   const userId = user?.id ?? null
-  const { decks, sessions, settings, theme, installLibrary, say } = useApp()
+  const { decks, folders, sessions, settings, theme, installLibrary, say } = useApp()
 
   /*
    * The rows as the database last confirmed them. Every push is the difference
@@ -147,17 +147,31 @@ export default function LibrarySync() {
 
     let cancelled = false
 
-    /** Everything the account holds, as four requests that go together. */
+    /**
+     * Everything the account holds, as requests that go together.
+     *
+     * A failed folders read fails the whole pull, the same as a failed deck
+     * read. Installing decks without their folders would put every one of
+     * them in Ungrouped and then push that back up as the truth — the local
+     * copy, folders and all, is left on screen instead, and nothing is sent
+     * until a pull succeeds.
+     */
     const select = async (supabase) => {
-      const [deckRes, cardRes, sessionRes, profileRes] = await Promise.all([
+      const [deckRes, cardRes, sessionRes, folderRes, profileRes] = await Promise.all([
         supabase.from('decks').select('*'),
         supabase.from('cards').select('*'),
         supabase.from('sessions').select('*'),
+        supabase.from('folders').select('*'),
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       ])
       return {
-        error: deckRes.error || cardRes.error || sessionRes.error,
-        rows: { decks: deckRes.data, cards: cardRes.data, sessions: sessionRes.data },
+        error: deckRes.error || cardRes.error || sessionRes.error || folderRes.error,
+        rows: {
+          decks: deckRes.data,
+          cards: cardRes.data,
+          sessions: sessionRes.data,
+          folders: folderRes.data ?? [],
+        },
         profile: profileRes.data ? profileToSettings(profileRes.data) : {},
       }
     }
@@ -195,6 +209,9 @@ export default function LibrarySync() {
       if (hasUnsent(userId)) {
         const mine = toRows(readLibrary(userKey(userId)), userId)
         const carried = {
+          // Upserts only, folders included: a folder made here in the lost
+          // beat goes up, and one deleted elsewhere is not deleted again.
+          folders: { upsert: mine.folders, remove: [] },
           decks: { upsert: mine.decks, remove: [] },
           cards: { upsert: mine.cards, remove: [] },
           sessions: { insert: mine.sessions },
@@ -276,11 +293,11 @@ export default function LibrarySync() {
    * registered rather than what is there when it runs — which is precisely the
    * change it exists to rescue.
    */
-  const latest = useRef({ decks, sessions, userId })
+  const latest = useRef({ decks, folders, sessions, userId })
   // Written after each render rather than during one: a ref updated in the
   // render body is a value React may have thrown away and re-derived.
   useEffect(() => {
-    latest.current = { decks, sessions, userId }
+    latest.current = { decks, folders, sessions, userId }
   })
 
   /**
@@ -294,10 +311,15 @@ export default function LibrarySync() {
   const flushNow = useCallback(async () => {
     clearTimeout(pushTimer.current)
 
-    const { decks: nowDecks, sessions: nowSessions, userId: nowUser } = latest.current
+    const {
+      decks: nowDecks,
+      folders: nowFolders,
+      sessions: nowSessions,
+      userId: nowUser,
+    } = latest.current
     if (!available || !nowUser || !synced.current) return { error: null }
 
-    const next = toRows({ decks: nowDecks, sessions: nowSessions }, nowUser)
+    const next = toRows({ decks: nowDecks, folders: nowFolders, sessions: nowSessions }, nowUser)
     const change = changesBetween(synced.current, next)
     if (isEmptyChange(change)) return { error: null }
 
@@ -377,7 +399,7 @@ export default function LibrarySync() {
     pushTimer.current = setTimeout(async () => {
       if (busy.current || !alive.current) return
 
-      const next = toRows({ decks, sessions }, userId)
+      const next = toRows({ decks, folders, sessions }, userId)
       const change = changesBetween(synced.current, next)
       if (isEmptyChange(change)) {
         clearUnsent(userId)
@@ -402,7 +424,7 @@ export default function LibrarySync() {
     }, QUIET_MS)
 
     return () => clearTimeout(pushTimer.current)
-  }, [available, userId, decks, sessions, trouble])
+  }, [available, userId, decks, folders, sessions, trouble])
 
   /**
    * Preferences are small and change rarely; no diffing earns its keep.
@@ -442,8 +464,10 @@ export default function LibrarySync() {
     if (!supabase || !uid) return
 
     const guest = readGuestLibrary()
+    // Folders come with their decks, under new ids that the decks follow.
     const rows = toRows(guest, uid, { reissueIds: true })
     const { error } = await write(supabase, {
+      folders: { upsert: rows.folders, remove: [] },
       decks: { upsert: rows.decks, remove: [] },
       cards: { upsert: rows.cards, remove: [] },
       sessions: { insert: rows.sessions },

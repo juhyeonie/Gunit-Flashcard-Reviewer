@@ -52,7 +52,7 @@ const textInput =
  * without seeing it is no choice at all. Cancel puts it back.
  */
 export default function Settings() {
-  const { theme, toggleTheme, settings, updateSettings, say, decks, sessions, restoreLibrary } =
+  const { theme, toggleTheme, settings, updateSettings, say, decks, folders, sessions, restoreLibrary } =
     useApp()
   useDocumentTitle('Preferences')
   const navigate = useNavigate()
@@ -110,7 +110,7 @@ export default function Settings() {
    */
   const backUp = () => {
     const name = libraryFileName()
-    const blob = new Blob([JSON.stringify(toLibraryTransfer({ decks, sessions }), null, 2)], {
+    const blob = new Blob([JSON.stringify(toLibraryTransfer({ decks, sessions, folders }), null, 2)], {
       type: 'application/json',
     })
     const url = URL.createObjectURL(blob)

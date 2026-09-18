@@ -91,6 +91,8 @@ describe('creating a deck', () => {
       title: 'Roman Provinces',
       subject: 'Ancient Rome',
       desc: 'The imperial provinces.',
+      // No folders exist in these tests, so none can be chosen.
+      folderId: null,
     })
     expect(p.onClose).toHaveBeenCalled()
   })
@@ -129,6 +131,7 @@ describe('handing off to the import modal', () => {
       title: 'Roman Provinces',
       subject: 'Ancient Rome',
       desc: '',
+      folderId: null,
     })
   })
 
@@ -139,7 +142,7 @@ describe('handing off to the import modal', () => {
 
     await user.click(screen.getByRole('button', { name: /Import a file/ }))
 
-    expect(p.onRequestImport).toHaveBeenCalledWith({ title: '', subject: '', desc: '' })
+    expect(p.onRequestImport).toHaveBeenCalledWith({ title: '', subject: '', desc: '', folderId: null })
   })
 
   it('does not save or close on its own — the parent decides what happens next', async () => {

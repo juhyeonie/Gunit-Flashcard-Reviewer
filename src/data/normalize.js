@@ -39,6 +39,8 @@ export const DEFAULT_SETTINGS = {
 
 export const DEFAULT_STATE = {
   decks: DECKS,
+  // One level, and optional: a deck is in one folder or in none.
+  folders: [],
   theme: 'light',
   // When study actually happened. Drives the streak, the weekly chart and the
   // daily goal — all of which were hardcoded before this existed.
@@ -124,6 +126,10 @@ export const reviveDeck = (deck, now = Date.now()) => {
     desc: typeof deck.desc === 'string' ? deck.desc : '',
     cards: Array.isArray(deck.cards) ? deck.cards.filter(isCard) : [],
     schedule: deck.schedule && typeof deck.schedule === 'object' ? deck.schedule : undefined,
+    // Every deck saved before folders existed arrives here with none, and
+    // null is what "ungrouped" means. Whether a named folder still exists is
+    // checked in normalizeState, which can see the folders.
+    folderId: typeof deck.folderId === 'string' && deck.folderId ? deck.folderId : null,
   }
 
   try {
@@ -134,6 +140,50 @@ export const reviveDeck = (deck, now = Date.now()) => {
 }
 
 const isSession = (s) => s && typeof s === 'object' && typeof s.at === 'number'
+
+/** The longest folder name kept; the database holds the same limit. */
+export const FOLDER_NAME_MAX = 80
+
+/**
+ * One folder, repaired or dropped.
+ *
+ * A folder is only a name and an id — the decks point at it, not the other
+ * way round — so there is nothing inside one to lose. One with no usable id or
+ * no name is dropped, and any deck that pointed at it falls back to ungrouped.
+ */
+export const reviveFolder = (folder) => {
+  if (!folder || typeof folder !== 'object' || Array.isArray(folder)) return null
+  if (typeof folder.id !== 'string' || !folder.id) return null
+  const name = typeof folder.name === 'string' ? folder.name.trim().slice(0, FOLDER_NAME_MAX) : ''
+  if (!name) return null
+  return { id: folder.id, name }
+}
+
+/**
+ * The folders, cleaned, and every deck's folderId checked against them.
+ *
+ * A deck pointing at a folder that is not there — deleted on another device, or
+ * lost from a hand-edited backup — is not an error to report. It is simply
+ * ungrouped again, which is where a deck with no folder lives.
+ */
+export const fileDecks = (decks, folders) => {
+  const known = new Set(folders.map((f) => f.id))
+  return decks.map((d) =>
+    d.folderId === null || known.has(d.folderId) ? d : { ...d, folderId: null },
+  )
+}
+
+const reviveFolders = (list) => {
+  const seen = new Set()
+  const folders = []
+  for (const entry of Array.isArray(list) ? list : []) {
+    const folder = reviveFolder(entry)
+    if (!folder || seen.has(folder.id)) continue
+    seen.add(folder.id)
+    folders.push(folder)
+  }
+  return folders
+}
 
 /*
  * A session logged before sessions carried ids is given one, once, here. It is
@@ -162,12 +212,14 @@ const forgetMockName = (settings) => (settings?.name === MOCK_NAME ? { name: '' 
 export function normalizeState(state, now = Date.now()) {
   const source = state && typeof state === 'object' ? state : {}
   const decks = Array.isArray(source.decks) ? source.decks : DEFAULT_STATE.decks
+  const folders = reviveFolders(source.folders)
 
   return {
     theme: source.theme === 'dark' ? 'dark' : 'light',
     settings: { ...DEFAULT_SETTINGS, ...(source.settings ?? {}), ...forgetMockName(source.settings) },
     sessions: Array.isArray(source.sessions) ? source.sessions.filter(isSession).map(withId) : [],
-    decks: decks.map((d) => reviveDeck(d, now)).filter(Boolean),
+    folders,
+    decks: fileDecks(decks.map((d) => reviveDeck(d, now)).filter(Boolean), folders),
   }
 }
 

@@ -4,6 +4,8 @@ import { grade, newEntry } from './scheduler.js'
 import { MAX_SESSIONS, appendSession } from './activity.js'
 import {
   DEFAULT_STATE,
+  FOLDER_NAME_MAX,
+  fileDecks,
   normalizeState,
   parseStoredState,
   progressOf,
@@ -53,6 +55,10 @@ const load = (key) => {
   // once per browser rather than on every load.
   return key === GUEST_KEY ? retireDefaultDecks(state) : state
 }
+
+/** A folder name as it is kept: trimmed, bounded, or '' when there is none. */
+const folderName = (name) =>
+  typeof name === 'string' ? name.trim().slice(0, FOLDER_NAME_MAX) : ''
 
 export function AppProvider({ children }) {
   /*
@@ -135,19 +141,72 @@ export function AppProvider({ children }) {
     setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }))
   }, [])
 
-  const addDeck = useCallback(({ title, subject, desc }) => {
+  const addDeck = useCallback(({ title, subject, desc, folderId = null }) => {
     const deck = {
       id: uid(),
       title: title.trim(),
       subject: subject.trim() || 'General',
       desc: desc.trim(),
+      folderId: folderId ?? null,
       studiedAt: null,
       progress: 0,
       cards: [],
       schedule: {},
     }
-    setState((s) => ({ ...s, decks: [deck, ...s.decks] }))
+    // Filed against the folders as they are when it lands, so a folder
+    // deleted while the modal was open leaves the deck ungrouped rather than
+    // pointing at nothing.
+    setState((s) => ({ ...s, decks: fileDecks([deck, ...s.decks], s.folders) }))
     return deck
+  }, [])
+
+  /*
+   * Folders.
+   *
+   * One level, and a deck is in one folder or in none. There is nothing to
+   * duplicate, because a folder does not hold its decks: each deck says which
+   * folder it is in. Renaming a folder is then one change that every deck
+   * sees, and deleting one only has to point its decks back at nothing.
+   */
+  const createFolder = useCallback((name) => {
+    const clean = folderName(name)
+    if (!clean) return null
+    const folder = { id: uid(), name: clean }
+    setState((s) => ({ ...s, folders: [...s.folders, folder] }))
+    return folder
+  }, [])
+
+  const renameFolder = useCallback((id, name) => {
+    const clean = folderName(name)
+    if (!clean) return
+    setState((s) => ({
+      ...s,
+      folders: s.folders.map((f) => (f.id === id ? { ...f, name: clean } : f)),
+    }))
+  }, [])
+
+  /**
+   * Deletes a folder and nothing else. Its decks go back to ungrouped in the
+   * same update, so there is no moment at which one points at a folder that
+   * is gone.
+   */
+  const deleteFolder = useCallback((id) => {
+    setState((s) => ({
+      ...s,
+      folders: s.folders.filter((f) => f.id !== id),
+      decks: s.decks.map((d) => (d.folderId === id ? { ...d, folderId: null } : d)),
+    }))
+  }, [])
+
+  /** Files a deck in a folder, or takes it out of one with `null`. */
+  const moveDeckToFolder = useCallback((deckId, folderId) => {
+    setState((s) => {
+      const target = folderId && s.folders.some((f) => f.id === folderId) ? folderId : null
+      return {
+        ...s,
+        decks: s.decks.map((d) => (d.id === deckId ? { ...d, folderId: target } : d)),
+      }
+    })
   }, [])
 
   /**
@@ -170,6 +229,9 @@ export function AppProvider({ children }) {
       title,
       subject,
       desc,
+      // A deck file carries no folder: where someone else kept it means
+      // nothing in this library.
+      folderId: null,
       studiedAt: null,
       cards: withIds,
       schedule,
@@ -188,7 +250,15 @@ export function AppProvider({ children }) {
    * see and delete. Sessions are merged on their timestamp, so restoring the
    * same backup twice does not double a streak.
    */
-  const restoreLibrary = useCallback(({ decks, sessions = [] }) => {
+  const restoreLibrary = useCallback(({ decks, sessions = [], folders = [] }) => {
+    /*
+     * Folders are matched by name before any are made. A backup restored into
+     * a library that already has "Biology" files its Biology decks there,
+     * rather than beside a second "Biology"; and restoring the same backup
+     * twice does not double the folders, only the decks, as it always has.
+     */
+    let made = 0
+
     const placed = decks.map((incoming) => {
       const schedule = {}
       const cards = incoming.cards.map((c) => {
@@ -201,6 +271,9 @@ export function AppProvider({ children }) {
         title: incoming.title,
         subject: incoming.subject,
         desc: incoming.desc,
+        // The backup's own folder id for now. Turned into one of this
+        // library's folders below, once the folders are known.
+        folderId: incoming.folder ?? null,
         studiedAt: null,
         cards,
         schedule,
@@ -210,18 +283,38 @@ export function AppProvider({ children }) {
 
     let added = 0
     setState((s) => {
+      const byName = new Map(s.folders.map((f) => [f.name.toLowerCase(), f]))
+      const nextFolders = [...s.folders]
+      const mapping = new Map()
+      made = 0
+      for (const incoming of folders) {
+        const existing = byName.get(incoming.name.toLowerCase())
+        if (existing) {
+          mapping.set(incoming.id, existing.id)
+          continue
+        }
+        const folder = { id: uid(), name: incoming.name }
+        nextFolders.push(folder)
+        byName.set(folder.name.toLowerCase(), folder)
+        mapping.set(incoming.id, folder.id)
+        made += 1
+      }
+      // A deck naming a folder the backup does not hold lands ungrouped.
+      const filed = placed.map((d) => ({ ...d, folderId: mapping.get(d.folderId) ?? null }))
+
       const seen = new Set(s.sessions.map((x) => `${x.at}`))
       // Minted here: an id in a backup belongs to the library that wrote it.
       const fresh = sessions.filter((x) => !seen.has(`${x.at}`)).map((x) => ({ ...x, id: uid() }))
       added = fresh.length
       return {
         ...s,
-        decks: [...placed, ...s.decks],
+        folders: nextFolders,
+        decks: [...filed, ...s.decks],
         sessions: [...s.sessions, ...fresh].sort((a, b) => a.at - b.at).slice(-MAX_SESSIONS),
       }
     })
 
-    return { decks: placed.length, sessions: added }
+    return { decks: placed.length, sessions: added, folders: made }
   }, [])
 
   /**
@@ -238,10 +331,14 @@ export function AppProvider({ children }) {
    * Installed raw, every page rendering `Math.round(deck.progress * 100)`
    * showed NaN%.
    */
-  const installLibrary = useCallback(({ decks, sessions, settings, theme }) => {
+  const installLibrary = useCallback(({ decks, sessions, folders, settings, theme }) => {
     setState((s) => ({
       ...s,
-      decks: decks.map((deck) => ({ ...deck, progress: progressOf(deck) })),
+      folders: folders ?? s.folders,
+      decks: fileDecks(
+        decks.map((deck) => ({ ...deck, folderId: deck.folderId ?? null, progress: progressOf(deck) })),
+        folders ?? s.folders,
+      ),
       sessions: sessions ?? s.sessions,
       settings: settings ? { ...s.settings, ...settings } : s.settings,
       theme: theme ?? s.theme,
@@ -249,9 +346,14 @@ export function AppProvider({ children }) {
   }, [])
 
   const updateDeck = useCallback((id, patch) => {
+    // Filed afterwards, so a folderId in the patch that names no folder leaves
+    // the deck ungrouped rather than pointing at nothing.
     setState((s) => ({
       ...s,
-      decks: s.decks.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+      decks: fileDecks(
+        s.decks.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+        s.folders,
+      ),
     }))
   }, [])
 
@@ -414,11 +516,16 @@ export function AppProvider({ children }) {
   const value = useMemo(
     () => ({
       decks: state.decks,
+      folders: state.folders,
       sessions: state.sessions,
       theme: state.theme,
       settings: state.settings,
       toast,
       say,
+      createFolder,
+      renameFolder,
+      deleteFolder,
+      moveDeckToFolder,
       toggleTheme,
       updateSettings,
       addDeck,
@@ -438,11 +545,16 @@ export function AppProvider({ children }) {
     }),
     [
       state.decks,
+      state.folders,
       state.sessions,
       state.theme,
       state.settings,
       toast,
       say,
+      createFolder,
+      renameFolder,
+      deleteFolder,
+      moveDeckToFolder,
       toggleTheme,
       updateSettings,
       addDeck,

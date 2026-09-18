@@ -18,12 +18,14 @@ export default function DeckDetail({
   onEditCard,
   onDeleteCard,
   onResetDeck,
+  onMoveDeck,
   onImport,
 }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, say, setCardSuspended } = useApp()
+  const { decks, folders, say, setCardSuspended } = useApp()
   const deck = decks.find((d) => d.id === id)
+  const folder = folders.find((f) => f.id === deck?.folderId) ?? null
   useDocumentTitle(deck?.title)
 
   const [studyMenu, setStudyMenu] = useState(false)
@@ -153,6 +155,19 @@ export default function DeckDetail({
                 menus further down have always used `right` for the same reason.
               */}
               <Menu open={deckMenu} onClose={() => setDeckMenu(false)} align="right" width={250}>
+                {/*
+                  First, and not danger-toned: it is filing, not losing. The
+                  hint says where the deck is now, which is otherwise shown
+                  nowhere on this page.
+                */}
+                <MenuItem
+                  title="Move to folder"
+                  hint={folder ? `In “${folder.name}”` : 'Not in a folder'}
+                  onClick={() => {
+                    setDeckMenu(false)
+                    onMoveDeck?.(deck)
+                  }}
+                />
                 <MenuItem
                   title="Reset progress"
                   hint="Every card new again. The cards themselves stay."

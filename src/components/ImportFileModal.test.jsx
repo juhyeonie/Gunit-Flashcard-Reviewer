@@ -213,6 +213,7 @@ describe('confirming', () => {
       title: 'Magistracies',
       subject: 'General',
       desc: '',
+      folderId: null,
     })
     // The cards go to the deck that was just made, not to nothing.
     expect(p.onAddCards.mock.calls[0][0]).toBe('new-deck')

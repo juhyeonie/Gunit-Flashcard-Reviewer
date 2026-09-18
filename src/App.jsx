@@ -10,6 +10,7 @@ import DeckModal from './components/DeckModal.jsx'
 import ImportFileModal from './components/ImportFileModal.jsx'
 import CardModal from './components/CardModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
+import MoveDeckModal from './components/MoveDeckModal.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Home from './pages/Home.jsx'
 import Decks from './pages/Decks.jsx'
@@ -34,6 +35,8 @@ function Shell() {
     updateCard,
     removeCard,
     resetDeck,
+    folders,
+    moveDeckToFolder,
     say,
     toast,
   } = useApp()
@@ -64,6 +67,7 @@ function Shell() {
   const openDeleteCard = (deck, index) => setModal({ kind: 'card-delete', deck, index })
   const openDeleteDeck = (deck) => setModal({ kind: 'deck-delete', deck })
   const openResetDeck = (deck) => setModal({ kind: 'deck-reset', deck })
+  const openMoveDeck = (deck) => setModal({ kind: 'deck-move', deck })
 
   /** Import against an existing deck, or standing alone as a new-deck flow. */
   const openImport = (deck, draft) =>
@@ -110,6 +114,7 @@ function Shell() {
                 onEditCard={openEditCard}
                 onDeleteCard={openDeleteCard}
                 onResetDeck={openResetDeck}
+                onMoveDeck={openMoveDeck}
                 onImport={(deck) => openImport(deck)}
               />
             }
@@ -141,6 +146,7 @@ function Shell() {
           key={modal.deck ? `deck-${modal.deck.id}` : 'deck-new'}
           mode={modal.kind === 'deck-edit' ? 'edit' : 'create'}
           deck={modal.deck}
+          folders={folders}
           onClose={close}
           onSave={(draft) => {
             if (modal.kind === 'deck-edit') {
@@ -188,6 +194,20 @@ function Shell() {
           say(`Reset “${modal.deck.title}”`)
         }}
       />
+
+      {modal.kind === 'deck-move' && (
+        <MoveDeckModal
+          key={`move-${modal.deck.id}`}
+          deck={modal.deck}
+          folders={folders}
+          onClose={close}
+          onMove={(folderId) => {
+            moveDeckToFolder(modal.deck.id, folderId)
+            const name = folders.find((f) => f.id === folderId)?.name
+            say(name ? `Moved to “${name}”` : 'Moved to Ungrouped')
+          }}
+        />
+      )}
 
       {modal.kind === 'import' && (
         <ImportFileModal

@@ -132,15 +132,25 @@ export const LIBRARY_FORMAT = 'gunit.library'
  * Settings are deliberately absent. They are preferences for this device — a
  * theme, a nightly goal — rather than anything a reader would be sorry to
  * retype, and restoring them would silently overwrite whatever is set here.
+ *
+ * Folders are listed once, and each deck names the one it is in by the id in
+ * this file. Ids here only need to mean something inside the file: restoring
+ * matches folders by name and mints new ids.
+ *
+ * Still version 1. Folders are an addition an older build can ignore — it
+ * restores every deck, ungrouped — so a newer backup is not refused by it.
  */
 export function toLibraryTransfer(state, { now = Date.now() } = {}) {
+  const folders = (state.folders ?? []).map((f) => ({ id: f.id, name: f.name }))
+  const known = new Set(folders.map((f) => f.id))
   return {
     format: LIBRARY_FORMAT,
     version: VERSION,
     exportedAt: new Date(now).toISOString(),
+    folders,
     decks: state.decks.map((deck) => {
       const { format: _f, version: _v, exportedAt: _e, ...rest } = toTransfer(deck, { now })
-      return rest
+      return { ...rest, folder: known.has(deck.folderId) ? deck.folderId : null }
     }),
     sessions: state.sessions ?? [],
   }
@@ -213,6 +223,18 @@ export function fromLibraryTransfer(source) {
   let skippedCards = 0
   const decks = []
 
+  // Folders first, so each deck can be checked against them. A backup from
+  // before folders has none, and every deck in it comes back ungrouped.
+  const folders = []
+  const seenFolders = new Set()
+  for (const entry of Array.isArray(data.folders) ? data.folders : []) {
+    const name = text(entry?.name)
+    const id = typeof entry?.id === 'string' ? entry.id : ''
+    if (!id || !name || seenFolders.has(id)) continue
+    seenFolders.add(id)
+    folders.push({ id, name })
+  }
+
   for (const entry of data.decks) {
     const { deck, error, skipped } = fromTransfer({ ...entry, format: FORMAT, version: VERSION })
     if (error) {
@@ -220,12 +242,13 @@ export function fromLibraryTransfer(source) {
       continue
     }
     skippedCards += skipped
-    decks.push(deck)
+    // A folder the file does not list is no folder at all.
+    decks.push({ ...deck, folder: seenFolders.has(entry.folder) ? entry.folder : null })
   }
 
   const sessions = (Array.isArray(data.sessions) ? data.sessions : [])
     .map(sessionOf)
     .filter(Boolean)
 
-  return { library: { decks, sessions }, error: null, skippedDecks, skippedCards }
+  return { library: { decks, sessions, folders }, error: null, skippedDecks, skippedCards }
 }

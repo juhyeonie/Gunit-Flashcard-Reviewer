@@ -109,7 +109,7 @@ describe('toRows', () => {
   })
 
   it('copes with an empty library', () => {
-    expect(toRows({ decks: [], sessions: [] }, USER)).toEqual({ decks: [], cards: [], sessions: [] })
+    expect(toRows({ decks: [], sessions: [] }, USER)).toEqual({ folders: [], decks: [], cards: [], sessions: [] })
   })
 })
 
@@ -164,7 +164,7 @@ describe('fromRows', () => {
   })
 
   it('copes with nothing at all', () => {
-    expect(fromRows({})).toEqual({ decks: [], sessions: [] })
+    expect(fromRows({})).toEqual({ decks: [], sessions: [], folders: [] })
   })
 })
 
@@ -269,6 +269,8 @@ describe('toPayload', () => {
       'cards_upsert',
       'decks_remove',
       'decks_upsert',
+      'folders_remove',
+      'folders_upsert',
       'sessions_insert',
     ])
   })
@@ -388,5 +390,129 @@ describe('adopting a library into an account', () => {
   it('leaves ids alone when not asked to reissue', () => {
     const before = uploaded()
     expect(toRows(before, USER).decks[0].id).toBe(before.decks[0].id)
+  })
+})
+
+describe('folders', () => {
+  const FOLDER = 'aaaaaaaa-1111-4111-8111-111111111111'
+  const OTHER = 'bbbbbbbb-2222-4222-8222-222222222222'
+  const DECK = 'cccccccc-3333-4333-8333-333333333333'
+
+  const state = (over = {}) => ({
+    folders: [{ id: FOLDER, name: 'Biology' }],
+    decks: [
+      { id: DECK, title: 'Cells', subject: 'Bio', desc: '', folderId: FOLDER, studiedAt: null, cards: [], schedule: {} },
+    ],
+    sessions: [],
+    ...over,
+  })
+
+  it('go up as rows of their own, owned by the account', () => {
+    expect(toRows(state(), USER).folders).toEqual([{ id: FOLDER, user_id: USER, name: 'Biology' }])
+  })
+
+  it('are pointed at by each deck, not the other way round', () => {
+    expect(toRows(state(), USER).decks[0].folder_id).toBe(FOLDER)
+  })
+
+  it('send an ungrouped deck with an explicit null', () => {
+    // Present and null, not absent: the database only re-files a deck that
+    // says where it is, so an absent key would leave it in its old folder.
+    const rows = toRows(state({ decks: [{ ...state().decks[0], folderId: null }] }), USER)
+    expect(rows.decks[0]).toHaveProperty('folder_id', null)
+  })
+
+  it('never point a deck at a folder the library does not hold', () => {
+    expect(toRows(state({ folders: [] }), USER).decks[0].folder_id).toBe(null)
+  })
+
+  it('keep their decks when ids are reissued for a new account', () => {
+    const rows = toRows(state(), USER, { reissueIds: true })
+    expect(rows.folders[0].id).not.toBe(FOLDER)
+    expect(rows.decks[0].folder_id).toBe(rows.folders[0].id)
+  })
+
+  it('survive a round trip', () => {
+    const back = fromRows(toRows(state(), USER))
+    expect(back.folders).toEqual([{ id: FOLDER, name: 'Biology' }])
+    expect(back.decks[0].folderId).toBe(FOLDER)
+  })
+
+  it('come back ungrouped for a deck whose folder row is missing', () => {
+    const back = fromRows({ ...toRows(state(), USER), folders: [] })
+    expect(back.decks[0].folderId).toBe(null)
+  })
+
+  describe('as changes', () => {
+    const before = () => toRows(state(), USER)
+
+    it('send nothing when nothing moved', () => {
+      expect(isEmptyChange(changesBetween(before(), toRows(state(), USER)))).toBe(true)
+    })
+
+    it('send a new folder', () => {
+      const after = toRows(state({ folders: [...state().folders, { id: OTHER, name: 'Chemistry' }] }), USER)
+      const change = changesBetween(before(), after)
+      expect(change.folders.upsert.map((f) => f.name)).toEqual(['Chemistry'])
+      expect(isEmptyChange(change)).toBe(false)
+    })
+
+    it('send a rename as one folder row, not every deck in it', () => {
+      const after = toRows(state({ folders: [{ id: FOLDER, name: 'Biology 101' }] }), USER)
+      const change = changesBetween(before(), after)
+      expect(change.folders.upsert).toEqual([{ id: FOLDER, user_id: USER, name: 'Biology 101' }])
+      expect(change.decks.upsert).toEqual([])
+    })
+
+    it('send a move as the deck’s row', () => {
+      const after = toRows(
+        state({
+          folders: [...state().folders, { id: OTHER, name: 'Chemistry' }],
+          decks: [{ ...state().decks[0], folderId: OTHER }],
+        }),
+        USER,
+      )
+      expect(changesBetween(before(), after).decks.upsert[0].folder_id).toBe(OTHER)
+    })
+
+    it('send a deleted folder as a removal, and its decks as ungrouped', () => {
+      const after = toRows(state({ folders: [], decks: [{ ...state().decks[0], folderId: null }] }), USER)
+      const change = changesBetween(before(), after)
+      expect(change.folders.remove).toEqual([FOLDER])
+      expect(change.decks.upsert[0].folder_id).toBe(null)
+      // No deck goes with it.
+      expect(change.decks.remove).toEqual([])
+    })
+
+    it('flatten into the payload the function reads', () => {
+      const after = toRows(state({ folders: [], decks: [{ ...state().decks[0], folderId: null }] }), USER)
+      const payload = toPayload(changesBetween(before(), after))
+      expect(payload.folders_remove).toEqual([FOLDER])
+      expect(payload.folders_upsert).toEqual([])
+    })
+  })
+})
+
+describe('ids minted by the app', () => {
+  it('are kept by the sync, so a second push of the same library is empty', () => {
+    // The bug this closes: local ids used to be re-minted on every push.
+    const id = newId()
+    const library = {
+      folders: [{ id: newId(), name: 'F' }],
+      decks: [
+        {
+          id,
+          title: 'T',
+          subject: 'S',
+          desc: '',
+          folderId: null,
+          studiedAt: null,
+          cards: [{ id: newId(), front: 'Q', back: 'A' }],
+          schedule: {},
+        },
+      ],
+      sessions: [{ id: newId(), at: 1, deckId: id, reviewed: 1, seconds: 1 }],
+    }
+    expect(isEmptyChange(changesBetween(toRows(library, USER), toRows(library, USER)))).toBe(true)
   })
 })
