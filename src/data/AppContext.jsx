@@ -211,7 +211,8 @@ export function AppProvider({ children }) {
     let added = 0
     setState((s) => {
       const seen = new Set(s.sessions.map((x) => `${x.at}`))
-      const fresh = sessions.filter((x) => !seen.has(`${x.at}`))
+      // Minted here: an id in a backup belongs to the library that wrote it.
+      const fresh = sessions.filter((x) => !seen.has(`${x.at}`)).map((x) => ({ ...x, id: uid() }))
       added = fresh.length
       return {
         ...s,
@@ -401,6 +402,7 @@ export function AppProvider({ children }) {
     setState((s) => ({
       ...s,
       sessions: appendSession(s.sessions, {
+        id: uid(),
         at: Date.now(),
         deckId,
         reviewed,

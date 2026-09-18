@@ -214,3 +214,25 @@ describe('progressOf and suspended cards', () => {
     expect(progressOf(d)).toBe(0)
   })
 })
+
+describe('sessions logged before they carried ids', () => {
+  const old = { decks: [], sessions: [{ at: 1_700_000_000_000, deckId: 'a', reviewed: 3, seconds: 20 }] }
+
+  it('are given one on the way in', () => {
+    const [session] = normalizeState(old).sessions
+    expect(session.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  })
+
+  it('keep that id once it has been written back', () => {
+    // The first load assigns it and the store persists it; every load after
+    // must read the same one, or the sync sees a new session each time.
+    const first = normalizeState(old)
+    const second = normalizeState(JSON.parse(JSON.stringify(first)))
+    expect(second.sessions[0].id).toBe(first.sessions[0].id)
+  })
+
+  it('leave an id that is already there alone', () => {
+    const kept = normalizeState({ sessions: [{ ...old.sessions[0], id: 'from-the-account' }] })
+    expect(kept.sessions[0].id).toBe('from-the-account')
+  })
+})

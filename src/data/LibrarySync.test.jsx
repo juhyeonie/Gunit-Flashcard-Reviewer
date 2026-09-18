@@ -802,3 +802,86 @@ describe('leaving the page', () => {
     expect(client.rpcPayloads).toHaveLength(0)
   })
 })
+
+/**
+ * Ids minted in this browser, and what a second push does with them.
+ *
+ * Local ids used to be eight random characters. The sync turned each into a
+ * uuid on the way out — a new one on every push, because nothing kept the
+ * mapping — so a deck made while signed in was deleted and re-created on every
+ * sync, and every session logged here was inserted again each time. Nothing
+ * failed and nothing was reported: the account simply collected copies.
+ */
+describe('what a second push sends', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+
+  const account = () =>
+    fakeClient({
+      decks: [
+        { id: DECK, user_id: USER, title: 'From the account', subject: 'Rome', description: '', studied_at: null },
+      ],
+      profile: null,
+    })
+
+  const ready = async () => {
+    client = account()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+  }
+
+  /** Waits for the push that carries `title`, and returns every payload since `from`. */
+  const pushesSince = (from) => client.rpcPayloads.slice(from)
+
+  it('sends a deck made here once, not again with every later change', async () => {
+    await ready()
+
+    await act(async () => {
+      api.addDeck({ title: 'Made while signed in', subject: 'Rome', desc: '' })
+    })
+    await waitFor(
+      () =>
+        expect(client.rpcPayloads.flatMap((p) => p.decks_upsert ?? []).map((d) => d.title)).toContain(
+          'Made while signed in',
+        ),
+      { timeout: 5000 },
+    )
+    const after = client.rpcPayloads.length
+
+    // An unrelated change, and the push it causes.
+    await act(async () => {
+      api.updateDeck(DECK, { title: 'Renamed' })
+    })
+    await waitFor(
+      () => expect(pushesSince(after).flatMap((p) => p.decks_upsert ?? []).map((d) => d.title)).toContain('Renamed'),
+      { timeout: 5000 },
+    )
+
+    const later = pushesSince(after)
+    expect(later.flatMap((p) => p.decks_upsert ?? []).map((d) => d.title)).not.toContain('Made while signed in')
+    expect(later.flatMap((p) => p.decks_remove ?? [])).toEqual([])
+  })
+
+  it('logs a session once, not again with every later change', async () => {
+    await ready()
+
+    await act(async () => {
+      api.recordSession({ deckId: DECK, reviewed: 4, seconds: 40 })
+    })
+    await waitFor(
+      () => expect(client.rpcPayloads.flatMap((p) => p.sessions_insert ?? [])).toHaveLength(1),
+      { timeout: 5000 },
+    )
+    const after = client.rpcPayloads.length
+
+    await act(async () => {
+      api.updateDeck(DECK, { title: 'Renamed' })
+    })
+    await waitFor(() => expect(pushesSince(after).length).toBeGreaterThan(0), { timeout: 5000 })
+
+    expect(pushesSince(after).flatMap((p) => p.sessions_insert ?? [])).toEqual([])
+    // And it kept its deck: the id it was logged against is the one the
+    // account holds, so the link survives the trip.
+    const [logged] = client.rpcPayloads.flatMap((p) => p.sessions_insert ?? [])
+    expect(logged.deck_id).toBe(DECK)
+  })
+})

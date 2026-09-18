@@ -135,6 +135,14 @@ export const reviveDeck = (deck, now = Date.now()) => {
 
 const isSession = (s) => s && typeof s === 'object' && typeof s.at === 'number'
 
+/*
+ * A session logged before sessions carried ids is given one, once, here. It is
+ * written back with the rest of the library on the first render, so it is the
+ * same id on every push after — which is what stops the sync inserting the same
+ * session again each time.
+ */
+const withId = (s) => (typeof s.id === 'string' && s.id ? s : { ...s, id: uid() })
+
 /**
  * Always returns renderable state. Decks are revived one at a time so a single
  * bad entry costs only itself, never the whole library.
@@ -158,7 +166,7 @@ export function normalizeState(state, now = Date.now()) {
   return {
     theme: source.theme === 'dark' ? 'dark' : 'light',
     settings: { ...DEFAULT_SETTINGS, ...(source.settings ?? {}), ...forgetMockName(source.settings) },
-    sessions: Array.isArray(source.sessions) ? source.sessions.filter(isSession) : [],
+    sessions: Array.isArray(source.sessions) ? source.sessions.filter(isSession).map(withId) : [],
     decks: decks.map((d) => reviveDeck(d, now)).filter(Boolean),
   }
 }
