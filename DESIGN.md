@@ -38,12 +38,48 @@ typography:
     fontWeight: 400
     lineHeight: 1.2
     letterSpacing: "normal"
+  card-face:
+    fontFamily: "Newsreader, Georgia, serif"
+    fontSize: "clamp(1.125rem, 2.5vw, 1.5rem)"
+    fontWeight: 400
+    lineHeight: 1.3
+    letterSpacing: "normal"
+  card-face-md:
+    fontFamily: "Newsreader, Georgia, serif"
+    fontSize: "1.375rem"
+    fontWeight: 400
+    lineHeight: 1.3
+    letterSpacing: "normal"
+  lead:
+    fontFamily: "Archivo, Helvetica, sans-serif"
+    fontSize: "1.0625rem"
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "normal"
   body:
     fontFamily: "Archivo, Helvetica, sans-serif"
     fontSize: "0.9375rem"
     fontWeight: 400
     lineHeight: 1.55
     letterSpacing: "normal"
+  body-sm:
+    fontFamily: "Archivo, Helvetica, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "normal"
+  numeral:
+    fontFamily: "Newsreader, Georgia, serif"
+    fontSize: "clamp(4rem, 9vw, 5.25rem)"
+    fontWeight: 300
+    lineHeight: 1
+    letterSpacing: "-0.02em"
+  label-sm:
+    fontFamily: "\"IBM Plex Mono\", monospace"
+    fontSize: "0.6875rem"
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: "0.04em"
   label:
     fontFamily: "\"IBM Plex Mono\", monospace"
     fontSize: "0.625rem"
@@ -182,7 +218,13 @@ A warm, paper-toned neutral field with exactly one accent: a deep olive that is 
 - **Headline** (400, 34px, 1.1, -0.02em): the one statement on a full-page state — "Nothing is due right now", "This page stopped working", the sign-in heading.
 - **Title** (400, 23px, 1.2): deck names on cards, folder names, dialog titles (26px in dialogs).
 - **Body** (400, 15px, 1.55): all running prose. Explanatory paragraphs are held to ~380–440px, roughly 55–65 characters.
-- **Label** (500, 10–11px, 0.12–0.14em, uppercase): the mono tag above a heading, counts ("12 cards", "8 due"), badges, and stat captions.
+- **Card face** (400, three steps — 18px, 22px, 24px — with the viewport, 1.3): the flashcard itself, the one piece of type the reader is actually working on.
+- **Lead** (400, 17px): the sentence under a heading on a full-page state.
+- **Body small** (400, 13px): the app's most-used size — buttons, menu items, hints, dialog prose, and anything inside a card that is not the title.
+- **Numeral** (300, 64px → 84px): the quiz score, and nothing else.
+- **Label** (500, 10–11px, 0.12–0.14em, uppercase): the mono tag above a heading, counts ("12 cards", "8 due"), badges, and stat captions. 11px carries a looser 0.04em where it sits inline with prose.
+
+The ramp above is the whole of it. Sizes between these steps exist in a few older screens and are drift, not a wider scale: use the nearest step rather than adding one.
 
 ### Named Rules
 
@@ -227,7 +269,7 @@ Separation is a 1px border in `{colors.line}`, or `{colors.line-soft}` where the
 
 ### Named Rules
 
-**The Hairline Rule.** 1px borders separate things. A border thicker than 1px is reserved for a deck's accent strip and the review screen's rating row; thick coloured borders on rounded cards are not part of this system.
+**The Hairline Rule.** 1px borders separate things. Exactly two elements go thicker, and only because the extra weight carries meaning: a deck card's 3px top strip, which shows that deck's own hue, and the 2px bottom edge on a `<kbd>` keycap in the review footer, which is what makes a key look like a key. Both stay in the system's own colours. A thick coloured border on a rounded card is not part of this system.
 
 ## Components
 
@@ -260,6 +302,9 @@ Separation is a 1px border in `{colors.line}`, or `{colors.line-soft}` where the
 
 ### Dialogs
 A `{colors.surface}` sheet at 14px radius with the Float shadow, on a blurred ink wash (`oklch(0.245 0.012 60 / .38)`, 3px blur). Structure is fixed: mono kicker, serif title (26px, as an `h2` that names the dialog), body sentence, content, then Cancel and a confirm button on the right, with any destructive action pushed to the far left so it cannot be hit while reaching for Save.
+
+### Keycaps
+The keyboard hints in the review footer are `<kbd>` elements at 22px tall: a 4px radius, a 1px hairline border, the Hairline shadow, mono at 11px — and a 2px bottom border, which is the whole of the keycap idiom. It is the one deliberate thick border in the app besides the deck strip, and it is the hairline colour rather than an accent.
 
 ### The Kicker
 The mono uppercase label above a page or dialog title — "LIBRARY", "NEW FOLDER", "ALL CAUGHT UP". It is this system's one persistent typographic signature and the reason the mono family exists. It is a label, never a sentence, and never longer than three words.
