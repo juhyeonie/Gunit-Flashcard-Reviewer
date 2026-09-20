@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-20T00:00:00.000Z",
+  "title": "Design System: Gunit",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(0.982 0.006 85)",
+        "tonalRamp": ["oklch(0.15 0.006 85)", "oklch(0.26 0.006 85)", "oklch(0.38 0.006 85)", "oklch(0.50 0.006 85)", "oklch(0.62 0.006 85)", "oklch(0.75 0.006 85)", "oklch(0.87 0.006 85)", "oklch(0.982 0.006 85)"]
+      },
+      "frame": {
+        "role": "neutral",
+        "displayName": "Frame",
+        "canonical": "oklch(0.945 0.008 85)",
+        "tonalRamp": ["oklch(0.15 0.008 85)", "oklch(0.26 0.008 85)", "oklch(0.38 0.008 85)", "oklch(0.50 0.008 85)", "oklch(0.62 0.008 85)", "oklch(0.75 0.008 85)", "oklch(0.87 0.008 85)", "oklch(0.945 0.008 85)"]
+      },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "oklch(0.998 0.003 85)" },
+      "raised": { "role": "neutral", "displayName": "Raised", "canonical": "oklch(0.968 0.006 85)" },
+      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "oklch(0.888 0.009 85)" },
+      "line-soft": { "role": "neutral", "displayName": "Soft Rule", "canonical": "oklch(0.932 0.007 85)" },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(0.245 0.012 60)",
+        "tonalRamp": ["oklch(0.15 0.012 60)", "oklch(0.245 0.012 60)", "oklch(0.35 0.012 60)", "oklch(0.47 0.011 60)", "oklch(0.59 0.010 60)", "oklch(0.71 0.009 60)", "oklch(0.83 0.008 60)", "oklch(0.95 0.006 60)"]
+      },
+      "ink-2": { "role": "neutral", "displayName": "Ink, secondary", "canonical": "oklch(0.4 0.011 65)" },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Measured Grey",
+        "canonical": "oklch(0.525 0.01 70)",
+        "note": "The lightest value clearing WCAG AA 4.5:1 on the darkest surface it is set against. Enforced by src/data/contrast.test.js."
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Library Olive",
+        "canonical": "oklch(0.455 0.058 130)",
+        "tonalRamp": ["oklch(0.20 0.040 130)", "oklch(0.30 0.050 130)", "oklch(0.375 0.055 130)", "oklch(0.455 0.058 130)", "oklch(0.545 0.062 130)", "oklch(0.68 0.055 130)", "oklch(0.855 0.035 130)", "oklch(0.945 0.022 130)"]
+      },
+      "accent-2": { "role": "primary", "displayName": "Library Olive, hover", "canonical": "oklch(0.545 0.062 130)" },
+      "accent-soft": { "role": "primary", "displayName": "Library Olive wash", "canonical": "oklch(0.945 0.022 130)" },
+      "accent-line": { "role": "primary", "displayName": "Library Olive edge", "canonical": "oklch(0.855 0.035 130)" },
+      "clay": {
+        "role": "tertiary",
+        "displayName": "Clay",
+        "canonical": "oklch(0.585 0.085 52)",
+        "tonalRamp": ["oklch(0.22 0.050 52)", "oklch(0.32 0.065 52)", "oklch(0.43 0.080 52)", "oklch(0.585 0.085 52)", "oklch(0.70 0.075 55)", "oklch(0.82 0.055 58)", "oklch(0.91 0.035 60)", "oklch(0.955 0.025 60)"]
+      },
+      "clay-soft": { "role": "tertiary", "displayName": "Clay wash", "canonical": "oklch(0.955 0.025 60)" },
+      "err": {
+        "role": "tertiary",
+        "displayName": "Signal Red",
+        "canonical": "oklch(0.505 0.135 28)",
+        "tonalRamp": ["oklch(0.20 0.080 28)", "oklch(0.30 0.105 28)", "oklch(0.40 0.125 28)", "oklch(0.505 0.135 28)", "oklch(0.62 0.125 28)", "oklch(0.76 0.090 29)", "oklch(0.89 0.050 30)", "oklch(0.958 0.022 30)"]
+      },
+      "err-soft": { "role": "tertiary", "displayName": "Signal Red wash", "canonical": "oklch(0.958 0.022 30)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The page title on the library, dashboard and settings. Newsreader at 400 with negative tracking." },
+      "headline": { "displayName": "Headline", "purpose": "The single statement on a full-page state: nothing due, a crash, the sign-in heading." },
+      "title": { "displayName": "Title", "purpose": "Deck names, folder names, dialog titles (26px in dialogs)." },
+      "body": { "displayName": "Body", "purpose": "All running prose. Explanatory paragraphs held to roughly 55-65 characters." },
+      "label": { "displayName": "Kicker / Label", "purpose": "Mono uppercase: the kicker above a title, counts, badges, stat captions. Never a sentence." }
+    },
+    "shadows": [
+      { "name": "hairline", "value": "0 1px 1px oklch(0.245 0.012 60 / 0.04)", "purpose": "The barely-there seat under a deck card at rest." },
+      { "name": "lift", "value": "0 10px 30px -14px oklch(0.245 0.012 60 / 0.18), 0 1px 2px oklch(0.245 0.012 60 / 0.05)", "purpose": "Hover on a deck card; anything that should read as picked up." },
+      { "name": "float", "value": "0 30px 70px -30px oklch(0.245 0.012 60 / 0.32)", "purpose": "Dialogs and dropdown panels, which sit above the page rather than on it." },
+      { "name": "hairline-dark", "value": "0 1px 2px oklch(0 0 0 / 0.3)", "purpose": "Dark theme equivalent of hairline." },
+      { "name": "lift-dark", "value": "0 12px 28px -18px oklch(0 0 0 / 0.72), 0 1px 2px oklch(0 0 0 / 0.35)", "purpose": "Dark theme equivalent of lift." },
+      { "name": "float-dark", "value": "0 28px 64px -28px oklch(0 0 0 / 0.8)", "purpose": "Dark theme equivalent of float." }
+    ],
+    "motion": [
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "Entrances and button state. The default curve of the system." },
+      { "name": "ease-in-out-quart", "value": "cubic-bezier(0.77, 0, 0.175, 1)", "purpose": "Motion that leaves and returns, such as the reduced-motion spinner breathing." },
+      { "name": "rise-in", "value": "opacity 0 -> 1, translateY(6px) -> 0 over 200ms ease-out-quint", "purpose": "The one page entrance. Applied per page, never per element." },
+      { "name": "toast-in", "value": "opacity 0 -> 1, translateY(10px) scale(0.97) -> none over 200ms ease-out-quint", "purpose": "The toast arriving from the foot of the screen." },
+      { "name": "colour-shift", "value": "150ms", "purpose": "Hover and focus colour transitions on buttons, cards and menu items." },
+      { "name": "reduced-motion", "value": "transition-duration 120ms, animation-duration 160ms, spinner switches from rotation to a 1.2s opacity breathe", "purpose": "What prefers-reduced-motion collapses the system to. Fewer and gentler, never zero." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "container-library", "value": "1080px" },
+      { "name": "container-reading", "value": "660px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The ordinary confirm: ink on paper text.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Create deck</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border-radius: 8px; border: 1px solid transparent; font-family: Archivo, Helvetica, sans-serif; font-size: 14px; line-height: 1; font-weight: 600; padding: 12px 18px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.23,1,0.32,1), border-color 150ms cubic-bezier(0.23,1,0.32,1), color 150ms cubic-bezier(0.23,1,0.32,1), transform 150ms cubic-bezier(0.23,1,0.32,1); } .ds-btn:active { transform: scale(0.975); } .ds-btn:focus-visible { outline: 2px solid var(--color-accent, oklch(0.455 0.058 130)); outline-offset: 2px; } .ds-btn-primary { background: var(--color-ink, oklch(0.245 0.012 60)); border-color: var(--color-ink, oklch(0.245 0.012 60)); color: var(--color-paper, oklch(0.982 0.006 85)); } .ds-btn-primary:hover { background: var(--color-ink-2, oklch(0.4 0.011 65)); border-color: var(--color-ink-2, oklch(0.4 0.011 65)); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The secondary action: hairline border, fills with raised on hover.",
+      "html": "<button class=\"ds-btn ds-btn-outline\">Import deck</button>",
+      "css": ".ds-btn-outline { background: transparent; border-color: var(--color-line, oklch(0.888 0.009 85)); color: var(--color-ink, oklch(0.245 0.012 60)); } .ds-btn-outline:hover { border-color: var(--color-ink-3, oklch(0.525 0.01 70)); background: var(--color-raised, oklch(0.968 0.006 85)); }"
+    },
+    {
+      "name": "Accent Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "Library Olive. Used on sign-in only, the one screen with no deck to reserve the green for.",
+      "html": "<button class=\"ds-btn ds-btn-accent\">Sign in</button>",
+      "css": ".ds-btn-accent { background: var(--color-accent, oklch(0.455 0.058 130)); border-color: var(--color-accent, oklch(0.455 0.058 130)); color: var(--color-paper, oklch(0.982 0.006 85)); } .ds-btn-accent:hover { background: var(--color-accent-2, oklch(0.545 0.062 130)); border-color: var(--color-accent-2, oklch(0.545 0.062 130)); }"
+    },
+    {
+      "name": "Deck Card",
+      "kind": "card",
+      "refersTo": "card-deck",
+      "description": "The library's unit: a bordered sheet with a 3px accent strip, a mono kicker row, a serif title and a progress meter.",
+      "html": "<article class=\"ds-card\"><span class=\"ds-card-strip\"></span><div class=\"ds-card-head\"><span class=\"ds-kicker\">Ancient Rome</span><span class=\"ds-badge\">In progress</span></div><h3 class=\"ds-card-title\">The Punic Wars</h3><div class=\"ds-card-meta\"><span>8 cards</span><span class=\"ds-due\">5 due</span></div><div class=\"ds-meter\"><span style=\"width:41%\"></span></div></article>",
+      "css": ".ds-card { position: relative; display: flex; flex-direction: column; gap: 16px; overflow: hidden; border-radius: 14px; border: 1px solid var(--color-line, oklch(0.888 0.009 85)); background: var(--color-surface, oklch(0.998 0.003 85)); color: var(--color-ink, oklch(0.245 0.012 60)); padding: 22px; box-shadow: 0 1px 1px oklch(0.245 0.012 60 / 0.04); transition: border-color 200ms, background-color 200ms, box-shadow 200ms; } .ds-card:hover { border-color: var(--color-ink-3, oklch(0.525 0.01 70)); background: var(--color-raised, oklch(0.968 0.006 85)); box-shadow: 0 10px 30px -14px oklch(0.245 0.012 60 / 0.18), 0 1px 2px oklch(0.245 0.012 60 / 0.05); } .ds-card-strip { position: absolute; inset: 0 0 auto 0; height: 3px; background: oklch(0.800 0.098 248); } .ds-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 2px; } .ds-kicker { font: 500 10px/1 \"IBM Plex Mono\", monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-ink-3, oklch(0.525 0.01 70)); } .ds-badge { border-radius: 5px; border: 1px solid var(--color-line, oklch(0.888 0.009 85)); background: var(--color-raised, oklch(0.968 0.006 85)); color: var(--color-ink-2, oklch(0.4 0.011 65)); padding: 5px 8px; font: 500 10px/1 \"IBM Plex Mono\", monospace; letter-spacing: 0.06em; text-transform: uppercase; } .ds-card-title { margin: 0; font: 400 23px/1.2 Newsreader, Georgia, serif; } .ds-card-meta { display: flex; justify-content: space-between; font: 500 10px/1 \"IBM Plex Mono\", monospace; letter-spacing: 0.06em; color: var(--color-ink-3, oklch(0.525 0.01 70)); } .ds-due { color: var(--color-accent, oklch(0.455 0.058 130)); } .ds-meter { height: 3px; border-radius: 2px; background: var(--color-raised, oklch(0.968 0.006 85)); overflow: hidden; } .ds-meter span { display: block; height: 100%; border-radius: 2px; background: oklch(0.800 0.098 248); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Mono uppercase label over a hairline field; focus moves the border to Library Olive, with no glow.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-kicker ds-field-label\">Deck name <em>*</em></span><input class=\"ds-input\" value=\"Roman Provinces\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 7px; } .ds-field-label { letter-spacing: 0.12em; } .ds-field-label em { font-style: normal; color: var(--color-accent, oklch(0.455 0.058 130)); } .ds-input { border-radius: 8px; border: 1px solid var(--color-line, oklch(0.888 0.009 85)); background: var(--color-paper, oklch(0.982 0.006 85)); color: var(--color-ink, oklch(0.245 0.012 60)); font: 400 15px/1.55 Archivo, Helvetica, sans-serif; padding: 11px 12px; outline: none; transition: border-color 150ms cubic-bezier(0.23,1,0.32,1); } .ds-input::placeholder { color: color-mix(in oklch, var(--color-ink-3, oklch(0.525 0.01 70)) 70%, transparent); } .ds-input:focus { border-color: var(--color-accent, oklch(0.455 0.058 130)); }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "The library's filter row. Selected is an ink fill; unselected is a hairline pill.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-on\">All decks</button><button class=\"ds-chip\">In progress</button><button class=\"ds-chip\">Mastered</button></div>",
+      "css": ".ds-chips { display: flex; gap: 4px; } .ds-chip { cursor: pointer; border-radius: 9999px; border: 1px solid var(--color-line, oklch(0.888 0.009 85)); background: transparent; color: var(--color-ink-2, oklch(0.4 0.011 65)); font: 500 12px/1 Archivo, Helvetica, sans-serif; padding: 8px 14px; transition: border-color 150ms, background-color 150ms, color 150ms; } .ds-chip:hover { border-color: var(--color-ink-3, oklch(0.525 0.01 70)); } .ds-chip-on { background: var(--color-ink, oklch(0.245 0.012 60)); border-color: var(--color-ink, oklch(0.245 0.012 60)); color: var(--color-paper, oklch(0.982 0.006 85)); }"
+    },
+    {
+      "name": "Glass Navigation",
+      "kind": "nav",
+      "refersTo": "nav-pill-active",
+      "description": "The sticky bar: paper at 82% alpha with a 14px backdrop blur, holding a pill group.",
+      "html": "<nav class=\"ds-nav\"><div class=\"ds-nav-group\"><a class=\"ds-nav-pill ds-nav-pill-on\">Home</a><a class=\"ds-nav-pill\">My decks</a><a class=\"ds-nav-pill\">Settings</a></div></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: center; height: 70px; padding: 0 24px; border-bottom: 1px solid var(--color-line-soft, oklch(0.932 0.007 85)); background: var(--glass, oklch(0.982 0.006 85 / 0.82)); backdrop-filter: blur(14px) saturate(1.5); } .ds-nav-group { display: flex; gap: 3px; border-radius: 9999px; border: 1px solid var(--color-line-soft, oklch(0.932 0.007 85)); background: var(--color-raised, oklch(0.968 0.006 85)); padding: 4px; } .ds-nav-pill { cursor: pointer; border-radius: 9999px; padding: 9px 16px; font: 500 14px/1 Archivo, Helvetica, sans-serif; color: var(--color-ink-2, oklch(0.4 0.011 65)); transition: color 150ms, background-color 150ms; } .ds-nav-pill:hover { color: var(--color-ink, oklch(0.245 0.012 60)); } .ds-nav-pill-on { background: var(--color-surface, oklch(0.998 0.003 85)); border: 1px solid var(--color-line, oklch(0.888 0.009 85)); color: var(--color-ink, oklch(0.245 0.012 60)); font-weight: 600; }"
+    },
+    {
+      "name": "Dialog",
+      "kind": "custom",
+      "refersTo": "card-deck",
+      "description": "Kicker, serif h2, body sentence, then Cancel and confirm. Destructive actions sit far left.",
+      "html": "<div class=\"ds-dialog\"><span class=\"ds-kicker\">Delete folder</span><h2 class=\"ds-dialog-title\">Delete “Biology 101”?</h2><p class=\"ds-dialog-body\">Its 2 decks move to Ungrouped. No decks or cards are deleted.</p><div class=\"ds-dialog-actions\"><button class=\"ds-btn ds-btn-outline\">Cancel</button><button class=\"ds-btn ds-btn-danger\">Delete folder</button></div></div>",
+      "css": ".ds-dialog { max-width: 420px; border-radius: 14px; border: 1px solid var(--color-line, oklch(0.888 0.009 85)); background: var(--color-surface, oklch(0.998 0.003 85)); color: var(--color-ink, oklch(0.245 0.012 60)); padding: 28px; box-shadow: 0 30px 70px -30px oklch(0.245 0.012 60 / 0.32); } .ds-dialog-title { margin: 12px 0 10px; font: 400 26px/1.15 Newsreader, Georgia, serif; } .ds-dialog-body { margin: 0 0 22px; font: 400 14px/1.55 Archivo, Helvetica, sans-serif; color: var(--color-ink-2, oklch(0.4 0.011 65)); } .ds-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; } .ds-btn-danger { background: var(--color-err, oklch(0.505 0.135 28)); border-color: var(--color-err, oklch(0.505 0.135 28)); color: var(--color-paper, oklch(0.982 0.006 85)); } .ds-btn-danger:hover { opacity: 0.9; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Reading Room",
+    "overview": "Gunit looks like a library desk, not a study app. Warm paper, a serif that belongs to a book, generous margins, and one green that behaves more like a second ink than a colour. The reader brings the effort; the room stays calm and gets out of the way. Everything on screen is either their material or a plain statement about it.\n\nThe system is calm, editorial and unhurried. Hierarchy is made with type and space before it is made with colour or weight: a serif heading against mono labels and a quiet sans body, on a surface that barely lifts off the page. Density is low where the reader is deciding and lowest of all where they are concentrating, which drop the navigation entirely.\n\nThe deliberate anti-reference is the gamified study app. No confetti, no badges, no streak pressure, no mascot supervising every screen. Gunit has a mascot and uses it in eight places on purpose, and nowhere near a card being studied. Encouragement is not the product; the schedule is.",
+    "keyCharacteristics": [
+      "Warm paper and ink, never white and black",
+      "One accent, used for progress and correctness only",
+      "Serif headings, sans body, mono labels — three families doing three jobs",
+      "Flat at rest; a shadow is a response, not a decoration",
+      "Hairline borders (1px) as the main separator",
+      "Every screen readable at 375px, with the navigation moving to the thumb"
+    ],
+    "rules": [
+      { "name": "The Second Ink Rule", "body": "Library Olive is not decoration. If a green element does not mean progress, correct or due, it is the wrong colour — use ink.", "section": "colors" },
+      { "name": "The Warm Field Rule", "body": "Nothing in the neutral field is pure. Every paper tone carries hue 85 and every ink carries hue 60-70; #fff and #000 appear nowhere.", "section": "colors" },
+      { "name": "The Measured Grey Rule", "body": "ink-3 is the floor for text. It sits at 0.525 lightness because that is the lightest value clearing 4.5:1 on the darkest surface it is ever set against, and src/data/contrast.test.js fails the build if it drifts. Nothing lighter is allowed to carry words.", "section": "colors" },
+      { "name": "The Three Jobs Rule", "body": "Serif names things, sans explains them, mono counts them. A number that can be counted is set in mono; a sentence never is.", "section": "typography" },
+      { "name": "The Unbolded Heading Rule", "body": "Serif headings stay at 400. Emphasis comes from size, space and the negative tracking, never from weight.", "section": "typography" },
+      { "name": "The Thumb Rule", "body": "Below 640px, primary navigation belongs at the bottom of the screen and every target is at least 44px.", "section": "layout" },
+      { "name": "The No Sideways Scroll Rule", "body": "Nothing scrolls horizontally at 375px. New layouts must not introduce a fixed width wider than the screen.", "section": "layout" },
+      { "name": "The Flat-At-Rest Rule", "body": "A shadow must answer something — hover, focus, or a layer genuinely above the page. Ambient shadow on a static surface is decoration and is not used.", "section": "elevation" },
+      { "name": "The Hairline Rule", "body": "1px borders separate things. A border thicker than 1px is reserved for a deck's accent strip and the review screen's rating row.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do use Library Olive only for progress, correctness and due counts — the Second Ink Rule.",
+      "Do set every named thing in Newsreader at weight 400, and let size and -0.02em tracking carry the emphasis.",
+      "Do put counts, badges and kickers in IBM Plex Mono, uppercase, 10-11px, tracking 0.12-0.14em.",
+      "Do separate with 1px hairlines in line before reaching for a shadow.",
+      "Do keep text at or above ink-3; the contrast test reads src/index.css directly and fails the build on drift.",
+      "Do give every dialog a real h2 title and a focus trap that returns focus where it came from.",
+      "Do design the 375px view at the same time as the desktop one; navigation moves to the bottom there.",
+      "Do state plainly what a destructive action will and will not remove, in the dialog body."
+    ],
+    "donts": [
+      "Don't add a second accent hue. A new colour means a new meaning; there is one.",
+      "Don't put ambient shadow on a resting surface, or a zero-offset coloured halo anywhere.",
+      "Don't bold a serif heading, or set body copy in the mono face.",
+      "Don't use pure white or pure black — every neutral is warm-tinted in light, cool-tinted in dark.",
+      "Don't celebrate ordinary actions: no confetti, no badges, no streak pressure, no mascot beside a card being studied.",
+      "Don't let the mascot appear more than once on a screen, or carry the word Gunit — the wordmark is the brand mark.",
+      "Don't introduce a thick coloured border on a rounded card; the one exception is the deck card's 3px top strip.",
+      "Don't animate without a reason: motion is a 200ms ease-out entrance or a 150ms colour transition, and it degrades under prefers-reduced-motion."
+    ]
+  }
+}
