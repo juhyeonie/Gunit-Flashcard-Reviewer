@@ -8,25 +8,72 @@
         "role": "neutral",
         "displayName": "Paper",
         "canonical": "oklch(0.982 0.006 85)",
-        "tonalRamp": ["oklch(0.15 0.006 85)", "oklch(0.26 0.006 85)", "oklch(0.38 0.006 85)", "oklch(0.50 0.006 85)", "oklch(0.62 0.006 85)", "oklch(0.75 0.006 85)", "oklch(0.87 0.006 85)", "oklch(0.982 0.006 85)"]
+        "tonalRamp": [
+          "oklch(0.15 0.006 85)",
+          "oklch(0.26 0.006 85)",
+          "oklch(0.38 0.006 85)",
+          "oklch(0.50 0.006 85)",
+          "oklch(0.62 0.006 85)",
+          "oklch(0.75 0.006 85)",
+          "oklch(0.87 0.006 85)",
+          "oklch(0.982 0.006 85)"
+        ]
       },
       "frame": {
         "role": "neutral",
         "displayName": "Frame",
         "canonical": "oklch(0.945 0.008 85)",
-        "tonalRamp": ["oklch(0.15 0.008 85)", "oklch(0.26 0.008 85)", "oklch(0.38 0.008 85)", "oklch(0.50 0.008 85)", "oklch(0.62 0.008 85)", "oklch(0.75 0.008 85)", "oklch(0.87 0.008 85)", "oklch(0.945 0.008 85)"]
+        "tonalRamp": [
+          "oklch(0.15 0.008 85)",
+          "oklch(0.26 0.008 85)",
+          "oklch(0.38 0.008 85)",
+          "oklch(0.50 0.008 85)",
+          "oklch(0.62 0.008 85)",
+          "oklch(0.75 0.008 85)",
+          "oklch(0.87 0.008 85)",
+          "oklch(0.945 0.008 85)"
+        ]
       },
-      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "oklch(0.998 0.003 85)" },
-      "raised": { "role": "neutral", "displayName": "Raised", "canonical": "oklch(0.968 0.006 85)" },
-      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "oklch(0.888 0.009 85)" },
-      "line-soft": { "role": "neutral", "displayName": "Soft Rule", "canonical": "oklch(0.932 0.007 85)" },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "oklch(0.998 0.003 85)"
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised",
+        "canonical": "oklch(0.968 0.006 85)"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0.888 0.009 85)"
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Soft Rule",
+        "canonical": "oklch(0.932 0.007 85)"
+      },
       "ink": {
         "role": "neutral",
         "displayName": "Ink",
         "canonical": "oklch(0.245 0.012 60)",
-        "tonalRamp": ["oklch(0.15 0.012 60)", "oklch(0.245 0.012 60)", "oklch(0.35 0.012 60)", "oklch(0.47 0.011 60)", "oklch(0.59 0.010 60)", "oklch(0.71 0.009 60)", "oklch(0.83 0.008 60)", "oklch(0.95 0.006 60)"]
+        "tonalRamp": [
+          "oklch(0.15 0.012 60)",
+          "oklch(0.245 0.012 60)",
+          "oklch(0.35 0.012 60)",
+          "oklch(0.47 0.011 60)",
+          "oklch(0.59 0.010 60)",
+          "oklch(0.71 0.009 60)",
+          "oklch(0.83 0.008 60)",
+          "oklch(0.95 0.006 60)"
+        ]
       },
-      "ink-2": { "role": "neutral", "displayName": "Ink, secondary", "canonical": "oklch(0.4 0.011 65)" },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink, secondary",
+        "canonical": "oklch(0.4 0.011 65)"
+      },
       "ink-3": {
         "role": "neutral",
         "displayName": "Measured Grey",
@@ -37,54 +84,200 @@
         "role": "primary",
         "displayName": "Library Olive",
         "canonical": "oklch(0.455 0.058 130)",
-        "tonalRamp": ["oklch(0.20 0.040 130)", "oklch(0.30 0.050 130)", "oklch(0.375 0.055 130)", "oklch(0.455 0.058 130)", "oklch(0.545 0.062 130)", "oklch(0.68 0.055 130)", "oklch(0.855 0.035 130)", "oklch(0.945 0.022 130)"]
+        "tonalRamp": [
+          "oklch(0.20 0.040 130)",
+          "oklch(0.30 0.050 130)",
+          "oklch(0.375 0.055 130)",
+          "oklch(0.455 0.058 130)",
+          "oklch(0.545 0.062 130)",
+          "oklch(0.68 0.055 130)",
+          "oklch(0.855 0.035 130)",
+          "oklch(0.945 0.022 130)"
+        ]
       },
-      "accent-2": { "role": "primary", "displayName": "Library Olive, hover", "canonical": "oklch(0.545 0.062 130)" },
-      "accent-soft": { "role": "primary", "displayName": "Library Olive wash", "canonical": "oklch(0.945 0.022 130)" },
-      "accent-line": { "role": "primary", "displayName": "Library Olive edge", "canonical": "oklch(0.855 0.035 130)" },
+      "accent-2": {
+        "role": "primary",
+        "displayName": "Library Olive, hover",
+        "canonical": "oklch(0.545 0.062 130)"
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Library Olive wash",
+        "canonical": "oklch(0.945 0.022 130)"
+      },
+      "accent-line": {
+        "role": "primary",
+        "displayName": "Library Olive edge",
+        "canonical": "oklch(0.855 0.035 130)"
+      },
       "clay": {
         "role": "tertiary",
         "displayName": "Clay",
         "canonical": "oklch(0.585 0.085 52)",
-        "tonalRamp": ["oklch(0.22 0.050 52)", "oklch(0.32 0.065 52)", "oklch(0.43 0.080 52)", "oklch(0.585 0.085 52)", "oklch(0.70 0.075 55)", "oklch(0.82 0.055 58)", "oklch(0.91 0.035 60)", "oklch(0.955 0.025 60)"]
+        "tonalRamp": [
+          "oklch(0.22 0.050 52)",
+          "oklch(0.32 0.065 52)",
+          "oklch(0.43 0.080 52)",
+          "oklch(0.585 0.085 52)",
+          "oklch(0.70 0.075 55)",
+          "oklch(0.82 0.055 58)",
+          "oklch(0.91 0.035 60)",
+          "oklch(0.955 0.025 60)"
+        ]
       },
-      "clay-soft": { "role": "tertiary", "displayName": "Clay wash", "canonical": "oklch(0.955 0.025 60)" },
+      "clay-soft": {
+        "role": "tertiary",
+        "displayName": "Clay wash",
+        "canonical": "oklch(0.955 0.025 60)"
+      },
       "err": {
         "role": "tertiary",
         "displayName": "Signal Red",
         "canonical": "oklch(0.505 0.135 28)",
-        "tonalRamp": ["oklch(0.20 0.080 28)", "oklch(0.30 0.105 28)", "oklch(0.40 0.125 28)", "oklch(0.505 0.135 28)", "oklch(0.62 0.125 28)", "oklch(0.76 0.090 29)", "oklch(0.89 0.050 30)", "oklch(0.958 0.022 30)"]
+        "tonalRamp": [
+          "oklch(0.20 0.080 28)",
+          "oklch(0.30 0.105 28)",
+          "oklch(0.40 0.125 28)",
+          "oklch(0.505 0.135 28)",
+          "oklch(0.62 0.125 28)",
+          "oklch(0.76 0.090 29)",
+          "oklch(0.89 0.050 30)",
+          "oklch(0.958 0.022 30)"
+        ]
       },
-      "err-soft": { "role": "tertiary", "displayName": "Signal Red wash", "canonical": "oklch(0.958 0.022 30)" }
+      "err-soft": {
+        "role": "tertiary",
+        "displayName": "Signal Red wash",
+        "canonical": "oklch(0.958 0.022 30)"
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The page title on the library, dashboard and settings. Newsreader at 400 with negative tracking." },
-      "headline": { "displayName": "Headline", "purpose": "The single statement on a full-page state: nothing due, a crash, the sign-in heading." },
-      "title": { "displayName": "Title", "purpose": "Deck names, folder names, dialog titles (26px in dialogs)." },
-      "body": { "displayName": "Body", "purpose": "All running prose. Explanatory paragraphs held to roughly 55-65 characters." },
-      "label": { "displayName": "Kicker / Label", "purpose": "Mono uppercase: the kicker above a title, counts, badges, stat captions. Never a sentence." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "The page title on the library, dashboard and settings. Newsreader at 400 with negative tracking."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The single statement on a full-page state: nothing due, a crash, the sign-in heading."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Deck names, folder names, dialog titles (26px in dialogs)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All running prose. Explanatory paragraphs held to roughly 55-65 characters."
+      },
+      "label": {
+        "displayName": "Kicker / Label",
+        "purpose": "Mono uppercase: the kicker above a title, counts, badges, stat captions. Never a sentence."
+      },
+      "card-face": {
+        "displayName": "Card face",
+        "purpose": "The flashcard itself, scaling 18px to 24px with the viewport. The one piece of type the reader is working on."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "The sentence under a heading on a full-page state."
+      },
+      "body-sm": {
+        "displayName": "Body small",
+        "purpose": "The app's most-used size: buttons, menu items, hints, dialog prose, anything in a card that is not the title."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "The quiz score, and nothing else."
+      },
+      "label-sm": {
+        "displayName": "Label, inline",
+        "purpose": "11px mono at looser tracking, where a label sits inline with prose."
+      },
+      "card-face-md": {
+        "displayName": "Card face, mid",
+        "purpose": "The middle step of the flashcard face at the sm breakpoint."
+      }
     },
     "shadows": [
-      { "name": "hairline", "value": "0 1px 1px oklch(0.245 0.012 60 / 0.04)", "purpose": "The barely-there seat under a deck card at rest." },
-      { "name": "lift", "value": "0 10px 30px -14px oklch(0.245 0.012 60 / 0.18), 0 1px 2px oklch(0.245 0.012 60 / 0.05)", "purpose": "Hover on a deck card; anything that should read as picked up." },
-      { "name": "float", "value": "0 30px 70px -30px oklch(0.245 0.012 60 / 0.32)", "purpose": "Dialogs and dropdown panels, which sit above the page rather than on it." },
-      { "name": "hairline-dark", "value": "0 1px 2px oklch(0 0 0 / 0.3)", "purpose": "Dark theme equivalent of hairline." },
-      { "name": "lift-dark", "value": "0 12px 28px -18px oklch(0 0 0 / 0.72), 0 1px 2px oklch(0 0 0 / 0.35)", "purpose": "Dark theme equivalent of lift." },
-      { "name": "float-dark", "value": "0 28px 64px -28px oklch(0 0 0 / 0.8)", "purpose": "Dark theme equivalent of float." }
+      {
+        "name": "hairline",
+        "value": "0 1px 1px oklch(0.245 0.012 60 / 0.04)",
+        "purpose": "The barely-there seat under a deck card at rest."
+      },
+      {
+        "name": "lift",
+        "value": "0 10px 30px -14px oklch(0.245 0.012 60 / 0.18), 0 1px 2px oklch(0.245 0.012 60 / 0.05)",
+        "purpose": "Hover on a deck card; anything that should read as picked up."
+      },
+      {
+        "name": "float",
+        "value": "0 30px 70px -30px oklch(0.245 0.012 60 / 0.32)",
+        "purpose": "Dialogs and dropdown panels, which sit above the page rather than on it."
+      },
+      {
+        "name": "hairline-dark",
+        "value": "0 1px 2px oklch(0 0 0 / 0.3)",
+        "purpose": "Dark theme equivalent of hairline."
+      },
+      {
+        "name": "lift-dark",
+        "value": "0 12px 28px -18px oklch(0 0 0 / 0.72), 0 1px 2px oklch(0 0 0 / 0.35)",
+        "purpose": "Dark theme equivalent of lift."
+      },
+      {
+        "name": "float-dark",
+        "value": "0 28px 64px -28px oklch(0 0 0 / 0.8)",
+        "purpose": "Dark theme equivalent of float."
+      }
     ],
     "motion": [
-      { "name": "ease-out-quint", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "Entrances and button state. The default curve of the system." },
-      { "name": "ease-in-out-quart", "value": "cubic-bezier(0.77, 0, 0.175, 1)", "purpose": "Motion that leaves and returns, such as the reduced-motion spinner breathing." },
-      { "name": "rise-in", "value": "opacity 0 -> 1, translateY(6px) -> 0 over 200ms ease-out-quint", "purpose": "The one page entrance. Applied per page, never per element." },
-      { "name": "toast-in", "value": "opacity 0 -> 1, translateY(10px) scale(0.97) -> none over 200ms ease-out-quint", "purpose": "The toast arriving from the foot of the screen." },
-      { "name": "colour-shift", "value": "150ms", "purpose": "Hover and focus colour transitions on buttons, cards and menu items." },
-      { "name": "reduced-motion", "value": "transition-duration 120ms, animation-duration 160ms, spinner switches from rotation to a 1.2s opacity breathe", "purpose": "What prefers-reduced-motion collapses the system to. Fewer and gentler, never zero." }
+      {
+        "name": "ease-out-quint",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Entrances and button state. The default curve of the system."
+      },
+      {
+        "name": "ease-in-out-quart",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "Motion that leaves and returns, such as the reduced-motion spinner breathing."
+      },
+      {
+        "name": "rise-in",
+        "value": "opacity 0 -> 1, translateY(6px) -> 0 over 200ms ease-out-quint",
+        "purpose": "The one page entrance. Applied per page, never per element."
+      },
+      {
+        "name": "toast-in",
+        "value": "opacity 0 -> 1, translateY(10px) scale(0.97) -> none over 200ms ease-out-quint",
+        "purpose": "The toast arriving from the foot of the screen."
+      },
+      {
+        "name": "colour-shift",
+        "value": "150ms",
+        "purpose": "Hover and focus colour transitions on buttons, cards and menu items."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition-duration 120ms, animation-duration 160ms, spinner switches from rotation to a 1.2s opacity breathe",
+        "purpose": "What prefers-reduced-motion collapses the system to. Fewer and gentler, never zero."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "640px" },
-      { "name": "lg", "value": "1024px" },
-      { "name": "container-library", "value": "1080px" },
-      { "name": "container-reading", "value": "660px" }
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "container-library",
+        "value": "1080px"
+      },
+      {
+        "name": "container-reading",
+        "value": "660px"
+      }
     ]
   },
   "components": [
@@ -165,15 +358,51 @@
       "Every screen readable at 375px, with the navigation moving to the thumb"
     ],
     "rules": [
-      { "name": "The Second Ink Rule", "body": "Library Olive is not decoration. If a green element does not mean progress, correct or due, it is the wrong colour — use ink.", "section": "colors" },
-      { "name": "The Warm Field Rule", "body": "Nothing in the neutral field is pure. Every paper tone carries hue 85 and every ink carries hue 60-70; #fff and #000 appear nowhere.", "section": "colors" },
-      { "name": "The Measured Grey Rule", "body": "ink-3 is the floor for text. It sits at 0.525 lightness because that is the lightest value clearing 4.5:1 on the darkest surface it is ever set against, and src/data/contrast.test.js fails the build if it drifts. Nothing lighter is allowed to carry words.", "section": "colors" },
-      { "name": "The Three Jobs Rule", "body": "Serif names things, sans explains them, mono counts them. A number that can be counted is set in mono; a sentence never is.", "section": "typography" },
-      { "name": "The Unbolded Heading Rule", "body": "Serif headings stay at 400. Emphasis comes from size, space and the negative tracking, never from weight.", "section": "typography" },
-      { "name": "The Thumb Rule", "body": "Below 640px, primary navigation belongs at the bottom of the screen and every target is at least 44px.", "section": "layout" },
-      { "name": "The No Sideways Scroll Rule", "body": "Nothing scrolls horizontally at 375px. New layouts must not introduce a fixed width wider than the screen.", "section": "layout" },
-      { "name": "The Flat-At-Rest Rule", "body": "A shadow must answer something — hover, focus, or a layer genuinely above the page. Ambient shadow on a static surface is decoration and is not used.", "section": "elevation" },
-      { "name": "The Hairline Rule", "body": "1px borders separate things. A border thicker than 1px is reserved for a deck's accent strip and the review screen's rating row.", "section": "shapes" }
+      {
+        "name": "The Second Ink Rule",
+        "body": "Library Olive is not decoration. If a green element does not mean progress, correct or due, it is the wrong colour — use ink.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Field Rule",
+        "body": "Nothing in the neutral field is pure. Every paper tone carries hue 85 and every ink carries hue 60-70; #fff and #000 appear nowhere.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured Grey Rule",
+        "body": "ink-3 is the floor for text. It sits at 0.525 lightness because that is the lightest value clearing 4.5:1 on the darkest surface it is ever set against, and src/data/contrast.test.js fails the build if it drifts. Nothing lighter is allowed to carry words.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Jobs Rule",
+        "body": "Serif names things, sans explains them, mono counts them. A number that can be counted is set in mono; a sentence never is.",
+        "section": "typography"
+      },
+      {
+        "name": "The Unbolded Heading Rule",
+        "body": "Serif headings stay at 400. Emphasis comes from size, space and the negative tracking, never from weight.",
+        "section": "typography"
+      },
+      {
+        "name": "The Thumb Rule",
+        "body": "Below 640px, primary navigation belongs at the bottom of the screen and every target is at least 44px.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Sideways Scroll Rule",
+        "body": "Nothing scrolls horizontally at 375px. New layouts must not introduce a fixed width wider than the screen.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "A shadow must answer something — hover, focus, or a layer genuinely above the page. Ambient shadow on a static surface is decoration and is not used.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "1px borders separate things. Exactly two elements go thicker, and only because the extra weight carries meaning: a deck card's 3px top strip, and the 2px bottom edge on a kbd keycap in the review footer. Both stay in the system's own colours.",
+        "section": "shapes"
+      }
     ],
     "dos": [
       "Do use Library Olive only for progress, correctness and due counts — the Second Ink Rule.",

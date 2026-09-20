@@ -435,6 +435,13 @@ export default function Review() {
         <div className="hidden flex-wrap items-center justify-center gap-3.5 sm:flex">
           {hints.map((k) => (
             <div key={k.key} className="flex items-center gap-[7px]">
+              {/*
+                `border-b-2` is the keycap, not a stray thick border: a heavier
+                bottom edge is what makes a key read as pressable rather than
+                as a bordered box. It stays in the hairline colour, and it is
+                one of the two places the Hairline Rule in DESIGN.md allows a
+                border past 1px — the other being a deck card's accent strip.
+              */}
               <kbd
                 style={{ minWidth: k.w }}
                 className="inline-grid h-[22px] place-items-center rounded border border-b-2 border-line bg-surface px-[7px] font-mono text-[11px] leading-none font-medium text-ink-2 shadow-sh1"
