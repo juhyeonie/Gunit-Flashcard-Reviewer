@@ -6,6 +6,7 @@ import CreatorCredit from '../components/CreatorCredit.jsx'
 import { useAuth } from '../data/useAuth.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import Spinner from '../components/Spinner.jsx'
+import useOnline from '../hooks/useOnline.js'
 
 /**
  * One page for the three ways in: signing in, signing up, and asking for a
@@ -133,6 +134,7 @@ const input =
 
 export default function SignIn() {
   const { available, user, signIn, signUp, requestPasswordReset } = useAuth()
+  const online = useOnline()
   const navigate = useNavigate()
   /*
    * The landing page's "Create an account" asks for the sign-up mode by
@@ -337,7 +339,23 @@ export default function SignIn() {
               )}
             </div>
 
-            <Button type="submit" variant="accent" disabled={busy} className="mt-1 w-full">
+            {/*
+              Offline, the account cannot be reached, and a form that let the
+              reader try would answer with a network error that means nothing
+              to them. Said before they type, instead.
+            */}
+            {!online && (
+              <p role="status" className="m-0 text-[13px] leading-[1.5] text-ink-2 text-pretty">
+                You’re offline. Signing in needs a connection — your decks on this device work
+                without one.
+              </p>
+            )}
+            <Button
+              type="submit"
+              variant="accent"
+              disabled={busy || !online}
+              className="mt-1 w-full"
+            >
               {busy && <Spinner />}
               {busy ? copy.busy : copy.action}
             </Button>

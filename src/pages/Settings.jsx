@@ -7,6 +7,9 @@ import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { useAuth } from '../data/useAuth.js'
 import { fromLibraryTransfer, libraryFileName, toLibraryTransfer } from '../data/transfer.js'
 import Spinner from '../components/Spinner.jsx'
+import usePwa from '../pwa/usePwa.js'
+import { promptInstall } from '../pwa/pwaState.js'
+import useOnline from '../hooks/useOnline.js'
 
 function Row({ label, hint, children }) {
   return (
@@ -81,6 +84,8 @@ export default function Settings() {
   const fileRef = useRef(null)
   const deckCount = decks.length
   const { available, user, signOut } = useAuth()
+  const { installPrompt, installed } = usePwa()
+  const online = useOnline()
 
   /*
    * Signing out asks first, and it did not used to.
@@ -246,22 +251,72 @@ export default function Settings() {
       {available && (
         <section>
           <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">Signing in</h2>
+          {/*
+            Offline, the account is not pretended into. Studying and editing
+            carry on against this device's copy; signing in or out needs the
+            server, so those wait for a connection rather than failing when
+            pressed. Signing out offline could not send the last changes
+            first, which is the one thing it must do before it lets go.
+          */}
           {user ? (
-            <Row label="Signed in" hint={user.email}>
-              <Button variant="outline" size="sm" onClick={() => setConfirmingSignOut(true)}>
+            <Row
+              label="Signed in"
+              hint={
+                online
+                  ? user.email
+                  : `${user.email} — offline. Changes are saved here and sync when you reconnect.`
+              }
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!online}
+                title={online ? undefined : 'Signing out needs a connection'}
+                onClick={() => setConfirmingSignOut(true)}
+              >
                 Sign out
               </Button>
             </Row>
           ) : (
             <Row
               label="Not signed in"
-              hint="Your decks are in this browser only. An account carries them between machines."
+              hint={
+                online
+                  ? 'Your decks are in this browser only. An account carries them between machines.'
+                  : 'Signing in needs a connection. Your decks here work without one.'
+              }
             >
-              <Button as={Link} variant="outline" size="sm" to="/sign-in">
-                Sign in
-              </Button>
+              {online ? (
+                <Button as={Link} variant="outline" size="sm" to="/sign-in">
+                  Sign in
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  Sign in
+                </Button>
+              )}
             </Row>
           )}
+        </section>
+      )}
+
+      {/*
+        Only where the browser can actually install Gunit and it is not already
+        installed. Safari and Firefox offer no install prompt to a page, so they
+        get no button here — their own "Add to Home Screen" is the way — rather
+        than a button that could only fail.
+      */}
+      {installPrompt && !installed && (
+        <section>
+          <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">This device</h2>
+          <Row
+            label="Install Gunit"
+            hint="Opens in its own window from your home screen or dock, and works without a connection."
+          >
+            <Button variant="outline" size="sm" onClick={() => promptInstall()}>
+              Install
+            </Button>
+          </Row>
         </section>
       )}
 

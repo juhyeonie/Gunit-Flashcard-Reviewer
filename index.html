@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/assets/gunit-logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover is what makes env(safe-area-inset-*) report real values
+      on iOS. Without it they are all 0, and the bottom tab bar, which already
+      asks for the inset, sat under the home indicator of an installed app.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="A flashcard reviewer that reads your notes." />
+    <!-- Library Olive, as in the manifest: the colour the logo's back card is cut from. -->
+    <meta name="theme-color" content="#4c5d3a" />
+    <!-- The home-screen icon and title iOS uses; it reads neither from the manifest. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Gunit" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
