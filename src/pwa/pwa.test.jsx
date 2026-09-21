@@ -257,3 +257,16 @@ describe('the page shell', () => {
     }
   })
 })
+
+describe('which Gunit this is', () => {
+  it('says its version and commit in Settings → About', () => {
+    const { version } = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
+    renderWith(<Settings />)
+    const line = screen.getByText(/^Version /).textContent
+    // package.json's version, not a number typed into the page.
+    const [label, commit] = line.split(' · ')
+    expect(label).toBe(`Version ${version}`)
+    expect(commit).toMatch(/^([0-9a-f]{7}|dev)$/)
+    expect(line).not.toMatch(/undefined/)
+  })
+})

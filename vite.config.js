@@ -1,3 +1,5 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -130,8 +132,34 @@ const manualChunks = (id) => {
   return undefined
 }
 
+/*
+ * Which Gunit this is, shown in Settings → About so a bug report can say.
+ *
+ * The version is package.json's, bumped by hand at each release and tagged
+ * v<version> on main. The commit pins it down between releases: Vercel hands
+ * the build its commit, and a local build asks git. Neither is fatal when
+ * missing — a build from a zip still builds, it just says "dev".
+ */
+const APP_VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version
+
+function commitSha() {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)
+  try {
+    return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return 'dev'
+  }
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), pwa],
+
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_VERSION),
+    'import.meta.env.VITE_APP_COMMIT': JSON.stringify(commitSha()),
+  },
 
   build: {
     rollupOptions: { output: { manualChunks } },
