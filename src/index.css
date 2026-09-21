@@ -121,6 +121,31 @@ select {
   font-family: inherit;
 }
 
+/*
+ * The notch, in landscape. With viewport-fit=cover the page runs under it, so
+ * the sides give way by exactly the inset — which is zero everywhere else, so
+ * nothing moves on any screen without one.
+ */
+#root {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/*
+ * iOS zooms the whole page into any field whose text is under 16px, and does
+ * not zoom back out when the field is left. Gunit's fields are 14-15px, so
+ * tapping the search box or a deck name knocked the layout sideways on every
+ * iPhone. Touch screens get 16px text in form controls; pointer-driven layouts
+ * are untouched. Unlayered, so it outranks the utility classes on the fields.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
 ::selection {
   background: var(--color-accent-soft);
 }

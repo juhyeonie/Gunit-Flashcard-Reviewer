@@ -103,6 +103,27 @@ export default function LibrarySync() {
   /** The guest library waiting to be offered to an empty account, if any. */
   const [offer, setOffer] = useState(null)
 
+  /*
+   * Bumped to read the account again — when the connection comes back after a
+   * pull that failed. Keyed into the pull effect alongside the account.
+   */
+  const [pullTick, setPullTick] = useState(0)
+
+  /*
+   * The library as it was loaded, before anything was done to it, and whether
+   * this device had anything unsent at that moment.
+   *
+   * It matters when the first pull fails — a reader opening the app with no
+   * signal. Until now nothing was marked unsent without a confirmed pull, so
+   * whatever they did offline sat in local storage unmarked, and the next pull
+   * that worked installed the account's older copy straight over it.
+   *
+   * A clean start also makes this the account's last confirmed state as far as
+   * this device knows, which is what lets reconnecting send a precise
+   * difference — deletions included — rather than only upserts.
+   */
+  const baseline = useRef(null)
+
   useEffect(() => {
     alive.current = true
     return () => {
@@ -116,7 +137,16 @@ export default function LibrarySync() {
       // Said once. A failing network would otherwise narrate every keystroke.
       if (complained.current) return
       complained.current = true
-      say(message)
+      /*
+       * With no connection at all, the account did not fail and saying so
+       * would be untrue. The reader's work is safe on this device, and that is
+       * the one thing worth telling them.
+       */
+      say(
+        typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'You’re offline — changes are saved on this device and sync when you reconnect'
+          : message,
+      )
     },
     [say],
   )
@@ -283,7 +313,7 @@ export default function LibrarySync() {
     // Keyed on the account alone, and now honestly so: the library this reads
     // comes from its key rather than from props, so there is nothing missing
     // from this list. It used to need a lint exception to say the same thing.
-  }, [available, userId, installLibrary, say, trouble])
+  }, [available, userId, installLibrary, say, trouble, pullTick])
 
   /*
    * The latest library, for the flush below to read.
@@ -349,6 +379,41 @@ export default function LibrarySync() {
   useEffect(() => registerPendingSync(flushNow, outstanding), [flushNow, outstanding])
 
   /**
+   * The connection coming back.
+   *
+   * If the account had been read, all that is owed is whatever the debounce
+   * could not send, and a flush sends it. Nothing is read again: going online
+   * is not a reason to reload a library that is already right.
+   *
+   * If it had not — the app was opened offline — the pull is run again. When
+   * this device was clean as it started, what it loaded is exactly what the
+   * account last confirmed, so it becomes the base and the offline work goes up
+   * first as an ordinary difference: a deck deleted on the train is removed,
+   * not brought back by the read that follows. A device that was not clean
+   * falls to the pull's own carry, which only ever adds.
+   */
+  useEffect(() => {
+    if (!available || !userId) return undefined
+
+    const reconnect = async () => {
+      complained.current = false
+      if (synced.current) {
+        await flushNow()
+        return
+      }
+      const b = baseline.current
+      if (b && b.userId === userId && b.clean) {
+        synced.current = toRows({ decks: b.decks, folders: b.folders, sessions: b.sessions }, userId)
+        await flushNow()
+      }
+      if (alive.current) setPullTick((t) => t + 1)
+    }
+
+    window.addEventListener('online', reconnect)
+    return () => window.removeEventListener('online', reconnect)
+  }, [available, userId, flushNow])
+
+  /**
    * Leaving the page ends the wait early.
    *
    * The debounce exists so that grading five cards is one request. It is not
@@ -381,7 +446,29 @@ export default function LibrarySync() {
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {
-    if (!available || !userId || !synced.current) return undefined
+    if (!available || !userId) {
+      baseline.current = null
+      return undefined
+    }
+
+    /*
+     * No confirmed picture of the account yet — the pull is in flight, or it
+     * failed because there is no connection. Nothing can be sent, but a change
+     * still has to be recorded as unsent, or the next pull that works will
+     * install the account's copy over it.
+     *
+     * The first run for an account records what was loaded; any run after it
+     * with a different library is the reader's own doing.
+     */
+    if (!synced.current) {
+      const b = baseline.current
+      if (!b || b.userId !== userId) {
+        baseline.current = { userId, decks, folders, sessions, clean: !hasUnsent(userId) }
+      } else if (b.decks !== decks || b.folders !== folders || b.sessions !== sessions) {
+        markUnsent(userId)
+      }
+      return undefined
+    }
 
     /*
      * Marked here, before the wait, rather than inside it.

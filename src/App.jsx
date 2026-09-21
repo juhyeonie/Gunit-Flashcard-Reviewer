@@ -12,6 +12,7 @@ import CardModal from './components/CardModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import MoveDeckModal from './components/MoveDeckModal.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import UpdateNotice from './components/UpdateNotice.jsx'
 import Home from './pages/Home.jsx'
 import Decks from './pages/Decks.jsx'
 import DeckDetail from './pages/DeckDetail.jsx'
@@ -258,6 +259,7 @@ function Shell() {
       />
 
       <Toast message={toast} />
+      <UpdateNotice />
     </div>
   )
 }

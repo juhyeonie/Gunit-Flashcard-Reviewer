@@ -1081,3 +1081,161 @@ describe('folders and the account', () => {
     await waitFor(() => expect(api.decks[0].folderId).toBe(folder.id))
   })
 })
+
+/**
+ * Starting without a connection.
+ *
+ * An installed app is opened on a train as often as at a desk. The pull fails,
+ * the reader studies anyway — every grade and edit lands in local storage — and
+ * the connection comes back later, either while the app is still open or the
+ * next time it is.
+ *
+ * Neither return may cost what was done in between. And the account must not be
+ * pretended into: nothing is sent while there is nothing to send it to.
+ */
+describe('a signed-in reader who starts offline', () => {
+  const A = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+  const B = 'b6c2d7e8-1111-4222-8333-944455556666'
+
+  const deckRow = (id, title) => ({ id, user_id: USER, title, subject: 'S', description: '', studied_at: null })
+
+  const online = () =>
+    fakeClient({ decks: [deckRow(A, 'Alpha'), deckRow(B, 'Beta')], profile: null })
+
+  /** No network: every read and every write fails the way fetch does. */
+  const offline = () => {
+    const failure = { data: null, error: new TypeError('Failed to fetch') }
+    const reads = []
+    return {
+      reads,
+      rpcPayloads: [],
+      from(table) {
+        reads.push(table)
+        const answer = Promise.resolve(failure)
+        answer.eq = () => answer
+        answer.maybeSingle = () => Promise.resolve(failure)
+        return {
+          select: () => answer,
+          update: () => ({ eq: () => Promise.resolve(failure) }),
+        }
+      },
+      async rpc() {
+        return { error: new TypeError('Failed to fetch') }
+      },
+    }
+  }
+
+  /** The account's library as this device last synced it: clean, nothing unsent. */
+  const lastSynced = () =>
+    localStorage.setItem(
+      userKey(USER),
+      JSON.stringify({
+        decks: [
+          { id: A, title: 'Alpha', subject: 'S', desc: '', cards: [], schedule: {}, folderId: null },
+          { id: B, title: 'Beta', subject: 'S', desc: '', cards: [], schedule: {}, folderId: null },
+        ],
+        folders: [],
+        sessions: [],
+      }),
+    )
+
+  const goOnline = async (next) => {
+    client = next
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+    })
+  }
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+  })
+
+  it('keeps what was done offline when the app is opened again online', async () => {
+    lastSynced()
+    client = offline()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['Alpha', 'Beta']))
+
+    await act(async () => {
+      api.addCards(A, [{ front: 'Written on the train', back: 'Kept' }])
+    })
+    cleanup()
+
+    // Back online, a fresh launch.
+    client = online()
+    await mountSignedIn()
+    await waitFor(() =>
+      expect(client.rpcPayloads.flatMap((p) => p.cards_upsert ?? []).map((c) => c.front)).toContain(
+        'Written on the train',
+      ),
+    )
+    await waitFor(() =>
+      expect(api.decks.find((d) => d.id === A).cards.map((c) => c.front)).toContain('Written on the train'),
+    )
+  })
+
+  it('sends what was done offline when the connection returns with the app still open', async () => {
+    lastSynced()
+    client = offline()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks).toHaveLength(2))
+
+    await act(async () => {
+      api.addCards(A, [{ front: 'Added offline', back: 'x' }])
+    })
+
+    const back = online()
+    await goOnline(back)
+
+    await waitFor(() =>
+      expect(back.rpcPayloads.flatMap((p) => p.cards_upsert ?? []).map((c) => c.front)).toContain('Added offline'),
+    )
+  })
+
+  it('sends a deletion made offline, rather than bringing the deck back', async () => {
+    // A deck deleted on the train is meant to stay deleted. Carried up as
+    // upserts alone, it would be read back from the account and reappear.
+    lastSynced()
+    client = offline()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks).toHaveLength(2))
+
+    await act(async () => {
+      api.removeDeck(B)
+    })
+
+    const back = online()
+    await goOnline(back)
+
+    await waitFor(() => expect(back.rpcPayloads.flatMap((p) => p.decks_remove ?? [])).toEqual([B]))
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['Alpha']))
+  })
+
+  it('does not pull when nothing failed, so coming back online is not a reload', async () => {
+    client = online()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks).toHaveLength(2))
+    const reads = []
+    const from = client.from.bind(client)
+    client.from = (table) => {
+      reads.push(table)
+      return from(table)
+    }
+    await goOnline(client)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(reads).toEqual([])
+  })
+
+  it('says it is offline rather than that the account failed', async () => {
+    lastSynced()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    client = offline()
+    mount()
+    await act(async () => {
+      signInAs({ id: USER })
+    })
+    await waitFor(() => expect(api.toast).toMatch(/offline/i))
+    expect(api.toast).not.toMatch(/could not be refreshed/)
+  })
+})
