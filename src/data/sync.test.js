@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   changesBetween,
+  confirmedIds,
   fromRows,
   isEmptyChange,
   isUuid,
   newId,
   profileToSettings,
+  removalsSince,
   settingsToProfile,
   toPayload,
   toRows,
@@ -514,5 +516,62 @@ describe('ids minted by the app', () => {
       sessions: [{ id: newId(), at: 1, deckId: id, reviewed: 1, seconds: 1 }],
     }
     expect(isEmptyChange(changesBetween(toRows(library, USER), toRows(library, USER)))).toBe(true)
+  })
+})
+
+describe('what this device deleted since the account last agreed with it', () => {
+  const F = 'f0000000-0000-4000-8000-000000000001'
+  const D1 = 'd0000000-0000-4000-8000-000000000001'
+  const D2 = 'd0000000-0000-4000-8000-000000000002'
+  const C1 = 'c0000000-0000-4000-8000-000000000001'
+  const C2 = 'c0000000-0000-4000-8000-000000000002'
+  const C3 = 'c0000000-0000-4000-8000-000000000003'
+
+  const library = () => ({
+    folders: [{ id: F, name: 'Term' }],
+    decks: [
+      { id: D1, cards: [{ id: C1 }, { id: C2 }] },
+      { id: D2, cards: [{ id: C3 }] },
+    ],
+  })
+
+  it('records real ids only, with cards grouped under their deck', () => {
+    const lib = library()
+    lib.decks.push({ id: 'example', cards: [{ id: 'example-1' }] })
+    lib.decks[0].cards.push({ id: 'abc12345' })
+    expect(confirmedIds(lib)).toEqual({ folders: [F], decks: { [D1]: [C1, C2], [D2]: [C3] } })
+  })
+
+  it('names nothing when nothing was deleted', () => {
+    expect(removalsSince(confirmedIds(library()), library())).toEqual({ folders: [], decks: [], cards: [] })
+  })
+
+  it('names a deleted deck, and leaves its cards to the cascade', () => {
+    const now = library()
+    now.decks = now.decks.filter((d) => d.id !== D2)
+    expect(removalsSince(confirmedIds(library()), now)).toEqual({ folders: [], decks: [D2], cards: [] })
+  })
+
+  it('names a card deleted from a deck that is still here', () => {
+    const now = library()
+    now.decks[0].cards = [{ id: C1 }]
+    expect(removalsSince(confirmedIds(library()), now).cards).toEqual([C2])
+  })
+
+  it('names a deleted folder', () => {
+    const now = { ...library(), folders: [] }
+    expect(removalsSince(confirmedIds(library()), now).folders).toEqual([F])
+  })
+
+  it('never names what was not in the record — a deck added on another machine', () => {
+    const before = confirmedIds({ folders: [], decks: [{ id: D1, cards: [] }] })
+    // D2 and F are here and were never recorded; nothing about them is removed.
+    expect(removalsSince(before, library())).toEqual({ folders: [], decks: [], cards: [] })
+  })
+
+  it('names nothing without a record, or with one that is not a record', () => {
+    for (const bad of [null, undefined, 'x', 7, { decks: 'x', folders: 'y' }, { decks: [D1] }]) {
+      expect(removalsSince(bad, { folders: [], decks: [] })).toEqual({ folders: [], decks: [], cards: [] })
+    }
   })
 })

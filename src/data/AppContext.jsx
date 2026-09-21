@@ -13,7 +13,13 @@ import {
 } from './normalize.js'
 import { AppContext } from './appContext.js'
 import { AuthContext } from './authContext.js'
-import { GUEST_KEY, SALVAGE_KEY, keyFor, migrateLegacyStorage } from './storageKeys.js'
+import {
+  GUEST_KEY,
+  SALVAGE_KEY,
+  forgetSyncStateFor,
+  keyFor,
+  migrateLegacyStorage,
+} from './storageKeys.js'
 
 /**
  * Reads the library at one key.
@@ -38,6 +44,9 @@ const load = (key) => {
   }
 
   if (!raw) {
+    // Starting an account from nothing: whatever the sync last recorded about
+    // this browser's copy describes a copy that is no longer here.
+    forgetSyncStateFor(key)
     return key === GUEST_KEY
       ? normalizeState(DEFAULT_STATE)
       : normalizeState({ decks: [], sessions: [] })
@@ -45,6 +54,7 @@ const load = (key) => {
 
   const { state, ok } = parseStoredState(raw)
   if (!ok) {
+    forgetSyncStateFor(key)
     try {
       localStorage.setItem(`${SALVAGE_KEY}.${key}`, raw)
     } catch {

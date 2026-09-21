@@ -9,6 +9,8 @@ import {
   hasDeclinedImport,
   hasUnsent,
   markUnsent,
+  readConfirmed,
+  rememberConfirmed,
   rememberDeclinedImport,
   userKey,
 } from './storageKeys.js'
@@ -16,9 +18,11 @@ import { isUntouchedExample, parseStoredState } from './normalize.js'
 import Modal from '../components/Modal.jsx'
 import {
   changesBetween,
+  confirmedIds,
   fromRows,
   isEmptyChange,
   profileToSettings,
+  removalsSince,
   settingsToProfile,
   toPayload,
   toRows,
@@ -53,6 +57,26 @@ function readLibrary(key) {
     return parseStoredState(localStorage.getItem(key)).state
   } catch {
     return { decks: [], sessions: [] }
+  }
+}
+
+/**
+ * The account's library as this browser holds it, and whether it really does.
+ *
+ * `readLibrary` answers a missing or unreadable key with the default library,
+ * which is right for showing something and wrong for working out deletions:
+ * compared with the record of what the account holds, an empty library reads
+ * as every deck deleted. So the carry asks this instead, and sends removals
+ * only when there is a real library here to have removed them from.
+ */
+function readOwnLibrary(key) {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return { state: readLibrary(key), present: false }
+    const { state, ok } = parseStoredState(raw)
+    return { state, present: ok }
+  } catch {
+    return { state: { decks: [], sessions: [] }, present: false }
   }
 }
 
@@ -152,6 +176,19 @@ export default function LibrarySync() {
   )
 
   /**
+   * The account has agreed with this browser: these are its rows now.
+   *
+   * The rows are what the next push is diffed against, in memory. The ids go
+   * to storage as well, because the memory does not outlive the page and the
+   * record has to — it is what lets the next launch tell a deletion made here
+   * from a row added somewhere else.
+   */
+  const confirm = useCallback((rows, library, uid) => {
+    synced.current = rows
+    rememberConfirmed(uid, confirmedIds(library))
+  }, [])
+
+  /**
    * Signing in: read the account's library into this browser's copy of it.
    *
    * An account with nothing in it adopts whatever the guest library was
@@ -228,22 +265,33 @@ export default function LibrarySync() {
        * nowhere else — where, until this existed, the next sign-in's install
        * quietly wrote the account's older copy straight over it.
        *
-       * Carried as upserts with nothing removed, which is the whole of the
-       * safety here. A plain difference against what was just fetched would
+       * Never a plain difference against what was just fetched: that would
        * read every row another machine has added since as a row this one
-       * deleted, and send five deletions to tidy up. So rows are only ever
-       * written or left alone: at worst a card deleted in the lost beat comes
-       * back, and nothing that exists anywhere is destroyed.
+       * deleted, and send five deletions to tidy up. Everything here is
+       * written, and only what the record below proves was deleted here is
+       * removed.
        */
       let carriedUp = false
       if (hasUnsent(userId)) {
-        const mine = toRows(readLibrary(userKey(userId)), userId)
+        const own = readOwnLibrary(userKey(userId))
+        const mine = toRows(own.state, userId)
+        /*
+         * Deletions, now that there is something to tell them apart by.
+         *
+         * The record is what the account held the last time it agreed with
+         * this browser. A row in it that is missing here was deleted here — on
+         * a train, say, with the app closed before the connection came back —
+         * and is removed. A row another machine added since was never in it,
+         * and is left alone, so the rule above still holds: nothing that
+         * exists only elsewhere is destroyed.
+         */
+        const gone = own.present
+          ? removalsSince(readConfirmed(userId), own.state)
+          : { folders: [], decks: [], cards: [] }
         const carried = {
-          // Upserts only, folders included: a folder made here in the lost
-          // beat goes up, and one deleted elsewhere is not deleted again.
-          folders: { upsert: mine.folders, remove: [] },
-          decks: { upsert: mine.decks, remove: [] },
-          cards: { upsert: mine.cards, remove: [] },
+          folders: { upsert: mine.folders, remove: gone.folders },
+          decks: { upsert: mine.decks, remove: gone.decks },
+          cards: { upsert: mine.cards, remove: gone.cards },
           sessions: { insert: mine.sessions },
         }
 
@@ -278,8 +326,9 @@ export default function LibrarySync() {
         }
       }
 
-      synced.current = toRows(fromRows(rows), userId)
-      installLibrary({ ...fromRows(rows), ...profile })
+      const library = fromRows(rows)
+      confirm(toRows(library, userId), library, userId)
+      installLibrary({ ...library, ...profile })
 
       /*
        * An empty account, and decks sitting in the guest library: ask.
@@ -313,7 +362,7 @@ export default function LibrarySync() {
     // Keyed on the account alone, and now honestly so: the library this reads
     // comes from its key rather than from props, so there is nothing missing
     // from this list. It used to need a lint exception to say the same thing.
-  }, [available, userId, installLibrary, say, trouble, pullTick])
+  }, [available, userId, installLibrary, say, trouble, pullTick, confirm])
 
   /*
    * The latest library, for the flush below to read.
@@ -362,10 +411,10 @@ export default function LibrarySync() {
       say('Your last changes could not be saved to your account')
       return { error }
     }
-    synced.current = next
+    confirm(next, { decks: nowDecks, folders: nowFolders }, nowUser)
     clearUnsent(nowUser)
     return { error: null }
-  }, [available, say])
+  }, [available, say, confirm])
 
   /*
    * Asked when a session ends without going through the sign-out button, to
@@ -505,13 +554,13 @@ export default function LibrarySync() {
         trouble('Your last change is saved on this device but not to your account')
         return
       }
-      synced.current = next
+      confirm(next, { decks, folders }, userId)
       clearUnsent(userId)
       complained.current = false
     }, QUIET_MS)
 
     return () => clearTimeout(pushTimer.current)
-  }, [available, userId, decks, folders, sessions, trouble])
+  }, [available, userId, decks, folders, sessions, trouble, confirm])
 
   /**
    * Preferences are small and change rarely; no diffing earns its keep.
@@ -564,10 +613,11 @@ export default function LibrarySync() {
       trouble('Your decks could not be brought into this account')
       return
     }
-    synced.current = rows
-    installLibrary(fromRows(rows))
+    const adopted = fromRows(rows)
+    confirm(rows, adopted, uid)
+    installLibrary(adopted)
     say(`Brought ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'} in`)
-  }, [installLibrary, say, trouble])
+  }, [installLibrary, say, trouble, confirm])
 
   /** No: remembered, so signing in again does not ask the same thing forever. */
   const declineOffer = useCallback(() => {

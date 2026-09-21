@@ -1239,3 +1239,257 @@ describe('a signed-in reader who starts offline', () => {
     expect(api.toast).not.toMatch(/could not be refreshed/)
   })
 })
+
+describe('a deletion made offline, with the app closed before the connection returns', () => {
+  const A = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+  const B = 'b6c2d7e8-1111-4222-8333-944455556666'
+  const PHONE = 'c7d3e8f9-2222-4333-8444-a55566667777'
+  const FOLDER = 'd8e4f9a0-3333-4444-8555-b66677778888'
+  const CARD_1 = 'aaaaaaaa-0000-4000-8000-000000000001'
+  const CARD_2 = 'aaaaaaaa-0000-4000-8000-000000000002'
+
+  const deckRow = (id, title, folder_id = null) => ({
+    id,
+    user_id: USER,
+    title,
+    subject: 'S',
+    description: '',
+    studied_at: null,
+    folder_id,
+  })
+  const cardRow = (id, deck_id, front, position) => ({
+    id,
+    deck_id,
+    user_id: USER,
+    front,
+    back: 'x',
+    position,
+    due: null,
+    interval: 0,
+    ease: 2.5,
+    reps: 0,
+    lapses: 0,
+    last_grade: null,
+    suspended: false,
+  })
+
+  /** One account, shared by every launch and every device below. */
+  const account = () =>
+    fakeClient({
+      folders: [{ id: FOLDER, user_id: USER, name: 'Term 1' }],
+      decks: [deckRow(A, 'Alpha', FOLDER), deckRow(B, 'Beta')],
+      cards: [cardRow(CARD_1, A, 'Keep me', 0), cardRow(CARD_2, A, 'Delete me', 1)],
+      profile: null,
+    })
+
+  /** Every read and write fails the way fetch does with no network. */
+  const noNetwork = () => {
+    const failure = { data: null, error: new TypeError('Failed to fetch') }
+    return {
+      rpcPayloads: [],
+      from() {
+        const answer = Promise.resolve(failure)
+        answer.eq = () => answer
+        answer.maybeSingle = () => Promise.resolve(failure)
+        return { select: () => answer, update: () => ({ eq: () => Promise.resolve(failure) }) }
+      },
+      async rpc() {
+        return { error: new TypeError('Failed to fetch') }
+      },
+    }
+  }
+
+  const removed = (c, key) => c.rpcPayloads.flatMap((p) => p[key] ?? [])
+  const titles = () => api.decks.map((d) => d.title).sort()
+
+  /** A launch while online, which leaves this browser a confirmed picture of the account. */
+  const launchOnline = async (server) => {
+    client = server
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.length).toBeGreaterThan(0))
+  }
+
+  /** A launch with no network: the library comes from this device alone. */
+  const launchOffline = async () => {
+    client = noNetwork()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await mountSignedIn()
+    await waitFor(() => expect(titles()).toEqual(['Alpha', 'Beta']))
+  }
+
+  /** The app closed completely: nothing in memory survives, only storage. */
+  const close = () => {
+    cleanup()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+  }
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+  })
+
+  it('removes the deck from the account on the next launch, and does not bring it back', async () => {
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    await launchOffline()
+    await act(async () => {
+      api.removeDeck(B)
+    })
+    expect(titles()).toEqual(['Alpha'])
+    close()
+
+    server.rpcPayloads.length = 0
+    await launchOnline(server)
+
+    await waitFor(() => expect(removed(server, 'decks_remove')).toEqual([B]))
+    // Read back from the account after the carry, and still gone.
+    await waitFor(() => expect(titles()).toEqual(['Alpha']))
+    expect(JSON.parse(localStorage.getItem(userKey(USER))).decks.map((d) => d.id)).toEqual([A])
+  })
+
+  it('shows the deletion on another signed-in device once that one syncs', async () => {
+    const server = account()
+    await launchOnline(server)
+    close()
+    await launchOffline()
+    await act(async () => {
+      api.removeDeck(B)
+    })
+    close()
+    await launchOnline(server)
+    await waitFor(() => expect(removed(server, 'decks_remove')).toEqual([B]))
+    close()
+
+    // A second machine: the same account, none of this browser's storage.
+    localStorage.clear()
+    await launchOnline(server)
+    await waitFor(() => expect(titles()).toEqual(['Alpha']))
+  })
+
+  it('keeps what was created and edited offline beside the deletion', async () => {
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    await launchOffline()
+    await act(async () => {
+      api.addDeck({ title: 'Made on the train', subject: 'S', desc: '' })
+    })
+    await act(async () => {
+      api.addCards(A, [{ front: 'Added on the train', back: 'x' }])
+    })
+    await act(async () => {
+      api.removeDeck(B)
+    })
+    close()
+
+    await launchOnline(server)
+    await waitFor(() => expect(removed(server, 'decks_remove')).toEqual([B]))
+    await waitFor(() => expect(titles()).toEqual(['Alpha', 'Made on the train']))
+    expect(api.decks.find((d) => d.id === A).cards.map((c) => c.front)).toContain('Added on the train')
+  })
+
+  it('removes a card deleted offline, and only that card', async () => {
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    await launchOffline()
+    await act(async () => {
+      api.removeCard(A, 1)
+    })
+    close()
+
+    await launchOnline(server)
+    await waitFor(() => expect(removed(server, 'cards_remove')).toEqual([CARD_2]))
+    expect(removed(server, 'decks_remove')).toEqual([])
+    await waitFor(() =>
+      expect(api.decks.find((d) => d.id === A).cards.map((c) => c.front)).toEqual(['Keep me']),
+    )
+  })
+
+  it('removes a folder deleted offline, and keeps its decks', async () => {
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    await launchOffline()
+    await act(async () => {
+      api.deleteFolder(FOLDER)
+    })
+    close()
+
+    await launchOnline(server)
+    await waitFor(() => expect(removed(server, 'folders_remove')).toEqual([FOLDER]))
+    expect(removed(server, 'decks_remove')).toEqual([])
+    await waitFor(() => expect(api.folders).toEqual([]))
+    expect(titles()).toEqual(['Alpha', 'Beta'])
+  })
+
+  it('still leaves alone a deck another machine added while this one was offline', async () => {
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    await launchOffline()
+    await act(async () => {
+      api.removeDeck(B)
+    })
+    close()
+
+    // Meanwhile, the phone.
+    await server.rpc('sync_library', { payload: { decks_upsert: [deckRow(PHONE, 'Added on the phone')] } })
+    server.rpcPayloads.length = 0
+
+    await launchOnline(server)
+    await waitFor(() => expect(removed(server, 'decks_remove')).toEqual([B]))
+    await waitFor(() => expect(titles()).toEqual(['Added on the phone', 'Alpha']))
+  })
+
+  it('removes nothing when this browser no longer holds the library it recorded', async () => {
+    // An empty library compared with the record would read as every deck
+    // deleted. With no library here, there is nothing to have deleted.
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    localStorage.removeItem(userKey(USER))
+    localStorage.setItem(`gunit.sync.unsent.${USER}`, 'yes')
+
+    server.rpcPayloads.length = 0
+    await launchOnline(server)
+    await waitFor(() => expect(titles()).toEqual(['Alpha', 'Beta']))
+    expect(removed(server, 'decks_remove')).toEqual([])
+    expect(removed(server, 'cards_remove')).toEqual([])
+    expect(removed(server, 'folders_remove')).toEqual([])
+  })
+
+  it('removes nothing when the library here could not be read', async () => {
+    // The store sets an unreadable library aside and starts from an empty
+    // one. That empty one is not the reader deleting everything.
+    const server = account()
+    await launchOnline(server)
+    close()
+
+    localStorage.setItem(userKey(USER), '{ not json')
+    localStorage.setItem(`gunit.sync.unsent.${USER}`, 'yes')
+
+    server.rpcPayloads.length = 0
+    await launchOnline(server)
+    await waitFor(() => expect(titles()).toEqual(['Alpha', 'Beta']))
+    expect(removed(server, 'decks_remove')).toEqual([])
+    expect(removed(server, 'folders_remove')).toEqual([])
+  })
+
+  it('forgets the record with the library on sign-out, so a later sign-in has nothing to compare', async () => {
+    const server = account()
+    await launchOnline(server)
+    expect(localStorage.getItem(`gunit.sync.confirmed.${USER}`)).toContain(B)
+    close()
+
+    const { forgetAccountLibrary } = await import('./storageKeys.js')
+    forgetAccountLibrary(USER)
+    expect(localStorage.getItem(`gunit.sync.confirmed.${USER}`)).toBe(null)
+  })
+})
