@@ -182,6 +182,65 @@ export function hasUnsent(userId) {
 }
 
 /**
+ * The ids the account last confirmed, as this browser saw them.
+ *
+ * The unsent mark says *that* something here has not gone up; this says what
+ * the account held when it last agreed with this browser, and outlives the
+ * page for the same reason the mark does. Without it, a change carried up
+ * after a relaunch cannot tell a deck deleted here from a deck added on
+ * another machine — both are simply absent from one side — and so the carry
+ * could only ever add, and a deletion made offline came back.
+ *
+ * Written only when the account has confirmed the library: a pull installed,
+ * or a push accepted. Per account and per browser, like the mark.
+ */
+const confirmedKey = (userId) => `gunit.sync.confirmed.${userId}`
+
+export function rememberConfirmed(userId, ids) {
+  if (!userId) return
+  try {
+    localStorage.setItem(confirmedKey(userId), JSON.stringify(ids))
+  } catch {
+    // Left as it was. A stale record is safe in both directions: an id it
+    // lacks is never removed, and an id the account no longer has is a
+    // removal of nothing.
+  }
+}
+
+/**
+ * Forgets what the sync knew about the library under this key, if it is an
+ * account's: the record, and the unsent mark.
+ *
+ * Called by the store when it finds that library missing or unreadable and
+ * starts the account from a stand-in instead. Both described the copy that is
+ * gone. The record, kept, would be compared with the stand-in and read every
+ * deck the account holds as deleted here; the mark, kept, would carry the
+ * stand-in up as the reader's work. With neither, the next pull simply installs
+ * the account, which is what a browser with no copy of it should do.
+ */
+export function forgetSyncStateFor(key) {
+  const prefix = `${PREFIX}.user.`
+  if (typeof key !== 'string' || !key.startsWith(prefix)) return
+  const userId = key.slice(prefix.length)
+  try {
+    localStorage.removeItem(confirmedKey(userId))
+    localStorage.removeItem(unsentKey(userId))
+  } catch {
+    // Storage refused: then there is no record to read back either.
+  }
+}
+
+export function readConfirmed(userId) {
+  if (!userId) return null
+  try {
+    const raw = localStorage.getItem(confirmedKey(userId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Takes an account's library off this machine.
  *
  * Called on an explicit sign-out, and only once whatever was queued has gone
@@ -200,6 +259,9 @@ export function forgetAccountLibrary(userId) {
   if (!userId) return false
   try {
     localStorage.removeItem(userKey(userId))
+    // The record describes the copy just taken away. Left behind, the next
+    // sign-in would compare it with a library that is not there.
+    localStorage.removeItem(confirmedKey(userId))
     return true
   } catch {
     // Storage refused. The decks stay, which is the safe direction to fail in.

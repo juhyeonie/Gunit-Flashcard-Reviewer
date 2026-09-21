@@ -279,3 +279,62 @@ export const toPayload = (change) => ({
   cards_remove: change.cards.remove,
   decks_remove: change.decks.remove,
 })
+
+/**
+ * The ids a library holds, as a record of what the account has confirmed.
+ *
+ * Kept in storage beside the library so that it outlives the page. Ids only,
+ * and only real ones: a local id that is not yet a uuid has never been in the
+ * account, so it has nothing to be deleted from. Cards are grouped by deck,
+ * because a card whose deck went with it needs no removal of its own.
+ */
+export function confirmedIds(state) {
+  const decks = {}
+  for (const deck of state.decks ?? []) {
+    if (!isUuid(deck.id)) continue
+    decks[deck.id] = (deck.cards ?? []).map((c) => c.id).filter(isUuid)
+  }
+  return {
+    folders: (state.folders ?? []).map((f) => f.id).filter(isUuid),
+    decks,
+  }
+}
+
+/**
+ * What this device deleted since the account last confirmed its library.
+ *
+ * Only an id in the record can come out of this. The record holds what the
+ * account had and this device held at the same moment, so an id in it that is
+ * missing here now was deleted here. A row another machine added since was
+ * never in the record, and so is never named — which is what lets a carry after
+ * a relaunch send deletions without tidying away somebody else's work.
+ *
+ * No record — a device that last synced before there was one — means no
+ * removals, which is the carry as it was: at worst something deleted comes
+ * back, and nothing that exists is destroyed.
+ */
+export function removalsSince(confirmed, state) {
+  const none = { folders: [], decks: [], cards: [] }
+  if (!confirmed || typeof confirmed !== 'object') return none
+
+  const folderNow = new Set((state.folders ?? []).map((f) => f.id))
+  const deckNow = new Map((state.decks ?? []).map((d) => [d.id, d]))
+  const recordedDecks = confirmed.decks && typeof confirmed.decks === 'object' ? confirmed.decks : {}
+
+  const cards = []
+  for (const [deckId, cardIds] of Object.entries(recordedDecks)) {
+    const deck = deckNow.get(deckId)
+    // Its deck went too: the deck's removal cascades to it.
+    if (!deck || !Array.isArray(cardIds)) continue
+    const cardNow = new Set((deck.cards ?? []).map((c) => c.id))
+    for (const id of cardIds) if (isUuid(id) && !cardNow.has(id)) cards.push(id)
+  }
+
+  return {
+    folders: (Array.isArray(confirmed.folders) ? confirmed.folders : []).filter(
+      (id) => isUuid(id) && !folderNow.has(id),
+    ),
+    decks: Object.keys(recordedDecks).filter((id) => isUuid(id) && !deckNow.has(id)),
+    cards,
+  }
+}
