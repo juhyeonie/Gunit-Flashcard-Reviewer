@@ -354,6 +354,14 @@ export default function Settings() {
         <h2 className="kicker m-0 mb-1 border-b border-line pb-3 !text-[11px]">About</h2>
         <div className="flex flex-col gap-1">
           <div className="font-serif text-[20px] leading-[1.2] text-accent">Gunit</div>
+          {/*
+            Set at build time from package.json and the commit, so it is the
+            version actually running — after "A new version is ready" is taken,
+            this is where the reader can see that it was.
+          */}
+          <p className="m-0 font-mono text-[12px] leading-[1.5] text-ink-3">
+            Version {import.meta.env.VITE_APP_VERSION} · {import.meta.env.VITE_APP_COMMIT}
+          </p>
           <p className="m-0 text-[13px] leading-[1.5] text-ink-2">
             Designed &amp; developed by{' '}
             <span className="font-semibold text-ink">Justine Pelgone</span>
