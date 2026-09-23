@@ -27,7 +27,24 @@ const USER = '686963f7-42a5-4f94-9225-52a8a0a4859a'
  * So this records building and executing separately. A test that only checked
  * `update` was called would pass against the bug.
  */
-function fakeClient({ decks = [], cards = [], sessions = [], folders = [], profile = null } = {}) {
+/*
+ * `maxRows` is PostgREST's cap on a single response, 1,000 unless a project
+ * raises it. Every read is cut to it however many rows were asked for, and
+ * nothing in the response says so — which is how an account past a thousand
+ * cards came back short with no error to notice.
+ *
+ * `onRead` runs after each read has been answered, which is the gap between
+ * two pages — where another device's write lands in real life.
+ */
+function fakeClient({
+  decks = [],
+  cards = [],
+  sessions = [],
+  folders = [],
+  profile = null,
+  maxRows = 1000,
+  onRead = () => {},
+} = {}) {
   const built = []
   const executed = []
 
@@ -39,10 +56,43 @@ function fakeClient({ decks = [], cards = [], sessions = [], folders = [], profi
     from(table) {
       return {
         select() {
-          const answer = Promise.resolve({ data: rows[table] ?? [], error: null })
-          answer.eq = () => answer
-          answer.maybeSingle = () => Promise.resolve({ data: profile, error: null })
-          return answer
+          let orderBy = null
+          let after = null
+          let limit = Infinity
+          const query = {
+            eq: () => query,
+            order(column) {
+              orderBy = column
+              return query
+            },
+            gt(column, value) {
+              after = { column, value }
+              return query
+            },
+            limit(n) {
+              limit = n
+              return query
+            },
+            maybeSingle: () => Promise.resolve({ data: profile, error: null }),
+            then(resolve, reject) {
+              /*
+               * Postgres promises no order without `order by`, so two pages
+               * read without one may overlap or leave a gap. Refused here
+               * rather than simulated: returning rows in whatever order they
+               * were stored would let a pager with no order pass.
+               */
+              if ((after || limit !== Infinity) && !orderBy) {
+                return Promise.resolve({ data: null, error: new Error('paged without order()') }).then(resolve, reject)
+              }
+              let all = [...(rows[table] ?? [])]
+              if (orderBy) all.sort((a, b) => (a[orderBy] < b[orderBy] ? -1 : a[orderBy] > b[orderBy] ? 1 : 0))
+              if (after) all = all.filter((r) => r[after.column] > after.value)
+              const data = all.slice(0, Math.min(limit, maxRows))
+              onRead(table, data)
+              return Promise.resolve({ data, error: null }).then(resolve, reject)
+            },
+          }
+          return query
         },
         update(values) {
           built.push({ table, values })
@@ -1113,6 +1163,9 @@ describe('a signed-in reader who starts offline', () => {
         reads.push(table)
         const answer = Promise.resolve(failure)
         answer.eq = () => answer
+        answer.order = () => answer
+        answer.gt = () => answer
+        answer.limit = () => answer
         answer.maybeSingle = () => Promise.resolve(failure)
         return {
           select: () => answer,
@@ -1290,6 +1343,9 @@ describe('a deletion made offline, with the app closed before the connection ret
       from() {
         const answer = Promise.resolve(failure)
         answer.eq = () => answer
+        answer.order = () => answer
+        answer.gt = () => answer
+        answer.limit = () => answer
         answer.maybeSingle = () => Promise.resolve(failure)
         return { select: () => answer, update: () => ({ eq: () => Promise.resolve(failure) }) }
       },
@@ -1603,6 +1659,95 @@ describe('a deletion made offline, with the app closed before the connection ret
       await waitFor(() => expect(upserted(server, 'sessions_insert')).toHaveLength(1))
       expect(upserted(server, 'sessions_insert')[0]).toMatchObject({ deck_id: null, reviewed: 3 })
       await waitFor(() => expect(titles()).toEqual(['Alpha']))
+    })
+  })
+
+  /*
+   * Past the thousand rows one response carries. Read with a bare select, the
+   * rest stayed in Postgres and never reached the app — and to the carry, which
+   * compares the record with what the account handed back, every card past the
+   * first page looked deleted on another device.
+   */
+  describe('an account holding more than one page of rows', () => {
+    // Two full pages and a short one.
+    const MANY = 2500
+    const SESSIONS = 1200
+    const bulkId = (prefix, i) => `${prefix}-0000-4000-8000-${String(i).padStart(12, '0')}`
+    const bulkCards = Array.from({ length: MANY }, (_, i) => cardRow(bulkId('cccccccc', i), A, `Card ${i}`, i))
+    const bulkSessions = Array.from({ length: SESSIONS }, (_, i) => ({
+      id: bulkId('eeeeeeee', i),
+      user_id: USER,
+      deck_id: A,
+      at: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+      reviewed: 1,
+      seconds: 10,
+    }))
+
+    // Stored out of id order, the way a table written to for a while is.
+    const bigAccount = (extra = {}) =>
+      fakeClient({
+        decks: [deckRow(A, 'Alpha'), deckRow(B, 'Beta')],
+        cards: [...bulkCards].reverse(),
+        sessions: [...bulkSessions].reverse(),
+        profile: null,
+        ...extra,
+      })
+
+    const sent = (c, key) => c.rpcPayloads.flatMap((p) => p[key] ?? [])
+    const alphaCards = () => api.decks.find((d) => d.id === A)?.cards ?? []
+
+    it('installs every card and every session, not the first thousand', async () => {
+      const server = bigAccount()
+      await launchOnline(server)
+
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
+      expect(new Set(alphaCards().map((c) => c.id)).size).toBe(MANY)
+      expect(api.sessions).toHaveLength(SESSIONS)
+    })
+
+    it('reads on past a card deleted elsewhere between two pages, skipping nothing', async () => {
+      // By offset, the second page would start one row late once a row before
+      // it was gone, and the card at 1,000 would never be read.
+      let deleted = false
+      const server = bigAccount({
+        onRead: (table, page) => {
+          if (table !== 'cards' || deleted || page.length === 0) return
+          deleted = true
+          server.rpc('sync_library', { payload: { cards_remove: [page[0].id] } })
+        },
+      })
+      await launchOnline(server)
+
+      await waitFor(() => expect(alphaCards().length).toBeGreaterThan(0))
+      const got = new Set(alphaCards().map((c) => c.id))
+      // The deleted card was read before it went; the next pull drops it.
+      expect(bulkCards.filter((c) => !got.has(c.id)).map((c) => c.front)).toEqual([])
+      expect(got.size).toBe(MANY)
+    })
+
+    it('carries a change up without reading the later pages as deleted elsewhere', async () => {
+      const server = bigAccount()
+      await launchOnline(server)
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
+      close()
+
+      await launchOffline()
+      await act(async () => {
+        api.addCards(A, [{ front: 'Added on the train', back: 'x' }])
+      })
+      close()
+
+      server.rpcPayloads.length = 0
+      await launchOnline(server)
+      await waitFor(() => expect(server.rpcPayloads.length).toBeGreaterThan(0))
+
+      const carried = new Set(sent(server, 'cards_upsert').map((c) => c.id))
+      expect(carried.has(bulkCards.at(-1).id)).toBe(true)
+      expect(bulkCards.filter((c) => !carried.has(c.id)).length).toBe(0)
+      expect(sent(server, 'cards_remove')).toEqual([])
+
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY + 1))
+      expect(alphaCards().at(-1).front).toBe('Added on the train')
     })
   })
 })

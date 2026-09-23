@@ -98,6 +98,41 @@ const readGuestLibrary = () => {
 /** How long the library has to sit still before a push is worth making. */
 const QUIET_MS = 1200
 
+/**
+ * Rows asked for per request: PostgREST's default `max-rows`, which caps every
+ * response whatever the request says. Asking for more than the cap would read
+ * a full page as a short one and stop there.
+ */
+const PAGE_ROWS = 1000
+
+/**
+ * Every row of one of the account's tables, a page at a time.
+ *
+ * A bare `select('*')` stops at `max-rows` without saying so. An account past
+ * a thousand cards — or, sooner, a thousand sessions — was installed without
+ * the rest on every sign-in: still in Postgres, gone from the app, and the
+ * streak counted from part of the history.
+ *
+ * Each page starts after the last id the one before it ended on, rather than
+ * at an offset. An offset counts rows, so a row deleted on another device
+ * between two pages moved every later row back one and the first of them was
+ * never read; one added moved them forward and a row was read twice. An id
+ * stays where it is whatever happens around it. Any page failing fails the
+ * table, and with it the whole pull — a library missing its later pages is
+ * exactly what this exists to stop.
+ */
+async function selectAll(supabase, table) {
+  const rows = []
+  for (;;) {
+    let page = supabase.from(table).select('*').order('id').limit(PAGE_ROWS)
+    if (rows.length) page = page.gt('id', rows.at(-1).id)
+    const { data, error } = await page
+    if (error) return { data: null, error }
+    rows.push(...(data ?? []))
+    if (!data || data.length < PAGE_ROWS) return { data: rows, error: null }
+  }
+}
+
 export default function LibrarySync() {
   const { user, available } = useAuth()
   /*
@@ -226,10 +261,10 @@ export default function LibrarySync() {
      */
     const select = async (supabase) => {
       const [deckRes, cardRes, sessionRes, folderRes, profileRes] = await Promise.all([
-        supabase.from('decks').select('*'),
-        supabase.from('cards').select('*'),
-        supabase.from('sessions').select('*'),
-        supabase.from('folders').select('*'),
+        selectAll(supabase, 'decks'),
+        selectAll(supabase, 'cards'),
+        selectAll(supabase, 'sessions'),
+        selectAll(supabase, 'folders'),
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       ])
       return {
