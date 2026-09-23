@@ -26,6 +26,7 @@ import {
   settingsToProfile,
   toPayload,
   toRows,
+  withoutDeletedElsewhere,
 } from './sync.js'
 
 /**
@@ -274,20 +275,21 @@ export default function LibrarySync() {
       let carriedUp = false
       if (hasUnsent(userId)) {
         const own = readOwnLibrary(userKey(userId))
-        const mine = toRows(own.state, userId)
+        const confirmed = own.present ? readConfirmed(userId) : null
         /*
-         * Deletions, now that there is something to tell them apart by.
+         * Deletions, both ways, now that there is something to tell them
+         * apart by.
          *
          * The record is what the account held the last time it agreed with
          * this browser. A row in it that is missing here was deleted here — on
          * a train, say, with the app closed before the connection came back —
-         * and is removed. A row another machine added since was never in it,
-         * and is left alone, so the rule above still holds: nothing that
-         * exists only elsewhere is destroyed.
+         * and is removed. A row in it that is missing from the account was
+         * deleted on another device, and is not sent back up. A row another
+         * machine added since was never in it, and is left alone, so the rule
+         * above still holds: nothing that exists only elsewhere is destroyed.
          */
-        const gone = own.present
-          ? removalsSince(readConfirmed(userId), own.state)
-          : { folders: [], decks: [], cards: [] }
+        const mine = withoutDeletedElsewhere(toRows(own.state, userId), confirmed, rows)
+        const gone = removalsSince(confirmed, own.state)
         const carried = {
           folders: { upsert: mine.folders, remove: gone.folders },
           decks: { upsert: mine.decks, remove: gone.decks },

@@ -1492,4 +1492,117 @@ describe('a deletion made offline, with the app closed before the connection ret
     forgetAccountLibrary(USER)
     expect(localStorage.getItem(`gunit.sync.confirmed.${USER}`)).toBe(null)
   })
+
+  describe('while another device deletes', () => {
+    const upserted = (c, key) => c.rpcPayloads.flatMap((p) => p[key] ?? [])
+
+    /** The phone, doing its own deleting while this browser is away. */
+    const elsewhere = async (server, payload) => {
+      await server.rpc('sync_library', { payload })
+      server.rpcPayloads.length = 0
+    }
+
+    it('does not bring back a deck deleted on the phone, even with changes here to send', async () => {
+      const server = account()
+      await launchOnline(server)
+      close()
+
+      await launchOffline()
+      await act(async () => {
+        api.addCards(A, [{ front: 'Added on the train', back: 'x' }])
+      })
+      await act(async () => {
+        // An edit to the very deck the phone deletes: deletion wins.
+        api.addCards(B, [{ front: 'Edited on the train', back: 'x' }])
+      })
+      await act(async () => {
+        api.addDeck({ title: 'Made on the train', subject: 'S', desc: '' })
+      })
+      close()
+
+      await elsewhere(server, { decks_remove: [B] })
+
+      await launchOnline(server)
+      await waitFor(() => expect(server.rpcPayloads.length).toBeGreaterThan(0))
+      const sent = upserted(server, 'decks_upsert').map((d) => d.id)
+      expect(sent).not.toContain(B)
+      expect(upserted(server, 'cards_upsert').map((c) => c.front)).not.toContain('Edited on the train')
+
+      await waitFor(() => expect(titles()).toEqual(['Alpha', 'Made on the train']))
+      expect(api.decks.find((d) => d.id === A).cards.map((c) => c.front)).toContain('Added on the train')
+
+      // And from the account itself, on a machine with none of this storage.
+      close()
+      localStorage.clear()
+      await launchOnline(server)
+      await waitFor(() => expect(titles()).toEqual(['Alpha', 'Made on the train']))
+    })
+
+    it('does not bring back a card deleted on the phone', async () => {
+      const server = account()
+      await launchOnline(server)
+      close()
+
+      await launchOffline()
+      await act(async () => {
+        api.addCards(A, [{ front: 'Added on the train', back: 'x' }])
+      })
+      close()
+
+      await elsewhere(server, { cards_remove: [CARD_2] })
+
+      await launchOnline(server)
+      await waitFor(() => expect(server.rpcPayloads.length).toBeGreaterThan(0))
+      expect(upserted(server, 'cards_upsert').map((c) => c.id)).not.toContain(CARD_2)
+      await waitFor(() =>
+        expect(api.decks.find((d) => d.id === A).cards.map((c) => c.front)).toEqual([
+          'Keep me',
+          'Added on the train',
+        ]),
+      )
+    })
+
+    it('does not bring back a folder deleted on the phone, and keeps its deck ungrouped', async () => {
+      const server = account()
+      await launchOnline(server)
+      close()
+
+      await launchOffline()
+      await act(async () => {
+        api.addCards(A, [{ front: 'Added on the train', back: 'x' }])
+      })
+      close()
+
+      await elsewhere(server, { folders_remove: [FOLDER] })
+
+      await launchOnline(server)
+      await waitFor(() => expect(server.rpcPayloads.length).toBeGreaterThan(0))
+      expect(upserted(server, 'folders_upsert').map((f) => f.id)).not.toContain(FOLDER)
+      const alpha = upserted(server, 'decks_upsert').find((d) => d.id === A)
+      expect(alpha.folder_id).toBe(null)
+      await waitFor(() => expect(api.folders).toEqual([]))
+      expect(api.decks.find((d) => d.id === A).folderId).toBe(null)
+    })
+
+    it('keeps a session studied here in the streak when its deck was deleted on the phone', async () => {
+      // Sent pointing at the deleted deck, the session would fail the whole
+      // change set, and every sign-in after it would fail the same way.
+      const server = account()
+      await launchOnline(server)
+      close()
+
+      await launchOffline()
+      await act(async () => {
+        api.recordSession({ deckId: B, reviewed: 3, seconds: 30 })
+      })
+      close()
+
+      await elsewhere(server, { decks_remove: [B] })
+
+      await launchOnline(server)
+      await waitFor(() => expect(upserted(server, 'sessions_insert')).toHaveLength(1))
+      expect(upserted(server, 'sessions_insert')[0]).toMatchObject({ deck_id: null, reviewed: 3 })
+      await waitFor(() => expect(titles()).toEqual(['Alpha']))
+    })
+  })
 })

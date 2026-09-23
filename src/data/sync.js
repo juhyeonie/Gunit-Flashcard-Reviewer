@@ -338,3 +338,53 @@ export function removalsSince(confirmed, state) {
     cards,
   }
 }
+
+/**
+ * A carry with what another device deleted taken back out of it.
+ *
+ * The carry sends everything this browser holds, and a row deleted elsewhere
+ * since the account last agreed with this browser is still here — so it went
+ * up again, and the deletion was undone. The record tells the two apart: a row
+ * in it that the account no longer holds was there when they last agreed and
+ * has been removed since. A row in neither was made here, and still goes up.
+ *
+ * Deletion wins over an edit made here in the meantime. The other device's
+ * reader meant to remove it; this one only meant to change it.
+ *
+ * What the rows point at is kept valid, because one bad reference fails the
+ * whole change set: cards of a deck that is gone are left out, a deck filed in
+ * a folder that is gone goes up ungrouped, and a session logged against a deck
+ * that is gone keeps its place in the streak with no deck.
+ *
+ * No record means no way to tell, and the carry goes up as it is.
+ */
+export function withoutDeletedElsewhere(mine, confirmed, account) {
+  if (!confirmed || typeof confirmed !== 'object') return mine
+
+  const held = (rows) => new Set((rows ?? []).map((r) => r.id))
+  const folderThere = held(account.folders)
+  const deckThere = held(account.decks)
+  const cardThere = held(account.cards)
+  const recordedDecks = confirmed.decks && typeof confirmed.decks === 'object' ? confirmed.decks : {}
+
+  const goneFolders = new Set(
+    (Array.isArray(confirmed.folders) ? confirmed.folders : []).filter((id) => !folderThere.has(id)),
+  )
+  const goneDecks = new Set(Object.keys(recordedDecks).filter((id) => !deckThere.has(id)))
+  const goneCards = new Set()
+  for (const [deckId, cardIds] of Object.entries(recordedDecks)) {
+    if (goneDecks.has(deckId) || !Array.isArray(cardIds)) continue
+    for (const id of cardIds) if (!cardThere.has(id)) goneCards.add(id)
+  }
+
+  if (!goneFolders.size && !goneDecks.size && !goneCards.size) return mine
+
+  return {
+    folders: mine.folders.filter((f) => !goneFolders.has(f.id)),
+    decks: mine.decks
+      .filter((d) => !goneDecks.has(d.id))
+      .map((d) => (goneFolders.has(d.folder_id) ? { ...d, folder_id: null } : d)),
+    cards: mine.cards.filter((c) => !goneCards.has(c.id) && !goneDecks.has(c.deck_id)),
+    sessions: mine.sessions.map((s) => (goneDecks.has(s.deck_id) ? { ...s, deck_id: null } : s)),
+  }
+}

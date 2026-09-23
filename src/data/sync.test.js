@@ -11,6 +11,7 @@ import {
   settingsToProfile,
   toPayload,
   toRows,
+  withoutDeletedElsewhere,
 } from './sync.js'
 
 const USER = '11111111-2222-4333-8444-555555555555'
@@ -573,5 +574,71 @@ describe('what this device deleted since the account last agreed with it', () =>
     for (const bad of [null, undefined, 'x', 7, { decks: 'x', folders: 'y' }, { decks: [D1] }]) {
       expect(removalsSince(bad, { folders: [], decks: [] })).toEqual({ folders: [], decks: [], cards: [] })
     }
+  })
+})
+
+describe('a carry with what another device deleted taken out', () => {
+  const F = 'f0000000-0000-4000-8000-000000000001'
+  const D1 = 'd0000000-0000-4000-8000-000000000001'
+  const D2 = 'd0000000-0000-4000-8000-000000000002'
+  const D3 = 'd0000000-0000-4000-8000-000000000003'
+  const C1 = 'c0000000-0000-4000-8000-000000000001'
+  const C2 = 'c0000000-0000-4000-8000-000000000002'
+  const C3 = 'c0000000-0000-4000-8000-000000000003'
+  const S1 = 'e0000000-0000-4000-8000-000000000001'
+
+  const lib = {
+    folders: [{ id: F, name: 'Term' }],
+    decks: [
+      { id: D1, title: 'One', subject: 'S', desc: '', folderId: F, cards: [{ id: C1, front: 'a', back: 'b' }, { id: C2, front: 'c', back: 'd' }] },
+      { id: D2, title: 'Two', subject: 'S', desc: '', folderId: null, cards: [{ id: C3, front: 'e', back: 'f' }] },
+    ],
+    sessions: [{ id: S1, at: 1, deckId: D2, reviewed: 1, seconds: 1 }],
+  }
+  const mine = () => toRows(lib, USER)
+  const record = confirmedIds(lib)
+  // The account as another device left it: everything, unless a test takes it away.
+  const account = (drop = {}) => {
+    const rows = mine()
+    return {
+      folders: rows.folders.filter((f) => !(drop.folders ?? []).includes(f.id)),
+      decks: rows.decks.filter((d) => !(drop.decks ?? []).includes(d.id)),
+      cards: rows.cards.filter((c) => !(drop.cards ?? []).includes(c.id) && !(drop.decks ?? []).includes(c.deck_id)),
+    }
+  }
+
+  it('changes nothing when the account still holds everything it held', () => {
+    const rows = mine()
+    expect(withoutDeletedElsewhere(rows, record, account())).toBe(rows)
+  })
+
+  it('changes nothing without a record to tell by', () => {
+    const rows = mine()
+    expect(withoutDeletedElsewhere(rows, null, account({ decks: [D2] }))).toBe(rows)
+  })
+
+  it('leaves out a deck deleted elsewhere, with its cards, and keeps its session undecked', () => {
+    const out = withoutDeletedElsewhere(mine(), record, account({ decks: [D2] }))
+    expect(out.decks.map((d) => d.id)).toEqual([D1])
+    expect(out.cards.map((c) => c.id)).toEqual([C1, C2])
+    expect(out.sessions).toEqual([expect.objectContaining({ id: S1, deck_id: null })])
+  })
+
+  it('leaves out a card deleted elsewhere from a deck that is still there', () => {
+    const out = withoutDeletedElsewhere(mine(), record, account({ cards: [C2] }))
+    expect(out.cards.map((c) => c.id)).toEqual([C1, C3])
+    expect(out.decks).toHaveLength(2)
+  })
+
+  it('leaves out a folder deleted elsewhere, and sends its deck ungrouped', () => {
+    const out = withoutDeletedElsewhere(mine(), record, account({ folders: [F] }))
+    expect(out.folders).toEqual([])
+    expect(out.decks.find((d) => d.id === D1).folder_id).toBe(null)
+  })
+
+  it('still sends what was made here, which the account has never held', () => {
+    const withNew = { ...lib, decks: [...lib.decks, { id: D3, title: 'New', subject: 'S', desc: '', cards: [] }] }
+    const out = withoutDeletedElsewhere(toRows(withNew, USER), record, account({ decks: [D2] }))
+    expect(out.decks.map((d) => d.id)).toEqual([D1, D3])
   })
 })
