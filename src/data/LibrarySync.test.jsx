@@ -27,22 +27,58 @@ const USER = '686963f7-42a5-4f94-9225-52a8a0a4859a'
  * So this records building and executing separately. A test that only checked
  * `update` was called would pass against the bug.
  */
-function fakeClient({ decks = [], cards = [], sessions = [], folders = [], profile = null } = {}) {
+/*
+ * `maxRows` is PostgREST's cap on a single response, 1,000 unless a project
+ * raises it. Every read is cut to it however many rows were asked for, and
+ * nothing in the response says so — which is how an account past a thousand
+ * cards came back short with no error to notice.
+ */
+function fakeClient({ decks = [], cards = [], sessions = [], folders = [], profile = null, maxRows = 1000 } = {}) {
   const built = []
   const executed = []
+  const reads = []
 
   const rows = { decks, cards, sessions, folders }
 
   const client = {
     built,
     executed,
+    reads,
     from(table) {
       return {
         select() {
-          const answer = Promise.resolve({ data: rows[table] ?? [], error: null })
-          answer.eq = () => answer
-          answer.maybeSingle = () => Promise.resolve({ data: profile, error: null })
-          return answer
+          let orderBy = null
+          let range = null
+          const query = {
+            eq: () => query,
+            order(column) {
+              orderBy = column
+              return query
+            },
+            range(from, to) {
+              range = { from, to }
+              return query
+            },
+            maybeSingle: () => Promise.resolve({ data: profile, error: null }),
+            then(resolve, reject) {
+              reads.push({ table, orderBy, range })
+              /*
+               * Postgres promises no order without `order by`, so two pages
+               * read without one may overlap or leave a gap. Refused here
+               * rather than simulated: returning rows in whatever order they
+               * were stored would let a pager with no order pass.
+               */
+              if (range && !orderBy) {
+                return Promise.resolve({ data: null, error: new Error('range() without order()') }).then(resolve, reject)
+              }
+              const all = [...(rows[table] ?? [])]
+              if (orderBy) all.sort((a, b) => (a[orderBy] < b[orderBy] ? -1 : a[orderBy] > b[orderBy] ? 1 : 0))
+              const from = range?.from ?? 0
+              const to = Math.min(range?.to ?? Infinity, from + maxRows - 1)
+              return Promise.resolve({ data: all.slice(from, to + 1), error: null }).then(resolve, reject)
+            },
+          }
+          return query
         },
         update(values) {
           built.push({ table, values })
@@ -1113,6 +1149,8 @@ describe('a signed-in reader who starts offline', () => {
         reads.push(table)
         const answer = Promise.resolve(failure)
         answer.eq = () => answer
+        answer.order = () => answer
+        answer.range = () => answer
         answer.maybeSingle = () => Promise.resolve(failure)
         return {
           select: () => answer,
@@ -1290,6 +1328,8 @@ describe('a deletion made offline, with the app closed before the connection ret
       from() {
         const answer = Promise.resolve(failure)
         answer.eq = () => answer
+        answer.order = () => answer
+        answer.range = () => answer
         answer.maybeSingle = () => Promise.resolve(failure)
         return { select: () => answer, update: () => ({ eq: () => Promise.resolve(failure) }) }
       },
@@ -1603,6 +1643,74 @@ describe('a deletion made offline, with the app closed before the connection ret
       await waitFor(() => expect(upserted(server, 'sessions_insert')).toHaveLength(1))
       expect(upserted(server, 'sessions_insert')[0]).toMatchObject({ deck_id: null, reviewed: 3 })
       await waitFor(() => expect(titles()).toEqual(['Alpha']))
+    })
+  })
+
+  /*
+   * Past the thousand rows one response carries. Read with a bare select, the
+   * rest stayed in Postgres and never reached the app — and to the carry, which
+   * compares the record with what the account handed back, every card past the
+   * first page looked deleted on another device.
+   */
+  describe('an account holding more than one page of rows', () => {
+    // Two full pages and a short one.
+    const MANY = 2500
+    const SESSIONS = 1200
+    const bulkId = (prefix, i) => `${prefix}-0000-4000-8000-${String(i).padStart(12, '0')}`
+    const bulkCards = Array.from({ length: MANY }, (_, i) => cardRow(bulkId('cccccccc', i), A, `Card ${i}`, i))
+    const bulkSessions = Array.from({ length: SESSIONS }, (_, i) => ({
+      id: bulkId('eeeeeeee', i),
+      user_id: USER,
+      deck_id: A,
+      at: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+      reviewed: 1,
+      seconds: 10,
+    }))
+
+    // Stored out of id order, the way a table written to for a while is.
+    const bigAccount = () =>
+      fakeClient({
+        decks: [deckRow(A, 'Alpha'), deckRow(B, 'Beta')],
+        cards: [...bulkCards].reverse(),
+        sessions: [...bulkSessions].reverse(),
+        profile: null,
+      })
+
+    const sent = (c, key) => c.rpcPayloads.flatMap((p) => p[key] ?? [])
+    const alphaCards = () => api.decks.find((d) => d.id === A)?.cards ?? []
+
+    it('installs every card and every session, not the first thousand', async () => {
+      const server = bigAccount()
+      await launchOnline(server)
+
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
+      expect(new Set(alphaCards().map((c) => c.id)).size).toBe(MANY)
+      expect(api.sessions).toHaveLength(SESSIONS)
+    })
+
+    it('carries a change up without reading the later pages as deleted elsewhere', async () => {
+      const server = bigAccount()
+      await launchOnline(server)
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
+      close()
+
+      await launchOffline()
+      await act(async () => {
+        api.addCards(A, [{ front: 'Added on the train', back: 'x' }])
+      })
+      close()
+
+      server.rpcPayloads.length = 0
+      await launchOnline(server)
+      await waitFor(() => expect(server.rpcPayloads.length).toBeGreaterThan(0))
+
+      const carried = new Set(sent(server, 'cards_upsert').map((c) => c.id))
+      expect(carried.has(bulkCards.at(-1).id)).toBe(true)
+      expect(bulkCards.filter((c) => !carried.has(c.id)).length).toBe(0)
+      expect(sent(server, 'cards_remove')).toEqual([])
+
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY + 1))
+      expect(alphaCards().at(-1).front).toBe('Added on the train')
     })
   })
 })
