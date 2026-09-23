@@ -32,50 +32,64 @@ const USER = '686963f7-42a5-4f94-9225-52a8a0a4859a'
  * raises it. Every read is cut to it however many rows were asked for, and
  * nothing in the response says so — which is how an account past a thousand
  * cards came back short with no error to notice.
+ *
+ * `onRead` runs after each read has been answered, which is the gap between
+ * two pages — where another device's write lands in real life.
  */
-function fakeClient({ decks = [], cards = [], sessions = [], folders = [], profile = null, maxRows = 1000 } = {}) {
+function fakeClient({
+  decks = [],
+  cards = [],
+  sessions = [],
+  folders = [],
+  profile = null,
+  maxRows = 1000,
+  onRead = () => {},
+} = {}) {
   const built = []
   const executed = []
-  const reads = []
 
   const rows = { decks, cards, sessions, folders }
 
   const client = {
     built,
     executed,
-    reads,
     from(table) {
       return {
         select() {
           let orderBy = null
-          let range = null
+          let after = null
+          let limit = Infinity
           const query = {
             eq: () => query,
             order(column) {
               orderBy = column
               return query
             },
-            range(from, to) {
-              range = { from, to }
+            gt(column, value) {
+              after = { column, value }
+              return query
+            },
+            limit(n) {
+              limit = n
               return query
             },
             maybeSingle: () => Promise.resolve({ data: profile, error: null }),
             then(resolve, reject) {
-              reads.push({ table, orderBy, range })
               /*
                * Postgres promises no order without `order by`, so two pages
                * read without one may overlap or leave a gap. Refused here
                * rather than simulated: returning rows in whatever order they
                * were stored would let a pager with no order pass.
                */
-              if (range && !orderBy) {
-                return Promise.resolve({ data: null, error: new Error('range() without order()') }).then(resolve, reject)
+              if ((after || limit !== Infinity) && !orderBy) {
+                return Promise.resolve({ data: null, error: new Error('paged without order()') }).then(resolve, reject)
               }
-              const all = [...(rows[table] ?? [])]
+              let all = [...(rows[table] ?? [])]
               if (orderBy) all.sort((a, b) => (a[orderBy] < b[orderBy] ? -1 : a[orderBy] > b[orderBy] ? 1 : 0))
-              const from = range?.from ?? 0
-              const to = Math.min(range?.to ?? Infinity, from + maxRows - 1)
-              return Promise.resolve({ data: all.slice(from, to + 1), error: null }).then(resolve, reject)
+              if (after) all = all.filter((r) => r[after.column] > after.value)
+              const data = all.slice(0, Math.min(limit, maxRows))
+              onRead(table, data)
+              return Promise.resolve({ data, error: null }).then(resolve, reject)
             },
           }
           return query
@@ -1150,7 +1164,8 @@ describe('a signed-in reader who starts offline', () => {
         const answer = Promise.resolve(failure)
         answer.eq = () => answer
         answer.order = () => answer
-        answer.range = () => answer
+        answer.gt = () => answer
+        answer.limit = () => answer
         answer.maybeSingle = () => Promise.resolve(failure)
         return {
           select: () => answer,
@@ -1329,7 +1344,8 @@ describe('a deletion made offline, with the app closed before the connection ret
         const answer = Promise.resolve(failure)
         answer.eq = () => answer
         answer.order = () => answer
-        answer.range = () => answer
+        answer.gt = () => answer
+        answer.limit = () => answer
         answer.maybeSingle = () => Promise.resolve(failure)
         return { select: () => answer, update: () => ({ eq: () => Promise.resolve(failure) }) }
       },
@@ -1668,12 +1684,13 @@ describe('a deletion made offline, with the app closed before the connection ret
     }))
 
     // Stored out of id order, the way a table written to for a while is.
-    const bigAccount = () =>
+    const bigAccount = (extra = {}) =>
       fakeClient({
         decks: [deckRow(A, 'Alpha'), deckRow(B, 'Beta')],
         cards: [...bulkCards].reverse(),
         sessions: [...bulkSessions].reverse(),
         profile: null,
+        ...extra,
       })
 
     const sent = (c, key) => c.rpcPayloads.flatMap((p) => p[key] ?? [])
@@ -1686,6 +1703,26 @@ describe('a deletion made offline, with the app closed before the connection ret
       await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
       expect(new Set(alphaCards().map((c) => c.id)).size).toBe(MANY)
       expect(api.sessions).toHaveLength(SESSIONS)
+    })
+
+    it('reads on past a card deleted elsewhere between two pages, skipping nothing', async () => {
+      // By offset, the second page would start one row late once a row before
+      // it was gone, and the card at 1,000 would never be read.
+      let deleted = false
+      const server = bigAccount({
+        onRead: (table, page) => {
+          if (table !== 'cards' || deleted || page.length === 0) return
+          deleted = true
+          server.rpc('sync_library', { payload: { cards_remove: [page[0].id] } })
+        },
+      })
+      await launchOnline(server)
+
+      await waitFor(() => expect(alphaCards().length).toBeGreaterThan(0))
+      const got = new Set(alphaCards().map((c) => c.id))
+      // The deleted card was read before it went; the next pull drops it.
+      expect(bulkCards.filter((c) => !got.has(c.id)).map((c) => c.front)).toEqual([])
+      expect(got.size).toBe(MANY)
     })
 
     it('carries a change up without reading the later pages as deleted elsewhere', async () => {

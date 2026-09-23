@@ -113,23 +113,23 @@ const PAGE_ROWS = 1000
  * the rest on every sign-in: still in Postgres, gone from the app, and the
  * streak counted from part of the history.
  *
- * Ordered by id so the pages meet without overlapping or leaving a gap. A row
- * written between two pages can still shift the offsets by one, so a row that
- * arrives twice is kept once: two rows with one id would fail every push after
- * this one. Any page failing fails the table, and with it the whole pull — a
- * library missing its later pages is exactly what this exists to stop.
+ * Each page starts after the last id the one before it ended on, rather than
+ * at an offset. An offset counts rows, so a row deleted on another device
+ * between two pages moved every later row back one and the first of them was
+ * never read; one added moved them forward and a row was read twice. An id
+ * stays where it is whatever happens around it. Any page failing fails the
+ * table, and with it the whole pull — a library missing its later pages is
+ * exactly what this exists to stop.
  */
 async function selectAll(supabase, table) {
-  const byId = new Map()
-  for (let from = 0; ; from += PAGE_ROWS) {
-    const { data, error } = await supabase
-      .from(table)
-      .select('*')
-      .order('id')
-      .range(from, from + PAGE_ROWS - 1)
+  const rows = []
+  for (;;) {
+    let page = supabase.from(table).select('*').order('id').limit(PAGE_ROWS)
+    if (rows.length) page = page.gt('id', rows.at(-1).id)
+    const { data, error } = await page
     if (error) return { data: null, error }
-    for (const row of data ?? []) byId.set(row.id, row)
-    if (!data || data.length < PAGE_ROWS) return { data: [...byId.values()], error: null }
+    rows.push(...(data ?? []))
+    if (!data || data.length < PAGE_ROWS) return { data: rows, error: null }
   }
 }
 
