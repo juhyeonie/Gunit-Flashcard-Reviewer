@@ -35,6 +35,9 @@ const USER = '686963f7-42a5-4f94-9225-52a8a0a4859a'
  *
  * `onRead` runs after each read has been answered, which is the gap between
  * two pages — where another device's write lands in real life.
+ *
+ * `count: 'exact'` answers with how many rows match, before the cap, the way
+ * PostgREST reads it off `Content-Range`.
  */
 function fakeClient({
   decks = [],
@@ -55,7 +58,7 @@ function fakeClient({
     executed,
     from(table) {
       return {
-        select() {
+        select(_columns, { count: counting } = {}) {
           let orderBy = null
           let after = null
           let limit = Infinity
@@ -88,8 +91,9 @@ function fakeClient({
               if (orderBy) all.sort((a, b) => (a[orderBy] < b[orderBy] ? -1 : a[orderBy] > b[orderBy] ? 1 : 0))
               if (after) all = all.filter((r) => r[after.column] > after.value)
               const data = all.slice(0, Math.min(limit, maxRows))
+              const count = counting === 'exact' ? all.length : null
               onRead(table, data)
-              return Promise.resolve({ data, error: null }).then(resolve, reject)
+              return Promise.resolve({ data, count, error: null }).then(resolve, reject)
             },
           }
           return query
@@ -1703,6 +1707,33 @@ describe('a deletion made offline, with the app closed before the connection ret
       await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
       expect(new Set(alphaCards().map((c) => c.id)).size).toBe(MANY)
       expect(api.sessions).toHaveLength(SESSIONS)
+    })
+
+    it('reads every row from a project whose max-rows is below the page size', async () => {
+      // Every page comes back shorter than asked for. Taken as the end, the
+      // first one was all there was.
+      const server = bigAccount({ maxRows: 400 })
+      await launchOnline(server)
+
+      await waitFor(() => expect(alphaCards()).toHaveLength(MANY))
+      expect(new Set(alphaCards().map((c) => c.id)).size).toBe(MANY)
+      expect(api.sessions).toHaveLength(SESSIONS)
+    })
+
+    it('asks each table once when the library fits in a page', async () => {
+      // The count is what makes one request enough: without it, the only
+      // proof a table has ended is a second request that comes back empty.
+      const reads = []
+      client = fakeClient({
+        decks: [deckRow(A, 'Alpha'), deckRow(B, 'Beta')],
+        cards: [cardRow(CARD_1, A, 'Keep me', 0)],
+        profile: null,
+        onRead: (table) => reads.push(table),
+      })
+      await launchOnline(client)
+      await waitFor(() => expect(alphaCards()).toHaveLength(1))
+
+      expect(reads.sort()).toEqual(['cards', 'decks', 'folders', 'sessions'])
     })
 
     it('reads on past a card deleted elsewhere between two pages, skipping nothing', async () => {

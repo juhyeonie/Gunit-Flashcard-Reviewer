@@ -99,9 +99,9 @@ const readGuestLibrary = () => {
 const QUIET_MS = 1200
 
 /**
- * Rows asked for per request: PostgREST's default `max-rows`, which caps every
- * response whatever the request says. Asking for more than the cap would read
- * a full page as a short one and stop there.
+ * Rows asked for per request: PostgREST's default `max-rows`. A project that
+ * sets it lower answers with fewer, and nothing breaks — the end of a table is
+ * found by counting rows, not by a page coming back short.
  */
 const PAGE_ROWS = 1000
 
@@ -120,16 +120,32 @@ const PAGE_ROWS = 1000
  * stays where it is whatever happens around it. Any page failing fails the
  * table, and with it the whole pull — a library missing its later pages is
  * exactly what this exists to stop.
+ *
+ * A short page is not the end. Under a `max-rows` below `PAGE_ROWS` every page
+ * is short, and stopping at the first one was the truncation all over again.
+ * The first request asks for the table's size as well, and reading stops once
+ * that many rows are in — so an ordinary library is still one request. A row
+ * deleted elsewhere mid-read leaves the count too high, and an empty page ends
+ * it instead; one added mid-read and missed arrives with the next pull, like
+ * any row written after this one.
  */
 async function selectAll(supabase, table) {
   const rows = []
+  let total = null
   for (;;) {
-    let page = supabase.from(table).select('*').order('id').limit(PAGE_ROWS)
+    let page = supabase
+      .from(table)
+      .select('*', total === null ? { count: 'exact' } : undefined)
+      .order('id')
+      .limit(PAGE_ROWS)
     if (rows.length) page = page.gt('id', rows.at(-1).id)
-    const { data, error } = await page
+    const { data, error, count } = await page
     if (error) return { data: null, error }
-    rows.push(...(data ?? []))
-    if (!data || data.length < PAGE_ROWS) return { data: rows, error: null }
+    // No count in the answer: read on until a page is empty.
+    if (total === null) total = count ?? Infinity
+    if (!data?.length) return { data: rows, error: null }
+    rows.push(...data)
+    if (rows.length >= total) return { data: rows, error: null }
   }
 }
 
