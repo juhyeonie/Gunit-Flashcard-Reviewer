@@ -11,6 +11,7 @@ import {
   progressOf,
   retireDefaultDecks,
 } from './normalize.js'
+import { withoutRefused } from './sync.js'
 import { AppContext } from './appContext.js'
 import { AuthContext } from './authContext.js'
 import {
@@ -355,6 +356,24 @@ export function AppProvider({ children }) {
     }))
   }, [])
 
+  /**
+   * Takes off this device what the account refused because another device
+   * deleted it — a deck, a card, a folder the reader here was still holding.
+   *
+   * One update rather than a call to each remover, so the library never
+   * passes through a state where a deck names a folder that is gone.
+   */
+  const forgetDeletedElsewhere = useCallback((refused) => {
+    setState((s) => {
+      const kept = withoutRefused(s, refused)
+      return {
+        ...s,
+        folders: kept.folders,
+        decks: kept.decks.map((d) => (s.decks.includes(d) ? d : { ...d, progress: progressOf(d) })),
+      }
+    })
+  }, [])
+
   const updateDeck = useCallback((id, patch) => {
     // Filed afterwards, so a folderId in the patch that names no folder leaves
     // the deck ungrouped rather than pointing at nothing.
@@ -542,6 +561,7 @@ export function AppProvider({ children }) {
       importDeck,
       restoreLibrary,
       installLibrary,
+      forgetDeletedElsewhere,
       updateDeck,
       removeDeck,
       addCards,
@@ -571,6 +591,7 @@ export function AppProvider({ children }) {
       importDeck,
       restoreLibrary,
       installLibrary,
+      forgetDeletedElsewhere,
       updateDeck,
       removeDeck,
       addCards,

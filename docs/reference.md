@@ -148,6 +148,18 @@ only option — a function is its body — and it has to carry the column or eve
 push would reset it: `on conflict do update` writes the columns it names, so a
 card suspended on one machine would come back from the account unsuspended.
 
+`0005` makes a deletion stick when another device is open at the time. That
+device still holds the deleted deck, card or folder, and an edit to it went up
+as an upsert, which re-created the row everywhere. Now `sync_library` records
+every row it deletes in `deleted_rows`, refuses any later upsert of one, and
+answers with what it refused; the app takes those rows off the device that
+still had them and says so. It also stops a card edit or a study session
+against a deck deleted elsewhere from failing the push, and every push after
+it. Nothing legitimately brings a deleted id back: ids are random, nothing
+undoes a deletion, and importing or restoring a backup mints new ones. The app
+works with or without it — before `0005`, `sync_library` answers nothing, which
+the app reads as nothing refused.
+
 `0002` matters more than it looks. A change set goes up as one call to
 `sync_library`, which is one statement to Postgres and therefore one
 transaction — so a push either lands completely or not at all. Sent as separate

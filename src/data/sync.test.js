@@ -10,8 +10,11 @@ import {
   removalsSince,
   settingsToProfile,
   toPayload,
+  readRefused,
   toRows,
   withoutDeletedElsewhere,
+  withoutRefused,
+  withoutRefusedRows,
 } from './sync.js'
 
 const USER = '11111111-2222-4333-8444-555555555555'
@@ -640,5 +643,77 @@ describe('a carry with what another device deleted taken out', () => {
     const withNew = { ...lib, decks: [...lib.decks, { id: D3, title: 'New', subject: 'S', desc: '', cards: [] }] }
     const out = withoutDeletedElsewhere(toRows(withNew, USER), record, account({ decks: [D2] }))
     expect(out.decks.map((d) => d.id)).toEqual([D1, D3])
+  })
+})
+
+describe('what the account refused, because another device deleted it', () => {
+  const F = 'f0000000-0000-4000-8000-000000000001'
+  const D1 = 'd0000000-0000-4000-8000-000000000001'
+  const D2 = 'd0000000-0000-4000-8000-000000000002'
+  const C1 = 'c0000000-0000-4000-8000-000000000001'
+  const C2 = 'c0000000-0000-4000-8000-000000000002'
+  const C3 = 'c0000000-0000-4000-8000-000000000003'
+
+  const lib = {
+    folders: [{ id: F, name: 'Term' }],
+    decks: [
+      {
+        id: D1,
+        title: 'One',
+        subject: 'S',
+        desc: '',
+        folderId: F,
+        cards: [{ id: C1, front: 'a', back: 'b' }, { id: C2, front: 'c', back: 'd' }],
+        schedule: { [C1]: entry(), [C2]: entry() },
+      },
+      { id: D2, title: 'Two', subject: 'S', desc: '', folderId: null, cards: [{ id: C3, front: 'e', back: 'f' }], schedule: {} },
+    ],
+  }
+  const refused = (over = {}) => ({ folders: [], decks: [], cards: [], ...over })
+
+  it('reads an answer from before 0005, or a strange one, as nothing refused', () => {
+    for (const answer of [null, undefined, '', 7, [], { decks: 'x' }]) {
+      expect(readRefused(answer)).toEqual(refused())
+    }
+    expect(readRefused({ decks: [D1, 'not-an-id'], cards: [C1] })).toEqual(refused({ decks: [D1], cards: [C1] }))
+  })
+
+  it('takes a refused deck out of the rows with its cards', () => {
+    const out = withoutRefusedRows(toRows(lib, USER), refused({ decks: [D2], cards: [C3] }))
+    expect(out.decks.map((d) => d.id)).toEqual([D1])
+    expect(out.cards.map((c) => c.id)).toEqual([C1, C2])
+  })
+
+  it('takes a deck out even when only one of its cards was named', () => {
+    const out = withoutRefusedRows(toRows(lib, USER), refused({ decks: [D1], cards: [C1] }))
+    expect(out.cards.map((c) => c.id)).toEqual([C3])
+  })
+
+  it('ungroups the rows of a deck whose folder was refused', () => {
+    const out = withoutRefusedRows(toRows(lib, USER), refused({ folders: [F] }))
+    expect(out.folders).toEqual([])
+    expect(out.decks.find((d) => d.id === D1).folder_id).toBe(null)
+  })
+
+  it('takes a refused card out of the library, with its schedule', () => {
+    const out = withoutRefused(lib, refused({ cards: [C2] }))
+    const one = out.decks.find((d) => d.id === D1)
+    expect(one.cards.map((c) => c.id)).toEqual([C1])
+    expect(Object.keys(one.schedule)).toEqual([C1])
+  })
+
+  it('ungroups the decks of a refused folder, and keeps them', () => {
+    const out = withoutRefused(lib, refused({ folders: [F] }))
+    expect(out.folders).toEqual([])
+    expect(out.decks.map((d) => [d.id, d.folderId])).toEqual([
+      [D1, null],
+      [D2, null],
+    ])
+  })
+
+  it('leaves a deck nothing was taken from as the same object', () => {
+    const out = withoutRefused(lib, refused({ decks: [D1] }))
+    expect(out.decks).toEqual([lib.decks[1]])
+    expect(out.decks[0]).toBe(lib.decks[1])
   })
 })

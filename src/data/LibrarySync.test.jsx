@@ -38,6 +38,9 @@ const USER = '686963f7-42a5-4f94-9225-52a8a0a4859a'
  *
  * `count: 'exact'` answers with how many rows match, before the cap, the way
  * PostgREST reads it off `Content-Range`.
+ *
+ * `remembersDeletions` is migration 0005. Without it this is `sync_library`
+ * as 0004 left it: nothing recorded, nothing refused, nothing answered.
  */
 function fakeClient({
   decks = [],
@@ -47,15 +50,20 @@ function fakeClient({
   profile = null,
   maxRows = 1000,
   onRead = () => {},
+  remembersDeletions = true,
 } = {}) {
   const built = []
   const executed = []
 
   const rows = { decks, cards, sessions, folders }
+  // deleted_rows: every id the function has deleted.
+  const deleted = new Set()
 
   const client = {
     built,
     executed,
+    // What the account holds, for a test to look at directly.
+    rows,
     from(table) {
       return {
         select(_columns, { count: counting } = {}) {
@@ -130,23 +138,62 @@ function fakeClient({
         return [...by.values()]
       }
       const drop = (was, ids) => was.filter((r) => !ids.includes(r.id))
+      // Recorded from what was actually there, as `delete ... returning` is.
+      const record = (was, ids) => {
+        if (remembersDeletions) for (const r of was) if (ids.includes(r.id)) deleted.add(r.id)
+      }
+      const isDeleted = (id) => remembersDeletions && deleted.has(id)
+      const deckHere = (id) => rows.decks.some((d) => d.id === id)
+
+      const refused = { folders: [], decks: [], cards: [] }
+      const allowed = (list, kind) =>
+        (list ?? []).filter((r) => (isDeleted(r.id) ? (refused[kind].push(r.id), false) : true))
 
       // Folders first, as in 0004, so a deck can be filed in a new one.
-      rows.folders = upsert(rows.folders, payload.folders_upsert ?? [])
+      rows.folders = upsert(rows.folders, allowed(payload.folders_upsert, 'folders'))
       // A deck is only filed in a folder that exists; otherwise ungrouped.
       const filed = (d) =>
         'folder_id' in d && !rows.folders.some((f) => f.id === d.folder_id) ? { ...d, folder_id: null } : d
-      rows.decks = upsert(rows.decks, (payload.decks_upsert ?? []).map(filed))
-      rows.cards = upsert(rows.cards, payload.cards_upsert ?? [])
+      rows.decks = upsert(rows.decks, allowed(payload.decks_upsert, 'decks').map(filed))
+      // A card whose deck is not here is refused, and so is its deck. Before
+      // 0005 it failed the deck key instead, and the whole change set with it.
+      const cardsIn = []
+      for (const c of payload.cards_upsert ?? []) {
+        const deckGone = !deckHere(c.deck_id)
+        if (deckGone && !remembersDeletions) {
+          return { data: null, error: new Error('violates foreign key constraint "cards_deck_id_fkey"') }
+        }
+        // Either reason refuses the card; a missing deck is named whichever it was.
+        if (deckGone && !refused.decks.includes(c.deck_id)) refused.decks.push(c.deck_id)
+        if (deckGone || isDeleted(c.id)) refused.cards.push(c.id)
+        else cardsIn.push(c)
+      }
+      rows.cards = upsert(rows.cards, cardsIn)
       // Sessions are append-only and the real one is `on conflict do nothing`.
-      rows.sessions = upsert(rows.sessions, payload.sessions_insert ?? [])
+      // One logged against a deck that is not here keeps its place with no deck.
+      const logged = []
+      for (const x of payload.sessions_insert ?? []) {
+        if (x.deck_id && !deckHere(x.deck_id)) {
+          if (!remembersDeletions) return { data: null, error: new Error('violates foreign key constraint "sessions_deck_id_fkey"') }
+          logged.push({ ...x, deck_id: null })
+        } else logged.push(x)
+      }
+      rows.sessions = upsert(rows.sessions, logged)
+
+      record(rows.cards, payload.cards_remove ?? [])
       rows.cards = drop(rows.cards, payload.cards_remove ?? [])
-      rows.decks = drop(rows.decks, payload.decks_remove ?? [])
+      // A deck's cards go with it, by cascade, and are recorded with it.
+      const goneDecks = payload.decks_remove ?? []
+      record(rows.cards, rows.cards.filter((c) => goneDecks.includes(c.deck_id)).map((c) => c.id))
+      record(rows.decks, goneDecks)
+      rows.cards = rows.cards.filter((c) => !goneDecks.includes(c.deck_id))
+      rows.decks = drop(rows.decks, goneDecks)
       // Last, and `on delete set null (folder_id)`: the decks stay, ungrouped.
       const goneFolders = payload.folders_remove ?? []
+      record(rows.folders, goneFolders)
       rows.folders = drop(rows.folders, goneFolders)
       rows.decks = rows.decks.map((d) => (goneFolders.includes(d.folder_id) ? { ...d, folder_id: null } : d))
-      return { error: null }
+      return { data: remembersDeletions ? refused : null, error: null }
     },
   }
   return client
@@ -1779,6 +1826,131 @@ describe('a deletion made offline, with the app closed before the connection ret
 
       await waitFor(() => expect(alphaCards()).toHaveLength(MANY + 1))
       expect(alphaCards().at(-1).front).toBe('Added on the train')
+    })
+  })
+
+  /*
+   * Both devices open, both synced, and the phone deletes something this one
+   * is still showing. Nothing here knows until it pushes — and an edit pushed
+   * as an upsert used to put the row straight back, on every device.
+   */
+  describe('while this device is open and another deletes', () => {
+    /** The phone's own push. */
+    const phone = async (server, payload) => {
+      await server.rpc('sync_library', { payload })
+      server.rpcPayloads.length = 0
+    }
+    const pushed = (c, key) => c.rpcPayloads.flatMap((p) => p[key] ?? [])
+    const ids = (list) => list.map((r) => r.id)
+    const SLOW = { timeout: 5000 }
+
+    it('does not bring back a deck edited here after the phone deleted it', async () => {
+      const server = account()
+      await launchOnline(server)
+
+      await phone(server, { decks_remove: [B] })
+      await act(async () => {
+        api.updateDeck(B, { title: 'Renamed here' })
+      })
+
+      await waitFor(() => expect(titles()).toEqual(['Alpha']), SLOW)
+      expect(api.toast).toBe('A deck deleted on another device was removed here')
+      expect(ids(server.rows.decks)).toEqual([A])
+
+      // Settled: the next change goes up alone, with nothing about Beta in it.
+      server.rpcPayloads.length = 0
+      await act(async () => {
+        api.addDeck({ title: 'Made afterwards', subject: 'S', desc: '' })
+      })
+      await waitFor(() => expect(pushed(server, 'decks_upsert').map((d) => d.title)).toEqual(['Made afterwards']), SLOW)
+      expect(pushed(server, 'decks_remove')).toEqual([])
+      expect(ids(server.rows.decks)).not.toContain(B)
+    })
+
+    it('does not bring back a card edited here after the phone deleted it', async () => {
+      const server = account()
+      await launchOnline(server)
+
+      await phone(server, { cards_remove: [CARD_2] })
+      await act(async () => {
+        api.updateCard(A, 1, { front: 'Edited here', back: 'x' })
+      })
+
+      await waitFor(() => expect(api.decks.find((d) => d.id === A).cards.map((c) => c.id)).toEqual([CARD_1]), SLOW)
+      expect(api.toast).toBe('A card deleted on another device was removed here')
+      expect(ids(server.rows.cards)).toEqual([CARD_1])
+    })
+
+    it('does not bring back a folder renamed here after the phone deleted it, and ungroups its deck', async () => {
+      const server = account()
+      await launchOnline(server)
+
+      await phone(server, { folders_remove: [FOLDER] })
+      await act(async () => {
+        api.renameFolder(FOLDER, 'Renamed here')
+      })
+
+      await waitFor(() => expect(api.folders).toEqual([]), SLOW)
+      expect(api.decks.find((d) => d.id === A).folderId).toBe(null)
+      expect(server.rows.folders).toEqual([])
+      expect(server.rows.decks.find((d) => d.id === A).folder_id).toBe(null)
+    })
+
+    it('takes the whole deck off when only one of its cards was edited', async () => {
+      // The card goes up alone — the deck row has not changed — and until now
+      // failed the deck key, and so did every push after it.
+      const server = account()
+      await launchOnline(server)
+
+      await phone(server, { decks_remove: [A] })
+      await act(async () => {
+        api.updateCard(A, 0, { front: 'Edited here', back: 'x' })
+      })
+
+      await waitFor(() => expect(titles()).toEqual(['Beta']), SLOW)
+      expect(ids(server.rows.cards)).toEqual([])
+
+      await act(async () => {
+        api.addDeck({ title: 'Still syncing', subject: 'S', desc: '' })
+      })
+      await waitFor(() => expect(server.rows.decks.map((d) => d.title)).toContain('Still syncing'), SLOW)
+    })
+
+    it('logs a session studied here against a deck the phone deleted, with no deck', async () => {
+      const server = account()
+      await launchOnline(server)
+
+      await phone(server, { decks_remove: [B] })
+      await act(async () => {
+        api.recordSession({ deckId: B, reviewed: 3, seconds: 30 })
+      })
+
+      await waitFor(() => expect(server.rows.sessions).toHaveLength(1), SLOW)
+      expect(server.rows.sessions[0]).toMatchObject({ deck_id: null, reviewed: 3 })
+
+      await act(async () => {
+        api.addDeck({ title: 'Still syncing', subject: 'S', desc: '' })
+      })
+      await waitFor(() => expect(server.rows.decks.map((d) => d.title)).toContain('Still syncing'), SLOW)
+    })
+
+    it('keeps working against a project that has not run 0005, which answers nothing', async () => {
+      // Deploying the app before the migration changes nothing: the deck comes
+      // back as it always did, and nothing here breaks on the missing answer.
+      const server = fakeClient({
+        decks: [deckRow(A, 'Alpha'), deckRow(B, 'Beta')],
+        profile: null,
+        remembersDeletions: false,
+      })
+      await launchOnline(server)
+
+      await phone(server, { decks_remove: [B] })
+      await act(async () => {
+        api.updateDeck(B, { title: 'Renamed here' })
+      })
+
+      await waitFor(() => expect(server.rows.decks.map((d) => d.title)).toContain('Renamed here'), SLOW)
+      expect(titles()).toEqual(['Alpha', 'Renamed here'])
     })
   })
 })
