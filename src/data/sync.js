@@ -388,3 +388,75 @@ export function withoutDeletedElsewhere(mine, confirmed, account) {
     sessions: mine.sessions.map((s) => (goneDecks.has(s.deck_id) ? { ...s, deck_id: null } : s)),
   }
 }
+
+/**
+ * Nothing refused. What a `sync_library` from before 0005 means, since it
+ * answers nothing at all.
+ */
+export const NOTHING_REFUSED = Object.freeze({ folders: [], decks: [], cards: [] })
+
+/**
+ * The rows `sync_library` would not write, because another device deleted
+ * them — read defensively, since it is whatever the database said.
+ */
+export function readRefused(answer) {
+  if (!answer || typeof answer !== 'object') return NOTHING_REFUSED
+  const ids = (list) => (Array.isArray(list) ? list.filter(isUuid) : [])
+  return { folders: ids(answer.folders), decks: ids(answer.decks), cards: ids(answer.cards) }
+}
+
+export const anyRefused = (refused) =>
+  refused.folders.length > 0 || refused.decks.length > 0 || refused.cards.length > 0
+
+/**
+ * Rows as the account holds them after a push that was partly refused.
+ *
+ * What was refused is not there, and neither is anything that went with it:
+ * the cards of a refused deck, and the filing of a deck in a refused folder —
+ * the folder's deletion ungrouped every deck in it, whatever this push said.
+ * Sessions are left as they are. They are matched by id alone, and one never
+ * goes up twice.
+ */
+export function withoutRefusedRows(rows, refused) {
+  const folders = new Set(refused.folders)
+  const decks = new Set(refused.decks)
+  const cards = new Set(refused.cards)
+  return {
+    ...rows,
+    folders: (rows.folders ?? []).filter((f) => !folders.has(f.id)),
+    decks: rows.decks
+      .filter((d) => !decks.has(d.id))
+      .map((d) => (folders.has(d.folder_id) ? { ...d, folder_id: null } : d)),
+    cards: rows.cards.filter((c) => !cards.has(c.id) && !decks.has(c.deck_id)),
+  }
+}
+
+/**
+ * The same, in the app's own shape: the library with what another device
+ * deleted taken out of it, as `deleteFolder`, `removeDeck` and `removeCard`
+ * would have. A deck nothing was taken from is the same object, so the
+ * caller can tell which ones changed.
+ */
+export function withoutRefused({ decks = [], folders = [] }, refused) {
+  const goneFolders = new Set(refused.folders)
+  const goneDecks = new Set(refused.decks)
+  const goneCards = new Set(refused.cards)
+  return {
+    folders: folders.filter((f) => !goneFolders.has(f.id)),
+    decks: decks
+      .filter((d) => !goneDecks.has(d.id))
+      .map((d) => {
+        const unfiled = goneFolders.has(d.folderId)
+        const cut = (d.cards ?? []).some((c) => goneCards.has(c.id))
+        if (!unfiled && !cut) return d
+        const next = { ...d, folderId: unfiled ? null : d.folderId }
+        if (cut) {
+          next.cards = d.cards.filter((c) => !goneCards.has(c.id))
+          next.schedule = Object.fromEntries(
+            Object.entries(d.schedule ?? {}).filter(([id]) => !goneCards.has(id)),
+          )
+        }
+        return next
+      }),
+  }
+}

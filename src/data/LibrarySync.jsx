@@ -17,16 +17,20 @@ import {
 import { isUntouchedExample, parseStoredState } from './normalize.js'
 import Modal from '../components/Modal.jsx'
 import {
+  anyRefused,
   changesBetween,
   confirmedIds,
   fromRows,
   isEmptyChange,
   profileToSettings,
+  readRefused,
   removalsSince,
   settingsToProfile,
   toPayload,
   toRows,
   withoutDeletedElsewhere,
+  withoutRefused,
+  withoutRefusedRows,
 } from './sync.js'
 
 /**
@@ -160,7 +164,7 @@ export default function LibrarySync() {
    * changes when the account does.
    */
   const userId = user?.id ?? null
-  const { decks, folders, sessions, settings, theme, installLibrary, say } = useApp()
+  const { decks, folders, sessions, settings, theme, installLibrary, forgetDeletedElsewhere, say } = useApp()
 
   /*
    * The rows as the database last confirmed them. Every push is the difference
@@ -239,6 +243,28 @@ export default function LibrarySync() {
     synced.current = rows
     rememberConfirmed(uid, confirmedIds(library))
   }, [])
+
+  /**
+   * A push has landed: confirm what the account now holds.
+   *
+   * Usually that is exactly what was sent. When the account refused some of
+   * it — rows another device deleted while this one was open, and still had
+   * — it is what was sent without them, and they come off this device too.
+   * Confirmed as sent, they would sit here looking synced until the next
+   * sign-in, and every edit to them would be refused again without a word.
+   */
+  const settle = useCallback(
+    (sent, library, uid, refused) => {
+      if (!anyRefused(refused)) {
+        confirm(sent, library, uid)
+        return
+      }
+      confirm(withoutRefusedRows(sent, refused), withoutRefused(library, refused), uid)
+      forgetDeletedElsewhere(refused)
+      say(deletedElsewhere(refused))
+    },
+    [confirm, forgetDeletedElsewhere, say],
+  )
 
   /**
    * Signing in: read the account's library into this browser's copy of it.
@@ -456,7 +482,7 @@ export default function LibrarySync() {
     if (isEmptyChange(change)) return { error: null }
 
     const supabase = await getSupabase()
-    const { error } = await write(supabase, change)
+    const { error, refused } = await write(supabase, change)
     if (error) {
       // Said plainly rather than through `trouble`, which is worded for a
       // change that is still safely on this device. After signing out it will
@@ -464,10 +490,10 @@ export default function LibrarySync() {
       say('Your last changes could not be saved to your account')
       return { error }
     }
-    confirm(next, { decks: nowDecks, folders: nowFolders }, nowUser)
+    settle(next, { decks: nowDecks, folders: nowFolders }, nowUser, refused)
     clearUnsent(nowUser)
     return { error: null }
-  }, [available, say, confirm])
+  }, [available, say, settle])
 
   /*
    * Asked when a session ends without going through the sign-out button, to
@@ -597,7 +623,7 @@ export default function LibrarySync() {
 
       busy.current = true
       const supabase = await getSupabase()
-      const { error } = await write(supabase, change)
+      const { error, refused } = await write(supabase, change)
       busy.current = false
 
       if (!alive.current) return
@@ -607,13 +633,13 @@ export default function LibrarySync() {
         trouble('Your last change is saved on this device but not to your account')
         return
       }
-      confirm(next, { decks, folders }, userId)
+      settle(next, { decks, folders }, userId, refused)
       clearUnsent(userId)
       complained.current = false
     }, QUIET_MS)
 
     return () => clearTimeout(pushTimer.current)
-  }, [available, userId, decks, folders, sessions, trouble, confirm])
+  }, [available, userId, decks, folders, sessions, trouble, settle])
 
   /**
    * Preferences are small and change rarely; no diffing earns its keep.
@@ -717,7 +743,19 @@ export default function LibrarySync() {
  * the next sign-in would then read back as the truth.
  */
 async function write(supabase, change) {
-  if (!supabase) return { error: new Error('No project configured') }
-  const { error } = await supabase.rpc('sync_library', { payload: toPayload(change) })
-  return { error }
+  if (!supabase) return { error: new Error('No project configured'), refused: readRefused(null) }
+  const { data, error } = await supabase.rpc('sync_library', { payload: toPayload(change) })
+  return { error, refused: readRefused(error ? null : data) }
+}
+
+/** Said once, about the largest thing that went: a deck's cards go with it. */
+function deletedElsewhere({ folders, decks, cards }) {
+  const [n, one, many] = decks.length
+    ? [decks.length, 'deck', 'decks']
+    : folders.length
+      ? [folders.length, 'folder', 'folders']
+      : [cards.length, 'card', 'cards']
+  return n === 1
+    ? `A ${one} deleted on another device was removed here`
+    : `${n} ${many} deleted on another device were removed here`
 }
