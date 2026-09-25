@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import Modal from './Modal.jsx'
-import { dismissWhatsNew, launchWhatsNew, sectionsOf } from '../data/whatsNew.js'
+import { dismissWhatsNew, launchWhatsNew, sectionsOf, subscribeWhatsNew } from '../data/whatsNew.js'
 
 /** One version's notes: a heading per category that has anything, and its items. */
 function Sections({ entry, headingLevel }) {
@@ -78,12 +78,10 @@ export function WhatsNewDialog({ version, entries, onClose }) {
  * per page load, from what is in storage before the app writes to it.
  */
 export default function WhatsNewModal() {
-  const [launch, setLaunch] = useState(() => launchWhatsNew())
+  // Subscribed rather than read once, so a notification can open it again.
+  const launch = useSyncExternalStore(subscribeWhatsNew, launchWhatsNew, launchWhatsNew)
 
-  const close = useCallback(() => {
-    dismissWhatsNew(launch.version)
-    setLaunch((l) => ({ ...l, entries: [] }))
-  }, [launch.version])
+  const close = useCallback(() => dismissWhatsNew(launch.version), [launch.version])
 
   return <WhatsNewDialog version={launch.version} entries={launch.entries} onClose={close} />
 }

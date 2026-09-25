@@ -31,6 +31,9 @@ export const userKey = (userId) => `${PREFIX}.user.${userId}`
  */
 export const sharedKey = (userId) => `gunit.shared.${userId ?? 'guest'}`
 
+/** This device's notifications for an identity — see notices.js. */
+export const noticesKey = (userId) => `gunit.notices.${userId ?? 'guest'}`
+
 /** Whichever library the given identity reads. */
 export const keyFor = (userId) => (userId ? userKey(userId) : GUEST_KEY)
 
@@ -272,6 +275,8 @@ export function forgetAccountLibrary(userId) {
     // So is their progress on decks shared with them, and the offline copies
     // of those decks: somebody else's reviewer, left on a borrowed machine.
     localStorage.removeItem(sharedKey(userId))
+    // And the account's notifications, which name the people it shares with.
+    localStorage.removeItem(noticesKey(userId))
     return true
   } catch {
     // Storage refused. The decks stay, which is the safe direction to fail in.

@@ -15,6 +15,7 @@ import {
   userKey,
 } from './storageKeys.js'
 import { isUntouchedExample, parseStoredState } from './normalize.js'
+import { addNotice } from './notices.js'
 import Modal from '../components/Modal.jsx'
 import {
   anyRefused,
@@ -97,6 +98,24 @@ function readOwnLibrary(key) {
 const readGuestLibrary = () => {
   const guest = readLibrary(GUEST_KEY)
   return { ...guest, decks: guest.decks.filter((d) => !isUntouchedExample(d)) }
+}
+
+/**
+ * The two sync notices the notification center keeps, as opposed to the
+ * toasts that come and go. One each way, replacing each other: the newer is
+ * the truth.
+ */
+const SAVED_OFFLINE = {
+  kind: 'sync-offline',
+  group: 'sync',
+  title: 'Saved on this device',
+  message: 'Your changes are saved here and will sync when you’re back online.',
+}
+const SYNCED = {
+  kind: 'sync-done',
+  group: 'sync',
+  title: 'Changes synced',
+  message: 'Changes saved on this device have reached your account.',
 }
 
 /** How long the library has to sit still before a push is worth making. */
@@ -238,6 +257,9 @@ export default function LibrarySync() {
    * difference — deletions included — rather than only upserts.
    */
   const baseline = useRef(null)
+
+  /** Whether this offline spell has been noted in the notification center. */
+  const toldOffline = useRef(false)
 
   /** When the account was last read and installed, for the refresh below. */
   const lastRead = useRef(0)
@@ -413,6 +435,7 @@ export default function LibrarySync() {
           rows = again.rows
           profile = again.profile
           carriedUp = true
+          addNotice(userId, SYNCED)
         }
       }
 
@@ -504,7 +527,7 @@ export default function LibrarySync() {
     }
     settle(next, { decks: nowDecks, folders: nowFolders }, nowUser, refused)
     clearUnsent(nowUser)
-    return { error: null }
+    return { error: null, sent: true }
   }, [available, say, settle])
 
   /*
@@ -537,14 +560,18 @@ export default function LibrarySync() {
 
     const reconnect = async () => {
       complained.current = false
+      const noteSynced = (result) => {
+        if (!result?.error && result?.sent && toldOffline.current) addNotice(userId, SYNCED)
+        if (!result?.error) toldOffline.current = false
+      }
       if (synced.current) {
-        await flushNow()
+        noteSynced(await flushNow())
         return
       }
       const b = baseline.current
       if (b && b.userId === userId && b.clean) {
         synced.current = toRows({ decks: b.decks, folders: b.folders, sessions: b.sessions }, userId)
-        await flushNow()
+        noteSynced(await flushNow())
       }
       if (alive.current) setPullTick((t) => t + 1)
     }
@@ -655,6 +682,10 @@ export default function LibrarySync() {
         baseline.current = { userId, decks, folders, sessions, clean: !hasUnsent(userId) }
       } else if (b.decks !== decks || b.folders !== folders || b.sessions !== sessions) {
         markUnsent(userId)
+        if (typeof navigator !== 'undefined' && navigator.onLine === false && !toldOffline.current) {
+          toldOffline.current = true
+          addNotice(userId, SAVED_OFFLINE)
+        }
       }
       return undefined
     }
@@ -692,6 +723,10 @@ export default function LibrarySync() {
         // synced.current is left where it was, so the next change retries all
         // of this rather than skipping past it.
         trouble('Your last change is saved on this device but not to your account')
+        if (typeof navigator !== 'undefined' && navigator.onLine === false && !toldOffline.current) {
+          toldOffline.current = true
+          addNotice(userId, SAVED_OFFLINE)
+        }
         return
       }
       settle(next, { decks, folders }, userId, refused)

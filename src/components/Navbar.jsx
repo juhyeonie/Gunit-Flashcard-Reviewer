@@ -3,9 +3,12 @@ import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
 import { isConfigured } from '../data/supabase.js'
 import { NAV } from './navItems.js'
-import { DecksIcon, HomeIcon, SettingsIcon, SharedIcon } from './Icons.jsx'
+import { BellIcon, DecksIcon, HomeIcon, SettingsIcon, SharedIcon } from './Icons.jsx'
+import NotificationBell from './NotificationBell.jsx'
+import { useNotifications } from '../data/notificationsContext.js'
 
 const ITEMS = NAV.filter((item) => !item.accounts || isConfigured)
+const TOP_ITEMS = ITEMS.filter((item) => !item.phoneOnly)
 
 /** Empty when there is no name, which is the ordinary state of a new reader. */
 const initialsOf = (name = '') =>
@@ -44,7 +47,7 @@ export function TopNav() {
       </Link>
 
       <div className="flex shrink-0 gap-[3px] overflow-auto rounded-full border border-line-soft bg-raised p-1">
-        {ITEMS.map((item) => (
+        {TOP_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -72,6 +75,7 @@ export function TopNav() {
         in this bar says where you are or what you have done.
       */}
       <div className="flex flex-1 shrink-0 items-center justify-end gap-2.5">
+        {isConfigured && <NotificationBell />}
         <div className="flex items-center gap-[9px] rounded-full border border-line bg-surface py-1 pr-3 pl-1">
           {/* Dropped rather than drawn empty: a blank disc reads as a missing
               avatar, and there is nothing missing. */}
@@ -90,7 +94,7 @@ export function TopNav() {
 }
 
 /** Phone: sticky bottom tab bar, active tab marked by a top rule. */
-const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, settings: SettingsIcon }
+const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, alerts: BellIcon, settings: SettingsIcon }
 
 /**
  * Phone: a tab bar along the bottom, where a thumb already is.
@@ -118,6 +122,7 @@ const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, settings: 
  * guessing game — both together is the arrangement that has won.
  */
 export function BottomNav() {
+  const { unread } = useNotifications()
   return (
     <nav
       className="sticky bottom-0 z-20 flex border-t border-line-soft pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] backdrop-saturate-150 sm:hidden"
@@ -149,7 +154,14 @@ export function BottomNav() {
                     isActive ? 'bg-accent' : 'bg-transparent'
                   }`}
                 />
-                <Icon />
+                <span className="relative">
+                  <Icon />
+                  {item.icon === 'alerts' && unread > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-paper bg-accent">
+                      <span className="sr-only">{unread} unread</span>
+                    </span>
+                  )}
+                </span>
                 <span className="font-mono text-[10px] leading-none font-medium tracking-[0.06em] uppercase">
                   {item.short}
                 </span>

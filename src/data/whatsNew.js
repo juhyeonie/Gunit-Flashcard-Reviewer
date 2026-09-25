@@ -118,19 +118,40 @@ export function decide({ version, notes = RELEASE_NOTES, storage = globalThis.lo
  * and a moment later the store has written the guest library there too.
  */
 let launch = null
+const listeners = new Set()
+const announce = () => {
+  for (const listener of listeners) listener()
+}
+
+export const subscribeWhatsNew = (listener) => {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
 
 export function launchWhatsNew() {
   launch ??= decide({ version: import.meta.env.VITE_APP_VERSION })
   return launch
 }
 
+/**
+ * Shows the running version's notes again, when the reader asks for them —
+ * from its notification. Nothing about what was seen changes.
+ */
+export function reopenWhatsNew(notes = RELEASE_NOTES) {
+  const version = import.meta.env.VITE_APP_VERSION
+  launch = { version, entries: unseenNotes(notes, version, null) }
+  announce()
+}
+
 /** Read: remembered for good, and not shown again in this page load either. */
 export function dismissWhatsNew(version) {
   markSeen(version)
   launch = { version, entries: [] }
+  announce()
 }
 
 /** For tests: a fresh page load. */
 export const resetLaunch = () => {
   launch = null
+  announce()
 }

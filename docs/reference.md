@@ -165,6 +165,11 @@ functions and changes nothing that already exists, so it is safe to run
 whenever; until it has, the app says sharing is not set up yet and everything
 else carries on.
 
+`0007` adds notifications — see [Notifications](#notifications). One table,
+written only by triggers on the sharing tables, and added to Supabase's
+Realtime publication where there is one. Before it has run, the notification
+center shows this device's own notices and nothing from the account.
+
 `0002` matters more than it looks. A change set goes up as one call to
 `sync_library`, which is one statement to Postgres and therefore one
 transaction — so a push either lands completely or not at all. Sent as separate
@@ -267,6 +272,30 @@ it, who it is shared with — stays the owner's. A card an editor adds belongs t
 the owner and arrives on the owner's devices new, on their next sign-in. A
 folder share covers whatever is in the folder now: a deck moved out leaves the
 share, one moved in joins it.
+
+### Notifications
+
+The bell in the top bar — the Alerts tab on a phone — is an in-app
+notification center. Nothing is pushed to the browser and no permission is
+asked for.
+
+**Sharing news comes from the account.** When someone is given a deck or a
+folder, has their role changed, or loses it — including when the owner stops
+sharing or deletes it — a trigger in `0007_notifications.sql` writes a row
+for that person. The browser can read its own rows and mark them read, and
+nothing else: there is no policy that lets it write one. Each notification
+keeps who did it and what it was called, and offers **Open** while the reader
+still has access and **Decline**, which leaves the share. While Gunit is open,
+Supabase Realtime brings a new one in without a reload.
+
+**Everything else is this device's own**, kept per identity in local storage
+and never sent anywhere: cards due for review (once a day, reviews only),
+today's goal met (once a day), changes saved offline and then synced, a new
+version waiting for a reload, and What's New. Ordinary edits — making,
+renaming or opening a deck, editing a card — make nothing.
+
+Offline, the list is the one last seen, and a notification marked read is
+read at once and told to the account when the connection returns.
 
 ### What it costs
 
