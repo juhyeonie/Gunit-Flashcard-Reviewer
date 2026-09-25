@@ -4,6 +4,7 @@ import Modal from './Modal.jsx'
 import Button from './Button.jsx'
 import { useAuth } from '../data/useAuth.js'
 import { flushPendingSync } from '../data/pendingSync.js'
+import { noteShared } from '../data/ownShares.js'
 import {
   inviteToShare,
   removeMember,
@@ -85,10 +86,12 @@ export default function ShareModal({ kind, resource, onClose, say }) {
   const link = active ? shareUrl(kind, settings.token) : ''
 
   const adopt = useCallback((next) => {
+    // The library's "Shared" marker follows, whether or not this is still open.
+    noteShared(kind, resource.id, Boolean(next?.active))
     if (!alive.current) return
     setSettings(next)
     if (next?.active) setDraft({ access: next.access, role: next.role })
-  }, [])
+  }, [kind, resource.id])
 
   useEffect(() => {
     alive.current = true

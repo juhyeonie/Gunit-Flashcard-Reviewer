@@ -103,6 +103,12 @@ const readGuestLibrary = () => {
 const QUIET_MS = 1200
 
 /**
+ * How long the app has to have been away before coming back reads the account
+ * again. Switching tabs to check a word is not a reason to fetch the library.
+ */
+const REFRESH_AFTER_MS = 60 * 1000
+
+/**
  * Rows asked for per request: PostgREST's default `max-rows`. A project that
  * sets it lower answers with fewer, and nothing breaks — the end of a table is
  * found by counting rows, not by a page coming back short.
@@ -133,6 +139,35 @@ const PAGE_ROWS = 1000
  * it instead; one added mid-read and missed arrives with the next pull, like
  * any row written after this one.
  */
+/**
+ * Everything the account holds, as requests that go together.
+ *
+ * A failed folders read fails the whole pull, the same as a failed deck
+ * read. Installing decks without their folders would put every one of
+ * them in Ungrouped and then push that back up as the truth — the local
+ * copy, folders and all, is left on screen instead, and nothing is sent
+ * until a pull succeeds.
+ */
+async function readAccount(supabase, userId) {
+  const [deckRes, cardRes, sessionRes, folderRes, profileRes] = await Promise.all([
+    selectAll(supabase, 'decks'),
+    selectAll(supabase, 'cards'),
+    selectAll(supabase, 'sessions'),
+    selectAll(supabase, 'folders'),
+    supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+  ])
+  return {
+    error: deckRes.error || cardRes.error || sessionRes.error || folderRes.error,
+    rows: {
+      decks: deckRes.data,
+      cards: cardRes.data,
+      sessions: sessionRes.data,
+      folders: folderRes.data ?? [],
+    },
+    profile: profileRes.data ? profileToSettings(profileRes.data) : {},
+  }
+}
+
 async function selectAll(supabase, table) {
   const rows = []
   let total = null
@@ -203,6 +238,9 @@ export default function LibrarySync() {
    * difference — deletions included — rather than only upserts.
    */
   const baseline = useRef(null)
+
+  /** When the account was last read and installed, for the refresh below. */
+  const lastRead = useRef(0)
 
   useEffect(() => {
     alive.current = true
@@ -292,34 +330,7 @@ export default function LibrarySync() {
 
     let cancelled = false
 
-    /**
-     * Everything the account holds, as requests that go together.
-     *
-     * A failed folders read fails the whole pull, the same as a failed deck
-     * read. Installing decks without their folders would put every one of
-     * them in Ungrouped and then push that back up as the truth — the local
-     * copy, folders and all, is left on screen instead, and nothing is sent
-     * until a pull succeeds.
-     */
-    const select = async (supabase) => {
-      const [deckRes, cardRes, sessionRes, folderRes, profileRes] = await Promise.all([
-        selectAll(supabase, 'decks'),
-        selectAll(supabase, 'cards'),
-        selectAll(supabase, 'sessions'),
-        selectAll(supabase, 'folders'),
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      ])
-      return {
-        error: deckRes.error || cardRes.error || sessionRes.error || folderRes.error,
-        rows: {
-          decks: deckRes.data,
-          cards: cardRes.data,
-          sessions: sessionRes.data,
-          folders: folderRes.data ?? [],
-        },
-        profile: profileRes.data ? profileToSettings(profileRes.data) : {},
-      }
-    }
+    const select = (supabase) => readAccount(supabase, userId)
 
     const pull = async () => {
       const supabase = await getSupabase()
@@ -408,6 +419,7 @@ export default function LibrarySync() {
       const library = fromRows(rows)
       confirm(toRows(library, userId), library, userId)
       installLibrary({ ...library, ...profile })
+      lastRead.current = Date.now()
 
       /*
        * An empty account, and decks sitting in the guest library: ask.
@@ -571,6 +583,55 @@ export default function LibrarySync() {
       window.removeEventListener('pagehide', leave)
     }
   }, [available, userId, flushNow])
+
+  /**
+   * Coming back to the app reads the account again, so what changed elsewhere
+   * while it was in the background — a card a co-editor added to a shared
+   * deck, a deck renamed on the phone — is here without signing in again.
+   *
+   * Only ever onto a library with nothing of its own outstanding. Installing
+   * the account's copy replaces what is on screen, so it is done only when
+   * what is on screen is exactly what the account last confirmed: nothing
+   * unsent, no push in flight, no difference from the confirmed rows. The same
+   * is checked again once the read is back, because the reader may have done
+   * something while it was out; then this one stands down, and the next
+   * return tries again. Quietly, too: it says nothing and asks nothing, since
+   * the reader did not ask for it.
+   */
+  useEffect(() => {
+    if (!available || !userId) return undefined
+    let reading = false
+
+    const settled = () => {
+      if (!synced.current || busy.current || hasUnsent(userId)) return false
+      const now = latest.current
+      if (now.userId !== userId) return false
+      const here = toRows({ decks: now.decks, folders: now.folders, sessions: now.sessions }, userId)
+      return isEmptyChange(changesBetween(synced.current, here))
+    }
+
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || reading) return
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+      if (Date.now() - lastRead.current < REFRESH_AFTER_MS || !settled()) return
+      reading = true
+      try {
+        const supabase = await getSupabase()
+        if (!supabase) return
+        const { error, rows, profile } = await readAccount(supabase, userId)
+        if (error || !alive.current || !settled()) return
+        const library = fromRows(rows)
+        confirm(toRows(library, userId), library, userId)
+        installLibrary({ ...library, ...profile })
+        lastRead.current = Date.now()
+      } finally {
+        reading = false
+      }
+    }
+
+    document.addEventListener('visibilitychange', refresh)
+    return () => document.removeEventListener('visibilitychange', refresh)
+  }, [available, userId, confirm, installLibrary])
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {

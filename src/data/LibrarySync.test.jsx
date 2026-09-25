@@ -1954,3 +1954,106 @@ describe('a deletion made offline, with the app closed before the connection ret
     })
   })
 })
+
+/*
+ * Coming back to the app after a while reads the account again, so a card a
+ * co-editor added to a shared deck arrives without signing in again — and
+ * never over anything of this device's own that has not gone up.
+ */
+describe('coming back to the app', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+  const card = (id, front, position) => ({
+    id, deck_id: DECK, user_id: USER, front, back: 'x', position,
+    due: null, interval: 0, ease: 2.5, reps: 0, lapses: 0, last_grade: null, suspended: false,
+  })
+  const EDITORS = 'e0000000-0000-4000-8000-000000000001'
+
+  let reads = 0
+  let skew = 0
+  const account = () =>
+    fakeClient({
+      decks: [{ id: DECK, user_id: USER, title: 'Shared reviewer', subject: 'S', description: '', studied_at: null }],
+      cards: [card('c0000000-0000-4000-8000-000000000001', 'Mine', 0)],
+      profile: null,
+      onRead: (table) => {
+        if (table === 'decks') reads += 1
+      },
+    })
+
+  const away = async (ms) => {
+    skew += ms
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+  }
+  const fronts = () => api.decks[0]?.cards.map((c) => c.front) ?? []
+
+  beforeEach(() => {
+    reads = 0
+    skew = 0
+    const real = Date.now.bind(Date)
+    vi.spyOn(Date, 'now').mockImplementation(() => real() + skew)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  })
+
+  const ready = async () => {
+    client = account()
+    await mountSignedIn()
+    await waitFor(() => expect(fronts()).toEqual(['Mine']))
+    expect(reads).toBe(1)
+    // Installing marks the library changed until the push after it finds
+    // nothing to send; the refresh rightly waits for that.
+    await waitFor(() => expect(hasUnsent(USER)).toBe(false), { timeout: 4000 })
+  }
+
+  it('brings in what someone else added while the app was in the background', async () => {
+    await ready()
+    client.rows.cards = [...client.rows.cards, card(EDITORS, 'Added by a co-editor', 1)]
+
+    await away(2 * 60 * 1000)
+    await waitFor(() => expect(fronts()).toEqual(['Mine', 'Added by a co-editor']))
+    expect(reads).toBe(2)
+    // And sends nothing back: the account is what is on screen now.
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(client.rpcPayloads).toEqual([])
+  })
+
+  it('does not read again for a quick look at another tab', async () => {
+    await ready()
+    await away(10 * 1000)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(reads).toBe(1)
+  })
+
+  it('never reads over a change of its own that has not gone up yet', async () => {
+    await ready()
+    client.rows.cards = [...client.rows.cards, card(EDITORS, 'Added by a co-editor', 1)]
+    // The push fails — a bad connection — so the change stays on this device only.
+    const send = client.rpc
+    client.rpc = async () => ({ data: null, error: new TypeError('Failed to fetch') })
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Added here, not sent yet', back: 'x' }])
+    })
+
+    await away(2 * 60 * 1000)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(hasUnsent(USER)).toBe(true)
+    expect(reads).toBe(1)
+    expect(fronts()).toEqual(['Mine', 'Added here, not sent yet'])
+
+    // Once it can go up, it does, as it always did.
+    client.rpc = send
+    await act(async () => {
+      api.updateDeck(DECK, { title: 'Shared reviewer, renamed' })
+    })
+    await waitFor(
+      () => expect(client.rpcPayloads.flatMap((p) => p.cards_upsert ?? []).map((c) => c.front)).toContain('Added here, not sent yet'),
+      { timeout: 5000 },
+    )
+  })
+})
