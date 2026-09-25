@@ -18,6 +18,25 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.2.0',
+    new: [
+      {
+        title: 'Notifications',
+        detail: 'The bell — Alerts on a phone — tells you when a deck is shared with you, when your access changes, and when cards are due.',
+      },
+      {
+        title: 'See what you’ve shared',
+        detail: 'Decks and folders you share are marked “Shared” in My decks.',
+      },
+    ],
+    improved: [
+      {
+        title: 'Changes from your other devices',
+        detail: 'Come back to Gunit and what changed elsewhere is already here, including cards a co-editor added.',
+      },
+    ],
+  },
+  {
     version: '1.1.0',
     new: [
       {
