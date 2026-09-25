@@ -338,6 +338,20 @@ deployed but unused copy will need restoring by hand. Studying still works
 while it is down, because the library is read from this browser; syncing is
 what stops.
 
+## Announcing a release
+
+Bump the version in `package.json`, then add that version's notes to
+`src/data/releaseNotes.js` — `new`, `improved`, `fixed` and `removed`, any of
+which can be left out. That is all: the What's New dialog reads the notes and
+the running version, and shows them once to each reader on their first launch
+of it. Nothing about the dialog itself changes between releases.
+
+It is decided from local storage alone, with no request to anything. The
+version is the one compiled into the build, so an update the service worker
+has downloaded but not yet applied is not announced until the reader reloads
+into it. A browser that has never run Gunit is told nothing — everything is new
+to it — and a reader who skipped a release sees what they missed.
+
 ## Taking a deck with you
 
 A library otherwise lives in one browser and nowhere else. **Export deck** on a
