@@ -89,6 +89,16 @@ export function DecksIcon() {
   )
 }
 
+/** Two cards passed between two people: the shared tab. */
+export function SharedIcon() {
+  return (
+    <svg {...mark}>
+      <rect x="2.5" y="5" width="9" height="11" rx="1.6" />
+      <path d="M8.5 5V4.2A1.2 1.2 0 0 1 9.7 3h6.6a1.2 1.2 0 0 1 1.2 1.2v8.6a1.2 1.2 0 0 1-1.2 1.2h-4.8" />
+    </svg>
+  )
+}
+
 /** Sliders rather than a gear: these are preferences, not machinery. */
 export function SettingsIcon() {
   return (

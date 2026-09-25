@@ -25,7 +25,7 @@ import { grade as gradeEntry, newEntry } from './scheduler.js'
 import { progressOf } from './normalize.js'
 import { entryFromRow } from './sharing.js'
 
-export const sharedKey = (userId) => `gunit.shared.${userId ?? 'guest'}`
+export { sharedKey } from './storageKeys.js'
 
 export const EMPTY_SHARED = Object.freeze({ progress: {}, studied: {}, pending: [], cache: {}, copies: {} })
 

@@ -1,8 +1,11 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
+import { isConfigured } from '../data/supabase.js'
 import { NAV } from './navItems.js'
-import { DecksIcon, HomeIcon, SettingsIcon } from './Icons.jsx'
+import { DecksIcon, HomeIcon, SettingsIcon, SharedIcon } from './Icons.jsx'
+
+const ITEMS = NAV.filter((item) => !item.accounts || isConfigured)
 
 /** Empty when there is no name, which is the ordinary state of a new reader. */
 const initialsOf = (name = '') =>
@@ -41,7 +44,7 @@ export function TopNav() {
       </Link>
 
       <div className="flex shrink-0 gap-[3px] overflow-auto rounded-full border border-line-soft bg-raised p-1">
-        {NAV.map((item) => (
+        {ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -87,7 +90,7 @@ export function TopNav() {
 }
 
 /** Phone: sticky bottom tab bar, active tab marked by a top rule. */
-const ICONS = { home: HomeIcon, decks: DecksIcon, settings: SettingsIcon }
+const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, settings: SettingsIcon }
 
 /**
  * Phone: a tab bar along the bottom, where a thumb already is.
@@ -120,7 +123,7 @@ export function BottomNav() {
       className="sticky bottom-0 z-20 flex border-t border-line-soft pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] backdrop-saturate-150 sm:hidden"
       style={{ background: 'var(--glass)' }}
     >
-      {NAV.map((item) => {
+      {ITEMS.map((item) => {
         const Icon = ICONS[item.icon]
         return (
           <NavLink

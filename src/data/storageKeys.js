@@ -24,6 +24,13 @@ export const GUEST_KEY = `${PREFIX}.guest`
 /** One per account, per browser. Kept while signed in, so studying works offline. */
 export const userKey = (userId) => `${PREFIX}.user.${userId}`
 
+/**
+ * What this browser keeps about decks shared with an identity: the reader's
+ * own progress on them, and a copy of each for studying offline. Never part of
+ * the library itself — see sharedLibrary.js.
+ */
+export const sharedKey = (userId) => `gunit.shared.${userId ?? 'guest'}`
+
 /** Whichever library the given identity reads. */
 export const keyFor = (userId) => (userId ? userKey(userId) : GUEST_KEY)
 
@@ -262,6 +269,9 @@ export function forgetAccountLibrary(userId) {
     // The record describes the copy just taken away. Left behind, the next
     // sign-in would compare it with a library that is not there.
     localStorage.removeItem(confirmedKey(userId))
+    // So is their progress on decks shared with them, and the offline copies
+    // of those decks: somebody else's reviewer, left on a borrowed machine.
+    localStorage.removeItem(sharedKey(userId))
     return true
   } catch {
     // Storage refused. The decks stay, which is the safe direction to fail in.

@@ -10,7 +10,7 @@ import Mascot from '../components/Mascot.jsx'
 export default function Quiz() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, recordGrades, recordSession } = useApp()
+  const { decks, recordGrades, recordSession, deckPath } = useApp()
   const deck = decks.find((d) => d.id === id)
   useDocumentTitle(deck ? `Quiz · ${deck.title}` : 'Quiz')
 
@@ -45,11 +45,11 @@ export default function Quiz() {
           ever show the right one.
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-2">
-          <Button as={Link} to={`/decks/${deck.id}`}>
+          <Button as={Link} to={deckPath(deck.id)}>
             Add cards
           </Button>
           {has > 0 && (
-            <Button as={Link} to={`/decks/${deck.id}/review`} variant="outline">
+            <Button as={Link} to={deckPath(deck.id, '/review')} variant="outline">
               Study with flashcards
             </Button>
           )}

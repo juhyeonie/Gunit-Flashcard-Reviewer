@@ -8,5 +8,7 @@
 export const NAV = [
   { to: '/', label: 'Home', short: 'Home', icon: 'home', end: true },
   { to: '/decks', label: 'My decks', short: 'Decks', icon: 'decks' },
+  // Only where there are accounts: a local-only copy has nobody to share with.
+  { to: '/shared', label: 'Shared', short: 'Shared', icon: 'shared', accounts: true },
   { to: '/settings', label: 'Settings', short: 'Settings', icon: 'settings' },
 ]

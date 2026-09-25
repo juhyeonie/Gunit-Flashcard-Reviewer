@@ -36,7 +36,7 @@ const AUTO_REVEAL_MS = 4000
 export default function Review() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { decks, settings, say, recordGrades, restoreSchedule, recordSession } = useApp()
+  const { decks, settings, say, recordGrades, restoreSchedule, recordSession, deckPath } = useApp()
   const deck = decks.find((d) => d.id === id)
   useDocumentTitle(deck ? `Reviewing ${deck.title}` : 'Review')
 
@@ -90,7 +90,7 @@ export default function Review() {
     setFlipped(false)
   }
 
-  const exit = useCallback(() => navigate(`/decks/${id}`), [navigate, id])
+  const exit = useCallback(() => navigate(deckPath(id)), [navigate, id, deckPath])
 
   /**
    * Log the session on the way out, whichever way that happens — finishing the
@@ -108,12 +108,12 @@ export default function Review() {
   /** Grades are already saved by the time we get here; this only reports. */
   const finish = useCallback(
     (tally) => {
-      navigate(`/decks/${id}/summary`, {
+      navigate(deckPath(id, '/summary'), {
         state: summarise(tally, { startedAt: mountedAt }),
         replace: true,
       })
     },
-    [id, navigate, mountedAt],
+    [id, navigate, mountedAt, deckPath],
   )
 
   const next = useCallback(() => {
@@ -252,7 +252,7 @@ export default function Review() {
           {deck.cards.length > 0 && (
             <Button onClick={startAhead}>Review ahead</Button>
           )}
-          <Button as={Link} to={`/decks/${deck.id}`} variant="outline">
+          <Button as={Link} to={deckPath(deck.id)} variant="outline">
             Back to deck
           </Button>
         </div>

@@ -160,6 +160,11 @@ undoes a deletion, and importing or restoring a backup mints new ones. The app
 works with or without it — before `0005`, `sync_library` answers nothing, which
 the app reads as nothing refused.
 
+`0006` adds sharing — see [Sharing](#sharing). It adds three tables and a set of
+functions and changes nothing that already exists, so it is safe to run
+whenever; until it has, the app says sharing is not set up yet and everything
+else carries on.
+
 `0002` matters more than it looks. A change set goes up as one call to
 `sync_library`, which is one statement to Postgres and therefore one
 transaction — so a push either lands completely or not at all. Sent as separate
@@ -224,6 +229,44 @@ what actually changed between the last confirmed push and now, so grading one
 card sends that card rather than the deck it is in. A push that fails leaves
 the last-confirmed snapshot where it was, so the next change retries everything
 since instead of skipping past it.
+
+### Sharing
+
+A deck or a folder can be shared from its menu: **Share** on a deck, **Share
+folder** on a folder. Anyone with the link can open it, or only people invited
+by email; each can study it, or edit it too. The link is
+`/shared/deck/<token>` or `/shared/folder/<token>` — a random token, never a
+database id — and it can be reset (the old one stops working, members keep
+access) or turned off.
+
+**What is shared is the content, never anyone's study history.** The owner's
+schedule lives on the card row, and row level security picks rows, not
+columns, so recipients are never given the tables at all. They read shared
+content, and editors change it, only through security definer functions in
+`0006_sharing.sql` that return and write the content columns and check the
+caller's role themselves. A recipient's own schedule is a `card_progress` row
+only they can see — twenty students on one deck are twenty separate schedules,
+and none of them is the owner's.
+
+**Study the shared version, or add a copy.** Studying the shared version uses
+the app's own Review and Quiz pages, grading into the reader's private
+progress, and follows the owner's later edits. **Add to My Gunit** makes an
+independent copy with new ids — the owner's edits never reach it — carrying
+the reader's own progress and nobody else's. Shared cards never enter the
+reader's library: that library is synced as theirs, and somebody else's deck
+in it would be uploaded as their own.
+
+A link opens without an account. Saving it to **Shared with me**, being
+invited, and editing all need one; studying signed in joins the share so
+progress can be kept. Each link opened is kept on the device, so a shared deck
+opened once can be studied again offline. Signing out takes that, and the
+reader's progress on shared decks, off the machine with the account's library.
+
+Editors add, change and delete cards; the deck itself — its title, deleting
+it, who it is shared with — stays the owner's. A card an editor adds belongs to
+the owner and arrives on the owner's devices new, on their next sign-in. A
+folder share covers whatever is in the folder now: a deck moved out leaves the
+share, one moved in joins it.
 
 ### What it costs
 
@@ -353,6 +396,14 @@ they need:
 - `Quiz.test.jsx` — answering, scoring, and the deck too small to quiz
 - `Summary.test.jsx` — both of its states
 - `Settings.test.jsx` — backing the library up and restoring it
+
+The migrations themselves run under `supabase/test`, in PGlite — Postgres
+compiled to WebAssembly — with Supabase's `auth.uid()`, `auth.jwt()` and roles
+stubbed thinly enough that row level security and grants behave as they do in
+Supabase. Every test is a request made as a particular caller: a guest, the
+owner, a reader who was invited, one who was not. That is where the access
+rules are checked, because a policy that lets the wrong person through can
+only be caught by asking the database, not by reading the SQL.
 
 Pages are rendered through `test/render-app.jsx`, which puts them inside the
 store and a router at a real URL, seeds the library through `localStorage` —
