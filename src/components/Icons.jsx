@@ -99,6 +99,16 @@ export function SharedIcon() {
   )
 }
 
+/** A bell, for the notification center. */
+export function BellIcon({ size = 20 }) {
+  return (
+    <svg {...mark} width={size} height={size}>
+      <path d="M5.5 8.5a4.5 4.5 0 0 1 9 0c0 3.2 1.2 4.9 2 5.8.3.3.1.7-.3.7H3.8c-.4 0-.6-.4-.3-.7.8-.9 2-2.6 2-5.8Z" />
+      <path d="M8.3 17.2a1.9 1.9 0 0 0 3.4 0" />
+    </svg>
+  )
+}
+
 /** Sliders rather than a gear: these are preferences, not machinery. */
 export function SettingsIcon() {
   return (

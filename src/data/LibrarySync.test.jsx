@@ -2057,3 +2057,62 @@ describe('coming back to the app', () => {
     )
   })
 })
+
+/*
+ * What the notification center hears from syncing: two things, and only when
+ * they matter — a change kept on the device for lack of a connection, and the
+ * moment it reached the account.
+ */
+describe('what the notification center hears about syncing', () => {
+  const DECK = '95c84be2-9060-42c7-a072-9b7e7c7b5591'
+  const account = () =>
+    fakeClient({
+      decks: [{ id: DECK, user_id: USER, title: 'From the account', subject: 'S', description: '', studied_at: null }],
+      profile: null,
+    })
+  const notices = () => (JSON.parse(localStorage.getItem(`gunit.notices.${USER}`) ?? 'null')?.local ?? []).map((n) => n.kind)
+
+  const ready = async () => {
+    client = account()
+    await mountSignedIn()
+    await waitFor(() => expect(api.decks.map((d) => d.title)).toEqual(['From the account']))
+    await waitFor(() => expect(hasUnsent(USER)).toBe(false), { timeout: 4000 })
+  }
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+  })
+
+  it('notes a change kept here while offline, then that it synced once the connection came back', async () => {
+    await ready()
+    const send = client.rpc
+    client.rpc = async () => ({ data: null, error: new TypeError('Failed to fetch') })
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Written on the train', back: 'x' }])
+    })
+    await waitFor(() => expect(notices()).toEqual(['sync-offline']), { timeout: 4000 })
+
+    // More changes while still offline do not say it again.
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'And another', back: 'x' }])
+    })
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(notices()).toEqual(['sync-offline'])
+
+    client.rpc = send
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    await act(async () => window.dispatchEvent(new Event('online')))
+    // The newer replaces the older: it is no longer only on this device.
+    await waitFor(() => expect(notices()).toEqual(['sync-done']), { timeout: 4000 })
+  })
+
+  it('says nothing about syncing when it simply works', async () => {
+    await ready()
+    await act(async () => {
+      api.addCards(DECK, [{ front: 'Online the whole time', back: 'x' }])
+    })
+    await waitFor(() => expect(client.rpcPayloads.length).toBeGreaterThan(0), { timeout: 4000 })
+    expect(notices()).toEqual([])
+  })
+})

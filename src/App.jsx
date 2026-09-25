@@ -3,6 +3,7 @@ import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AppProvider } from './data/AppContext.jsx'
 import { AuthProvider } from './data/AuthProvider.jsx'
 import LibrarySync from './data/LibrarySync.jsx'
+import NotificationsProvider from './data/NotificationsProvider.jsx'
 import { useApp } from './data/useApp.js'
 import { BottomNav, TopNav } from './components/Navbar.jsx'
 import Toast from './components/Toast.jsx'
@@ -26,6 +27,7 @@ import SignIn from './pages/SignIn.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
 import SharedArea from './pages/SharedArea.jsx'
 import SharedWithMe from './pages/SharedWithMe.jsx'
+import Notifications from './pages/Notifications.jsx'
 
 const CLOSED = { kind: null }
 
@@ -148,6 +150,7 @@ function Shell() {
             what signing in would add.
           */}
           <Route path="/shared" element={<SharedWithMe />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="/shared/:kind/:token/*" element={<SharedArea />} />
           {/*
             Both are reachable whether or not a project is configured: each
@@ -314,7 +317,10 @@ export default function App() {
         <AppProvider>
           {/* Renders nothing; carries the library to and from the account. */}
           <LibrarySync />
-          <Shell />
+          {/* The notification center's state, for the bell, the tab and the page. */}
+          <NotificationsProvider>
+            <Shell />
+          </NotificationsProvider>
         </AppProvider>
       </AuthProvider>
     </ErrorBoundary>
