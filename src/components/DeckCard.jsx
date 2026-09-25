@@ -4,6 +4,7 @@ import { dueCount } from '../data/scheduler.js'
 import { formatRelative } from '../data/activity.js'
 import { EditButton } from './Icons.jsx'
 import ProgressBar from './ProgressBar.jsx'
+import { useOwnShares } from '../data/ownShares.js'
 
 /**
  * The prototype draws this card twice — on the dashboard (accent strip as the
@@ -22,6 +23,7 @@ export default function DeckCard({ deck, variant = 'library', headingLevel = 2, 
   const pct = Math.round(deck.progress * 100)
   const isDashboard = variant === 'dashboard'
   const due = dueCount(deck)
+  const shared = useOwnShares().deck(deck.id)
 
   // When cards are waiting, the card says so instead of when it was last
   // opened — that is the more useful of the two.
@@ -34,6 +36,7 @@ export default function DeckCard({ deck, variant = 'library', headingLevel = 2, 
       <span className="flex min-w-0 items-center gap-2">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
         <span className="kicker !tracking-[0.12em] truncate">{deck.subject}</span>
+        {shared && <span className="kicker shrink-0 !tracking-[0.12em] text-accent">· Shared</span>}
       </span>
       <span className="flex shrink-0 items-center gap-1.5">
         <span

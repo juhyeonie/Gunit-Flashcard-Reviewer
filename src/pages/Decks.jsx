@@ -6,6 +6,7 @@ import FolderModal from '../components/FolderModal.jsx'
 import AddDecksModal from '../components/AddDecksModal.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import Menu, { MenuItem } from '../components/Menu.jsx'
+import { useOwnShares } from '../data/ownShares.js'
 import { ChevronIcon, FolderIcon } from '../components/Icons.jsx'
 import { useApp } from '../data/useApp.js'
 import { FILTERS, SORTS, filterAndSortDecks } from '../data/library.js'
@@ -36,6 +37,7 @@ const readFolded = () => {
 }
 
 export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
+  const shares = useOwnShares()
   const { decks, folders, importDeck, createFolder, renameFolder, deleteFolder, moveDeckToFolder, say } =
     useApp()
   const navigate = useNavigate()
@@ -337,6 +339,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                     <span className="shrink-0 font-mono text-[11px] leading-none font-medium tracking-[0.04em] whitespace-nowrap text-ink-3 max-sm:order-last max-sm:basis-full max-sm:pb-1 max-sm:pl-[50px]">
                       {deckCount(count)}
                       {due > 0 && <span className="text-accent"> · {due} due</span>}
+                      {shares.folder(folder.id) && <span className="text-accent"> · Shared</span>}
                     </span>
                     <div className="relative shrink-0">
                       <button

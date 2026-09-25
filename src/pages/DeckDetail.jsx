@@ -10,6 +10,7 @@ import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import { formatRelative } from '../data/activity.js'
 import { fileNameFor, toTransfer } from '../data/transfer.js'
 import MissingDeck from '../components/MissingDeck.jsx'
+import { useOwnShares } from '../data/ownShares.js'
 import Mascot from '../components/Mascot.jsx'
 
 export default function DeckDetail({
@@ -28,6 +29,7 @@ export default function DeckDetail({
   const deck = decks.find((d) => d.id === id)
   const folder = folders.find((f) => f.id === deck?.folderId) ?? null
   useDocumentTitle(deck?.title)
+  const shares = useOwnShares()
 
   const [studyMenu, setStudyMenu] = useState(false)
   const [addMenu, setAddMenu] = useState(false)
@@ -107,7 +109,10 @@ export default function DeckDetail({
 
       <header className="flex flex-wrap items-end justify-between gap-[22px] border-b border-line pb-[26px]">
         <div className="min-w-0 max-w-[520px]">
-          <div className="kicker mb-3.5">{deck.subject}</div>
+          <div className="kicker mb-3.5">
+            {deck.subject}
+            {shares.deck(deck.id) && <span className="text-accent"> · Shared</span>}
+          </div>
           <div className="m-0 mb-3 flex min-w-0 items-start gap-3">
             <h1 className="m-0 min-w-0 font-serif text-[32px] leading-[1.05] tracking-[-0.02em] text-pretty sm:text-[42px]">
               {deck.title}
