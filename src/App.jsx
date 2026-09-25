@@ -14,6 +14,7 @@ import MoveDeckModal from './components/MoveDeckModal.jsx'
 import ShareModal from './components/ShareModal.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import UpdateNotice from './components/UpdateNotice.jsx'
+import WhatsNewModal from './components/WhatsNewModal.jsx'
 import Home from './pages/Home.jsx'
 import Decks from './pages/Decks.jsx'
 import DeckDetail from './pages/DeckDetail.jsx'
@@ -291,6 +292,11 @@ function Shell() {
 
       <Toast message={toast} />
       <UpdateNotice />
+      {/*
+        Not over a review: a reader who reloaded mid-session sees it when they
+        leave, rather than having the card they were on covered.
+      */}
+      {!isReview && <WhatsNewModal />}
     </div>
   )
 }

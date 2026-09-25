@@ -180,9 +180,13 @@ export default function Modal({
           {/* Destructive actions sit apart from the confirm button so they
               cannot be hit by someone reaching for "Save". */}
           {secondaryAction && <div className="mr-auto">{secondaryAction}</div>}
-          <Button variant="outline" size="sm" onClick={onClose}>
-            {cancelLabel}
-          </Button>
+          {/* `null` for a dialog with one answer: a second button saying the
+              same thing as the first would be a choice that is not one. */}
+          {cancelLabel !== null && (
+            <Button variant="outline" size="sm" onClick={onClose}>
+              {cancelLabel}
+            </Button>
+          )}
           <Button size="sm" variant={confirmVariant} onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
