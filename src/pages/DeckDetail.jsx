@@ -19,6 +19,7 @@ export default function DeckDetail({
   onDeleteCard,
   onResetDeck,
   onMoveDeck,
+  onShareDeck,
   onImport,
 }) {
   const { id } = useParams()
@@ -166,6 +167,14 @@ export default function DeckDetail({
                   onClick={() => {
                     setDeckMenu(false)
                     onMoveDeck?.(deck)
+                  }}
+                />
+                <MenuItem
+                  title="Share"
+                  hint="A link to study it, or to edit it with you."
+                  onClick={() => {
+                    setDeckMenu(false)
+                    onShareDeck?.(deck)
                   }}
                 />
                 <MenuItem

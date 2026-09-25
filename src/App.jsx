@@ -11,6 +11,7 @@ import ImportFileModal from './components/ImportFileModal.jsx'
 import CardModal from './components/CardModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import MoveDeckModal from './components/MoveDeckModal.jsx'
+import ShareModal from './components/ShareModal.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import UpdateNotice from './components/UpdateNotice.jsx'
 import Home from './pages/Home.jsx'
@@ -22,6 +23,8 @@ import Summary from './pages/Summary.jsx'
 import Settings from './pages/Settings.jsx'
 import SignIn from './pages/SignIn.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
+import SharedArea from './pages/SharedArea.jsx'
+import SharedWithMe from './pages/SharedWithMe.jsx'
 
 const CLOSED = { kind: null }
 
@@ -72,6 +75,7 @@ function Shell() {
   const openDeleteDeck = (deck) => setModal({ kind: 'deck-delete', deck })
   const openResetDeck = (deck) => setModal({ kind: 'deck-reset', deck })
   const openMoveDeck = (deck) => setModal({ kind: 'deck-move', deck })
+  const openShare = (shareKind, resource) => setModal({ kind: 'share', shareKind, resource })
 
   /** Import against an existing deck, or standing alone as a new-deck flow. */
   const openImport = (deck, draft) =>
@@ -108,7 +112,16 @@ function Shell() {
               />
             }
           />
-          <Route path="/decks" element={<Decks onNewDeck={openNewDeck} onEditDeck={openEditDeck} />} />
+          <Route
+            path="/decks"
+            element={
+              <Decks
+                onNewDeck={openNewDeck}
+                onEditDeck={openEditDeck}
+                onShareFolder={(folder) => openShare('folder', folder)}
+              />
+            }
+          />
           <Route
             path="/decks/:id"
             element={
@@ -119,6 +132,7 @@ function Shell() {
                 onDeleteCard={openDeleteCard}
                 onResetDeck={openResetDeck}
                 onMoveDeck={openMoveDeck}
+                onShareDeck={(deck) => openShare('deck', deck)}
                 onImport={(deck) => openImport(deck)}
               />
             }
@@ -127,6 +141,13 @@ function Shell() {
           <Route path="/decks/:id/quiz" element={<Quiz />} />
           <Route path="/decks/:id/summary" element={<Summary />} />
           <Route path="/settings" element={<Settings />} />
+          {/*
+            Opening a shared link needs no account; saving it, editing it or
+            being invited does. Both are reachable either way, and each says
+            what signing in would add.
+          */}
+          <Route path="/shared" element={<SharedWithMe />} />
+          <Route path="/shared/:kind/:token/*" element={<SharedArea />} />
           {/*
             Both are reachable whether or not a project is configured: each
             says plainly that this copy is local-only rather than 404ing on a
@@ -211,6 +232,16 @@ function Shell() {
             const name = folders.find((f) => f.id === folderId)?.name
             say(name ? `Moved to “${name}”` : 'Moved to Ungrouped')
           }}
+        />
+      )}
+
+      {modal.kind === 'share' && (
+        <ShareModal
+          key={`share-${modal.resource.id}`}
+          kind={modal.shareKind}
+          resource={modal.resource}
+          onClose={close}
+          say={say}
         />
       )}
 

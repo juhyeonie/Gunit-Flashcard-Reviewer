@@ -11,7 +11,7 @@ export default function Summary() {
   const { id } = useParams()
   const { state } = useLocation()
   const navigate = useNavigate()
-  const { decks, sessions } = useApp()
+  const { decks, sessions, deckPath } = useApp()
   const deck = decks.find((d) => d.id === id)
   // The route announcer reads this out on arrival, so it has to be true of the
   // page that actually rendered.
@@ -94,8 +94,8 @@ export default function Summary() {
       </div>
 
       <div className="flex flex-wrap justify-center gap-2">
-        <Button onClick={() => navigate(`/decks/${deck.id}/review`)}>Review again</Button>
-        <Button variant="outline" onClick={() => navigate(`/decks/${deck.id}/quiz`)}>
+        <Button onClick={() => navigate(deckPath(deck.id, '/review'))}>Review again</Button>
+        <Button variant="outline" onClick={() => navigate(deckPath(deck.id, '/quiz'))}>
           Take the quiz
         </Button>
         <Button variant="ghost" onClick={() => navigate('/')}>

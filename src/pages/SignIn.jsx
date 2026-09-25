@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { EyeIcon } from '../components/Icons.jsx'
 import CreatorCredit from '../components/CreatorCredit.jsx'
@@ -132,10 +132,19 @@ const input =
   'outline-none transition-colors placeholder:text-ink-3/70 ' +
   'focus:border-accent focus:outline-2 focus:outline-accent-soft'
 
+/**
+ * Where to go once signed in: back to the page that sent the reader here — a
+ * shared deck they wanted to save — or home. Only a path within this app, so
+ * a crafted link cannot bounce a fresh sign-in off to somebody else's site.
+ */
+const safeNext = (next) =>
+  typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/'
+
 export default function SignIn() {
   const { available, user, signIn, signUp, requestPasswordReset } = useAuth()
   const online = useOnline()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   /*
    * The landing page's "Create an account" asks for the sign-up mode by
    * carrying it in the navigation rather than in the address. The mode has
@@ -184,7 +193,7 @@ export default function SignIn() {
     // Email confirmation is off, so signing up returns a session outright and
     // there is nothing to wait for.
     if (mode === 'forgot') setSent(true)
-    else navigate('/')
+    else navigate(safeNext(searchParams.get('next')))
   }
 
   if (!available) {
@@ -217,7 +226,7 @@ export default function SignIn() {
           <h1 className="m-0 font-serif text-[30px] leading-[1.12] tracking-[-0.02em]">
             You are signed in as {user.email}
           </h1>
-          <Button as={Link} to="/" className="mt-1">
+          <Button as={Link} to={safeNext(searchParams.get('next'))} className="mt-1">
             Back to studying
           </Button>
         </div>

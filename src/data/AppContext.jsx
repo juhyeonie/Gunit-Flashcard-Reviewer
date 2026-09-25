@@ -67,6 +67,13 @@ const load = (key) => {
   return key === GUEST_KEY ? retireDefaultDecks(state) : state
 }
 
+/**
+ * Where a deck and its study pages live. The study pages build their links
+ * from this rather than spelling out /decks/..., so the same pages can study a
+ * deck shared with the reader under /shared/... without knowing the difference.
+ */
+const deckPath = (id, rest = '') => `/decks/${id}${rest}`
+
 /** A folder name as it is kept: trimmed, bounded, or '' when there is none. */
 const folderName = (name) =>
   typeof name === 'string' ? name.trim().slice(0, FOLDER_NAME_MAX) : ''
@@ -572,6 +579,7 @@ export function AppProvider({ children }) {
       resetDeck,
       setCardSuspended,
       recordSession,
+      deckPath,
     }),
     [
       state.decks,

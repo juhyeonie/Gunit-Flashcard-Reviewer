@@ -35,7 +35,7 @@ const readFolded = () => {
   }
 }
 
-export default function Decks({ onNewDeck, onEditDeck }) {
+export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
   const { decks, folders, importDeck, createFolder, renameFolder, deleteFolder, moveDeckToFolder, say } =
     useApp()
   const navigate = useNavigate()
@@ -382,6 +382,14 @@ export default function Decks({ onNewDeck, onEditDeck }) {
                           onClick={() => {
                             setFolderMenu(null)
                             setFolderDialog({ kind: 'rename', folder })
+                          }}
+                        />
+                        <MenuItem
+                          title="Share folder"
+                          hint="Every deck in it, by link or invitation."
+                          onClick={() => {
+                            setFolderMenu(null)
+                            onShareFolder?.(folder)
                           }}
                         />
                         <MenuItem
