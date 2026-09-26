@@ -18,6 +18,15 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.2.1',
+    fixed: [
+      {
+        title: 'Your quiz answers are safe',
+        detail: 'Leaving a quiz part-way — the nav bar, a link, or Back — now asks first, so a stray tap no longer throws your answers away.',
+      },
+    ],
+  },
+  {
     version: '1.2.0',
     new: [
       {

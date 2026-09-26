@@ -14,7 +14,7 @@ vi.mock('../data/supabase.js', () => ({ isConfigured: true, getSupabase }))
 
 const { AuthContext } = await import('../data/authContext.js')
 const { RELEASE_NOTES } = await import('../data/releaseNotes.js')
-const { SEEN_KEY, compareVersions, decide, launchWhatsNew, resetLaunch } = await import('../data/whatsNew.js')
+const { SEEN_KEY, compareVersions, decide, launchWhatsNew, resetLaunch, sectionsOf } = await import('../data/whatsNew.js')
 const { default: WhatsNewModal, WhatsNewDialog } = await import('./WhatsNewModal.jsx')
 const { offerUpdate, resetPwaState } = await import('../pwa/pwaState.js')
 
@@ -105,7 +105,9 @@ describe('the dialog on launch', () => {
     launch()
     const dialog = screen.getByRole('dialog', { name: 'What’s new' })
     expect(within(dialog).getByText(`Gunit v${RUNNING}`)).toBeTruthy()
-    expect(within(dialog).getByRole('heading', { name: 'New' })).toBeTruthy()
+    // Whichever section this release's notes open with — not every release has something new.
+    const [first] = sectionsOf(RELEASE_NOTES.find((entry) => entry.version === RUNNING))
+    expect(within(dialog).getByRole('heading', { name: first.label })).toBeTruthy()
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Got it' }))
     expect(screen.queryByRole('dialog')).toBeNull()
