@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { RouterProvider, createMemoryRouter, useLocation } from 'react-router-dom'
 import { AppProvider } from '../src/data/AppContext.jsx'
 import { AuthProvider } from '../src/data/AuthProvider.jsx'
 import { useApp } from '../src/data/useApp.js'
@@ -101,12 +101,25 @@ function Elsewhere() {
 }
 
 /**
- * @param {string} path the URL to open, e.g. "/decks/republic/review"
+ * @param {string|string[]} path the URL to open, e.g. "/decks/republic/review" —
+ *   or the history leading up to it, last entry current, for the back button
  * @param {string} pattern the route it should match, e.g. "/decks/:id/review"
  * @param {JSX.Element} element the page under test
  */
 export function renderRoute(path, pattern, element) {
-  return render(
+  /*
+   * A data router, as the app has, so a page that blocks navigation — the
+   * quiz, mid-way — is tested under the same router it runs under.
+   */
+  const router = createMemoryRouter(
+    [
+      { path: pattern, element },
+      // Anywhere the page navigates to lands here and says so.
+      { path: '*', element: <Elsewhere /> },
+    ],
+    { initialEntries: Array.isArray(path) ? path : [path] },
+  )
+  const result = render(
     /*
      * Auth wraps the store here as it does in the app. With no Supabase
      * credentials in the test environment it settles immediately into
@@ -115,15 +128,10 @@ export function renderRoute(path, pattern, element) {
      */
     <AuthProvider>
       <AppProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path={pattern} element={element} />
-            {/* Anywhere the page navigates to lands here and says so. */}
-            <Route path="*" element={<Elsewhere />} />
-          </Routes>
-          <Feedback />
-        </MemoryRouter>
+        <RouterProvider router={router} />
+        <Feedback />
       </AppProvider>
     </AuthProvider>,
   )
+  return { ...result, router }
 }

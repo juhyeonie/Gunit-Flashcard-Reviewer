@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Quiz from './Quiz.jsx'
+import { BottomNav } from '../components/Navbar.jsx'
 import { MIN_QUIZ_CARDS } from '../data/quiz.js'
 import { deck, renderRoute, seed, stored } from '../../test/render-app.jsx'
 
@@ -179,5 +180,126 @@ describe('when the deck is gone', () => {
     seed({ decks: [deck()] })
     open('/decks/deleted/quiz')
     expect(screen.getByText('That deck no longer exists.')).toBeTruthy()
+  })
+})
+
+/*
+ * Leaving part-way. A quiz's grades are saved only at the end, so leaving
+ * mid-quiz throws every answer away — and one tap on the nav bar used to do
+ * it without a word.
+ */
+describe('leaving a quiz part-way', () => {
+  /** The quiz with the phone's tab bar beside it, as the app lays them out. */
+  const openWithNav = (history = ['/decks/republic/quiz']) =>
+    renderRoute(
+      history,
+      '/decks/:id/quiz',
+      <>
+        <Quiz />
+        <BottomNav />
+      </>,
+    )
+  const tab = (name) => screen.getByRole('link', { name: new RegExp(name) })
+  const at = () => screen.queryByTestId('pathname')?.textContent ?? null
+  const dialog = () => screen.queryByRole('dialog', { name: 'Leave quiz?' })
+
+  beforeEach(() => seed({ decks: [deck({ count: 5 })] }))
+
+  it('lets the reader go freely before the first answer, when there is nothing to lose', async () => {
+    openWithNav()
+    await userEvent.click(tab('Decks'))
+    expect(dialog()).toBeNull()
+    expect(at()).toBe('/decks')
+  })
+
+  it('asks before a nav tap ends a quiz with answers in it, with Stay focused', async () => {
+    openWithNav()
+    await answer(true)
+    await userEvent.click(tab('Decks'))
+
+    expect(dialog()).toBeTruthy()
+    expect(document.activeElement.textContent).toBe('Stay')
+    expect(screen.getByText(/Your current quiz session will be ended/)).toBeTruthy()
+    expect(at()).toBeNull()
+  })
+
+  it('keeps the quiz exactly where it was on Stay, answer and all', async () => {
+    openWithNav()
+    const question = asking()
+    await answer(false)
+    await userEvent.click(tab('Home'))
+    await userEvent.click(screen.getByRole('button', { name: 'Stay' }))
+
+    expect(dialog()).toBeNull()
+    expect(at()).toBeNull()
+    expect(asking()).toBe(question)
+    expect(screen.getByText('Not quite')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next question' })).toBeTruthy()
+    // And it still asks the next time.
+    await userEvent.click(tab('Decks'))
+    expect(dialog()).toBeTruthy()
+  })
+
+  it('stays on Escape too, the way every Gunit dialog closes', async () => {
+    openWithNav()
+    await answer(true)
+    await userEvent.click(tab('Decks'))
+    await userEvent.keyboard('{Escape}')
+    expect(dialog()).toBeNull()
+    expect(screen.getByText('Correct')).toBeTruthy()
+  })
+
+  it('goes where the reader was going on Leave quiz, and saves nothing, as leaving always has', async () => {
+    openWithNav()
+    await answer(true)
+    await next()
+    await answer(true)
+    await userEvent.click(tab('Decks'))
+    await userEvent.click(screen.getByRole('button', { name: 'Leave quiz' }))
+
+    await waitFor(() => expect(at()).toBe('/decks'))
+    expect(stored().decks[0].schedule).toEqual({})
+    expect(stored().sessions).toEqual([])
+  })
+
+  it('catches the browser’s back button as well', async () => {
+    const { router } = openWithNav(['/decks/republic', '/decks/republic/quiz'])
+    await answer(true)
+    await act(async () => router.navigate(-1))
+    expect(dialog()).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/decks/republic/quiz')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave quiz' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/decks/republic'))
+  })
+
+  it('asks nothing once the quiz is finished', async () => {
+    openWithNav()
+    for (let i = 0; i < 5; i += 1) {
+      await answer(true)
+      await next()
+    }
+    expect(screen.getByText('Quiz complete')).toBeTruthy()
+    await userEvent.click(tab('Decks'))
+    expect(dialog()).toBeNull()
+    expect(at()).toBe('/decks')
+  })
+
+  it('asks the browser to confirm a reload or close only while answers would be lost', async () => {
+    openWithNav()
+    const unload = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    expect(unload()).toBe(false)
+    await answer(true)
+    expect(unload()).toBe(true)
+    for (let i = 0; i < 5; i += 1) {
+      if (i > 0) await answer(true)
+      await next()
+    }
+    expect(screen.getByText('Quiz complete')).toBeTruthy()
+    expect(unload()).toBe(false)
   })
 })

@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { addUser, as, beginTest, endTest, freshDatabase, rpc } from './db.js'
 
+/** Building Postgres and running every migration takes a while on a busy machine. */
+const SETUP_TIMEOUT = 60_000
+
 /**
  * Notifications, where they are made: in Postgres, by triggers on the sharing
  * tables, readable only by the person they are for.
@@ -32,7 +35,7 @@ beforeAll(async () => {
       decks_upsert: [deck(DECK, 'CC 116 Algorithms'), deck(OTHER, 'Networks', FOLDER)],
     }),
   ])
-})
+}, SETUP_TIMEOUT)
 beforeEach(() => beginTest(db))
 afterEach(() => endTest(db))
 

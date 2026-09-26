@@ -2,6 +2,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { addUser, as, beginTest, endTest, freshDatabase, rpc } from './db.js'
 
+/** Building Postgres and running every migration takes a while on a busy machine. */
+const SETUP_TIMEOUT = 60_000
+
 /**
  * Sharing, checked where it is enforced: in Postgres, as each kind of caller.
  *
@@ -51,7 +54,7 @@ beforeAll(async () => {
       ],
     }),
   ])
-})
+}, SETUP_TIMEOUT)
 
 beforeEach(() => beginTest(db))
 afterEach(() => endTest(db))
