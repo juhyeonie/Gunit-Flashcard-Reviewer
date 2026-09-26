@@ -18,6 +18,15 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.4.0',
+    new: [
+      {
+        title: 'Clear your notifications',
+        detail: 'Dismiss one with ×, or empty the list with Clear all.',
+      },
+    ],
+  },
+  {
     version: '1.3.1',
     improved: [
       {
