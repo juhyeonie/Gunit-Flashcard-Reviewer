@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { watchInstallability } from './pwa/pwaState.js'
 import { registerServiceWorker } from './pwa/register.js'
@@ -14,10 +14,16 @@ registerServiceWorker()
 // apart from a returning reader. The dialog reads this decision.
 launchWhatsNew()
 
+/*
+ * A data router, with the whole app as one catch-all route and its own
+ * <Routes> inside, exactly as before. The data router is what lets a page
+ * stop a navigation it would lose work to — an unfinished quiz — whether it
+ * comes from a link, the nav bar or the browser's back button.
+ */
+const router = createBrowserRouter([{ path: '*', element: <App /> }])
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <RouterProvider router={router} />
   </StrictMode>,
 )

@@ -35,8 +35,12 @@ export default function Modal({
   confirmDisabled = false,
   secondaryAction,
   maxWidth = 460,
+  // For a dialog whose safe answer is the cancel button — "Stay" rather than
+  // "Leave" — so Enter or Space on opening does the harmless thing.
+  focusCancel = false,
 }) {
   const dialogRef = useRef(null)
+  const cancelRef = useRef(null)
   const returnFocusTo = useRef(null)
   const titleId = useId()
 
@@ -66,7 +70,7 @@ export default function Modal({
     // effect, and would make the "previous" element the dialog's own input.
     const dialog = dialogRef.current
     const firstField = dialog?.querySelector('input,textarea,select')
-    ;(firstField ?? dialog)?.focus()
+    ;((focusCancel && cancelRef.current) || firstField || dialog)?.focus()
 
     return () => {
       document.removeEventListener('keydown', onKey)
@@ -77,7 +81,7 @@ export default function Modal({
       const target = returnFocusTo.current
       if (target?.isConnected) target.focus()
     }
-  }, [open, onClose])
+  }, [open, onClose, focusCancel])
 
   /** Keeps Tab and Shift+Tab cycling inside the dialog. */
   const onKeyDown = (e) => {
@@ -183,7 +187,7 @@ export default function Modal({
           {/* `null` for a dialog with one answer: a second button saying the
               same thing as the first would be a choice that is not one. */}
           {cancelLabel !== null && (
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button ref={cancelRef} variant="outline" size="sm" onClick={onClose}>
               {cancelLabel}
             </Button>
           )}

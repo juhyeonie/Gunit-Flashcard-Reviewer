@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
+import Modal from '../components/Modal.jsx'
 import { useApp } from '../data/useApp.js'
 import { MIN_QUIZ_CARDS, buildQuestions, verdictFor } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
@@ -25,6 +26,36 @@ export default function Quiz() {
   // Real elapsed time for the activity log. A lazy initialiser reads the clock
   // once; useRef(Date.now()) would re-read it on every render.
   const [startedAt, setStartedAt] = useState(() => Date.now())
+
+  /*
+   * A quiz with answers in it and no result yet. Its grades are only saved at
+   * the end — "See results" — so leaving now throws every answer away, and a
+   * tap on the nav bar mid-question was enough to do it. Before the first
+   * answer there is nothing to lose, and after the result nothing either;
+   * neither asks.
+   */
+  const inProgress = !done && Object.keys(grades).length > 0
+
+  // Any navigation to another page: a nav link, a button, back or forward.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => inProgress && currentLocation.pathname !== nextLocation.pathname,
+  )
+  // Stable while the question is up, so the dialog does not re-run its focus
+  // handling on every render and lose track of where focus should go back to.
+  const stay = useCallback(() => blocker.reset?.(), [blocker])
+  const leave = useCallback(() => blocker.proceed?.(), [blocker])
+
+  // Reloading or closing the tab is the browser's to ask about; this only
+  // tells it there is something to lose.
+  useEffect(() => {
+    if (!inProgress) return undefined
+    const warn = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [inProgress])
 
   if (!deck) return <MissingDeck />
 
@@ -231,6 +262,24 @@ export default function Quiz() {
           )}
         </div>
       </div>
+
+      {/*
+        Stay is the safe answer and has the focus: Enter, Escape, the close
+        button and the backdrop all keep the quiz exactly as it was.
+      */}
+      <Modal
+        open={blocker.state === 'blocked'}
+        onClose={stay}
+        kicker="Quiz in progress"
+        title="Leave quiz?"
+        body="Your current quiz session will be ended if you leave this page. Your answers so far won’t be saved."
+        cancelLabel="Stay"
+        confirmLabel="Leave quiz"
+        confirmVariant="danger"
+        onConfirm={leave}
+        focusCancel
+        maxWidth={420}
+      />
     </div>
   )
 }
