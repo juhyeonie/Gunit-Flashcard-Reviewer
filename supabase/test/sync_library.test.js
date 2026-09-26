@@ -2,6 +2,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { addUser, as, beginTest, endTest, freshDatabase, rpc } from './db.js'
 
+/** Building Postgres and running every migration takes a while on a busy machine. */
+const SETUP_TIMEOUT = 60_000
+
 /**
  * `sync_library` as 0005 left it: a deletion sticks, whichever device made it
  * and whichever device is still holding the row.
@@ -34,7 +37,7 @@ beforeAll(async () => {
     decks_upsert: [deck(D1, 'Alpha', F), deck(D2, 'Beta')],
     cards_upsert: [card(C1, D1, 'one'), card(C2, D1, 'two'), card(C3, D2, 'three')],
   })
-})
+}, SETUP_TIMEOUT)
 beforeEach(() => beginTest(db))
 afterEach(() => endTest(db))
 
