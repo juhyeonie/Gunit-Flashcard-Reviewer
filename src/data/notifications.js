@@ -24,6 +24,9 @@ export const fetchNotifications = () => rpc('notifications_list', { p_limit: 50 
 /** Marks these read, or every one of the caller's with `null`. */
 export const markNotificationsRead = (ids) => rpc('notifications_mark_read', { p_ids: ids })
 
+/** Removes these of the caller's from the account (0008). */
+export const clearNotifications = (ids) => rpc('notifications_clear', { p_ids: ids })
+
 /**
  * Hears about a notification the moment the database writes one, while the
  * reader has Gunit open: Supabase Realtime, filtered to their own rows and

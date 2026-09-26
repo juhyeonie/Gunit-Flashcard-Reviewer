@@ -8,6 +8,8 @@
  *                be shown with no connection
  *   pendingRead  ids of account notifications marked read while offline, or
  *                'all', waiting to be told to the account
+ *   pendingClear ids of account notifications cleared here, waiting to be
+ *                removed from the account
  *   marks        what has already been said, so a reminder is said once a day
  *                and What's New once a version
  *
@@ -23,7 +25,7 @@ import { noticesKey } from './storageKeys.js'
 const MAX_LOCAL = 40
 const MAX_MARKS = 30
 
-const empty = () => ({ local: [], remote: [], pendingRead: [], marks: {} })
+const empty = () => ({ local: [], remote: [], pendingRead: [], pendingClear: [], marks: {} })
 
 const isObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v)
 
@@ -35,6 +37,7 @@ export function readNotices(userId) {
       local: Array.isArray(raw.local) ? raw.local.filter(isObject) : [],
       remote: Array.isArray(raw.remote) ? raw.remote.filter(isObject) : [],
       pendingRead: raw.pendingRead === 'all' ? 'all' : Array.isArray(raw.pendingRead) ? raw.pendingRead : [],
+      pendingClear: Array.isArray(raw.pendingClear) ? raw.pendingClear.filter((id) => typeof id === 'string') : [],
       marks: isObject(raw.marks) ? raw.marks : {},
     }
   } catch {
@@ -88,11 +91,15 @@ export function addNotice(userId, { kind, title, message, action = null, once = 
 /** Whether something has been said already. */
 export const hasSaid = (userId, once) => Boolean(readNotices(userId).marks[once])
 
-/** The account's list, as it just came back. Reads still waiting are kept read. */
+/**
+ * The account's list, as it just came back. Reads still waiting are kept
+ * read, and anything cleared here stays cleared, whatever the account says.
+ */
 export function rememberRemote(userId, rows, now = Date.now()) {
   return update(userId, (s) => {
     const waiting = s.pendingRead === 'all' ? null : new Set(s.pendingRead)
-    const remote = (rows ?? []).map((n) =>
+    const cleared = new Set(s.pendingClear)
+    const remote = (rows ?? []).filter((n) => !cleared.has(n.id)).map((n) =>
       n.read_at || !(waiting === null || waiting.has(n.id)) ? n : { ...n, read_at: new Date(now).toISOString() },
     )
     return { ...s, remote }
@@ -120,6 +127,30 @@ export function markRead(userId, ids, now = Date.now()) {
 
 /** The account has been told; nothing waits any more. */
 export const clearPendingRead = (userId) => update(userId, (s) => ({ ...s, pendingRead: [] }))
+
+/**
+ * Takes notifications out of the list at once, whatever the connection:
+ * these ids, or everything on it with `null`. Account notifications are
+ * queued to be removed from the account too — by id, always, even for "clear
+ * all": one that arrived while this device was offline has not been seen,
+ * and clearing what is on screen should not take it with it.
+ */
+export function clearNotices(userId, ids) {
+  return update(userId, (s) => {
+    const gone = new Set(ids ?? [...s.local.map((n) => n.id), ...s.remote.map((n) => n.id)])
+    const remoteIds = s.remote.filter((n) => gone.has(n.id)).map((n) => n.id)
+    return {
+      ...s,
+      local: s.local.filter((n) => !gone.has(n.id)),
+      remote: s.remote.filter((n) => !gone.has(n.id)),
+      pendingClear: [...new Set([...s.pendingClear, ...remoteIds])],
+    }
+  })
+}
+
+/** These have gone from the account; nothing is waiting on them any more. */
+export const clearPendingClear = (userId, ids) =>
+  update(userId, (s) => ({ ...s, pendingClear: s.pendingClear.filter((id) => !ids.includes(id)) }))
 
 /** Account notifications (from the server) and local ones, as one list, newest first. */
 export function mergedNotices(store) {

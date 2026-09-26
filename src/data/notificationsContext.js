@@ -11,6 +11,8 @@ const NONE = {
   refresh: () => {},
   markRead: () => {},
   markAllRead: () => {},
+  clear: () => {},
+  clearAll: () => {},
   decline: async () => null,
   applyUpdate: null,
 }
