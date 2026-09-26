@@ -18,6 +18,15 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.3.0',
+    improved: [
+      {
+        title: 'A floating tab bar on your phone',
+        detail: 'It steps aside while you scroll down to read, and comes back as soon as you scroll up.',
+      },
+    ],
+  },
+  {
     version: '1.2.1',
     fixed: [
       {
