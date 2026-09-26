@@ -18,6 +18,19 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.3.1',
+    improved: [
+      {
+        title: 'Fresh icons',
+        detail: 'Cleaner, more familiar icons throughout — and a cog for Settings.',
+      },
+      {
+        title: 'A tidier tab bar on your phone',
+        detail: 'Just the icons now, with more room around them.',
+      },
+    ],
+  },
+  {
     version: '1.3.0',
     improved: [
       {
