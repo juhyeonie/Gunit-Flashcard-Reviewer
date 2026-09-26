@@ -119,9 +119,10 @@ const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, alerts: Be
  * to be subtle at the cost of being legible. The active tab is told apart by
  * hue and by the mark above it, not by the other two being faint.
  *
- * Icons beside the labels rather than instead of them. A tab bar of words is
- * slower to read at a glance than a shape, and a bar of unlabelled shapes is a
- * guessing game — both together is the arrangement that has won.
+ * Icons only, on screen: the words under them are gone, for a quieter bar.
+ * Each tab still has its name — in a span only a screen reader sees — so it
+ * is announced as "Home, link" rather than as nothing, and the icons stay
+ * aria-hidden so it is not announced twice.
  *
  * It floats: a pill inset from the edges and lifted clear of the home
  * indicator by the safe-area inset, rather than a strip welded to the bottom
@@ -182,16 +183,14 @@ export function BottomNav() {
                     }`}
                   />
                   <span className="relative">
-                    <Icon />
+                    <Icon size={22} />
                     {item.icon === 'alerts' && unread > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-paper bg-accent">
                         <span className="sr-only">{unread} unread</span>
                       </span>
                     )}
                   </span>
-                  <span className="font-mono text-[10px] leading-none font-medium tracking-[0.06em] uppercase">
-                    {item.short}
-                  </span>
+                  <span className="sr-only">{item.short}</span>
                 </>
               )}
             </NavLink>

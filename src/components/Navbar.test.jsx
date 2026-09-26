@@ -142,10 +142,16 @@ describe('the tab bar on a phone', () => {
     expect(nav.previousElementSibling.className).toContain('env(safe-area-inset-bottom)')
   })
 
-  it('draws an icon beside each label, not instead of it', () => {
+  it('draws an icon for each tab, and keeps its name for a screen reader', () => {
     // A bar of words is slow to scan; a bar of unlabelled shapes is a guess.
     showBottom()
     expect(screen.getByRole('navigation').querySelectorAll('svg')).toHaveLength(3)
+    // The words are off the screen, not out of the page.
+    for (const tab of tabs()) {
+      const name = [...tab.querySelectorAll('span')].find((s) => s.textContent.trim() === tab.textContent.trim())
+      expect(name.className).toBe('sr-only')
+    }
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeTruthy()
   })
 
   it('hides those icons from a screen reader, which has the label already', () => {

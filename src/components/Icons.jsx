@@ -1,13 +1,13 @@
 import {
   Bell,
   ChevronDown,
+  Cog,
   Eye,
   EyeOff,
   Folder,
   GalleryVerticalEnd,
   House,
   Pencil,
-  SlidersHorizontal,
   Users,
 } from 'lucide-react'
 
@@ -59,19 +59,19 @@ export function EyeIcon({ shown = false, size = 16 }) {
   return <Glyph size={size} strokeWidth={STROKE} {...quiet} />
 }
 
-/* The navigation marks: tab bar, top bar and the Shared list. */
-export function HomeIcon() {
-  return <House size={20} strokeWidth={STROKE} {...quiet} />
+/* The navigation marks: the phone's tab bar and the Shared list. */
+export function HomeIcon({ size = 20 }) {
+  return <House size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 /** Stacked cards, because a deck is a stack of them. */
-export function DecksIcon() {
-  return <GalleryVerticalEnd size={20} strokeWidth={STROKE} {...quiet} />
+export function DecksIcon({ size = 20 }) {
+  return <GalleryVerticalEnd size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 /** People: what others have shared with you. */
-export function SharedIcon() {
-  return <Users size={20} strokeWidth={STROKE} {...quiet} />
+export function SharedIcon({ size = 20 }) {
+  return <Users size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 /** The notification center. */
@@ -79,9 +79,9 @@ export function BellIcon({ size = 20 }) {
   return <Bell size={size} strokeWidth={STROKE} {...quiet} />
 }
 
-/** Sliders rather than a gear: these are preferences, not machinery. */
-export function SettingsIcon() {
-  return <SlidersHorizontal size={20} strokeWidth={STROKE} {...quiet} />
+/** The cog: settings, as every app draws them. */
+export function SettingsIcon({ size = 20 }) {
+  return <Cog size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 export function FolderIcon({ size = 16 }) {
