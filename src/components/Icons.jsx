@@ -1,21 +1,37 @@
-/** The pencil glyph the prototype inlines on every deck card and deck header. */
+import {
+  Bell,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Folder,
+  GalleryVerticalEnd,
+  House,
+  Pencil,
+  SlidersHorizontal,
+  Users,
+} from 'lucide-react'
+
+/*
+ * Gunit's icons, from Lucide.
+ *
+ * Each is wrapped under the name the app has always used, so a page asks for
+ * a HomeIcon or a FolderIcon and never knows where it comes from — swapping
+ * one for another is a change here and nowhere else.
+ *
+ * They share one recipe: `currentColor`, so each inherits whatever the link or
+ * button around it is doing and the active colour is set once; a 1.75 stroke,
+ * a touch lighter than Lucide's default 2, which at these sizes sits with the
+ * app's thin mono labels rather than shouting over them; and `aria-hidden`,
+ * every one, because each sits beside its own label or inside a control that
+ * carries the name — a screen reader announcing "home, Home" is worse than
+ * silent.
+ */
+const STROKE = 1.75
+const quiet = { 'aria-hidden': 'true', focusable: 'false' }
+
+/** The pencil on every deck card and deck header. */
 export function PencilIcon({ size = 13 }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M11.2 2.3l2.5 2.5-8 8H3.2v-2.5l8-8z" />
-      <path d="M9.6 3.9l2.5 2.5" />
-    </svg>
-  )
+  return <Pencil size={size} strokeWidth={2} {...quiet} />
 }
 
 export function EditButton({ className = '', size = 26, ...props }) {
@@ -34,106 +50,45 @@ export function EditButton({ className = '', size = 26, ...props }) {
 }
 
 /**
- * The password reveal, as one icon that changes rather than two that swap.
- *
- * `currentColor` throughout so it inherits whatever the button beside it is
- * doing, and no title: the button that holds it carries the accessible name,
- * and a title here would announce twice.
+ * The password reveal: the eye while it is hidden, the eye struck through
+ * once it shows. No title — the button that holds it carries the accessible
+ * name, and a title here would announce it twice.
  */
 export function EyeIcon({ shown = false, size = 16 }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M1.5 10S4.6 4.5 10 4.5 18.5 10 18.5 10 15.4 15.5 10 15.5 1.5 10 1.5 10Z" />
-      <circle cx="10" cy="10" r="2.75" />
-      {shown && <path d="M3 17 17 3" />}
-    </svg>
-  )
+  const Glyph = shown ? EyeOff : Eye
+  return <Glyph size={size} strokeWidth={STROKE} {...quiet} />
 }
 
-/*
- * The three navigation marks, drawn to the same recipe as the eye above:
- * currentColor, 1.5 stroke, 20x20, rounded joins. They inherit whatever the
- * tab beside them is doing, so the active colour is set once on the link.
- *
- * `aria-hidden`, every one of them. Each sits beside its own label in the tab
- * bar, and a screen reader announcing "home, Home" is worse than silent.
- */
-const mark = { width: 20, height: 20, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true', focusable: 'false' }
-
+/* The navigation marks: tab bar, top bar and the Shared list. */
 export function HomeIcon() {
-  return (
-    <svg {...mark}>
-      <path d="M3 8.2 10 3l7 5.2V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1Z" />
-    </svg>
-  )
+  return <House size={20} strokeWidth={STROKE} {...quiet} />
 }
 
 /** Stacked cards, because a deck is a stack of them. */
 export function DecksIcon() {
-  return (
-    <svg {...mark}>
-      <rect x="3" y="6.5" width="14" height="10.5" rx="2" />
-      <path d="M5.5 4h9" />
-    </svg>
-  )
+  return <GalleryVerticalEnd size={20} strokeWidth={STROKE} {...quiet} />
 }
 
-/** Two cards passed between two people: the shared tab. */
+/** People: what others have shared with you. */
 export function SharedIcon() {
-  return (
-    <svg {...mark}>
-      <rect x="2.5" y="5" width="9" height="11" rx="1.6" />
-      <path d="M8.5 5V4.2A1.2 1.2 0 0 1 9.7 3h6.6a1.2 1.2 0 0 1 1.2 1.2v8.6a1.2 1.2 0 0 1-1.2 1.2h-4.8" />
-    </svg>
-  )
+  return <Users size={20} strokeWidth={STROKE} {...quiet} />
 }
 
-/** A bell, for the notification center. */
+/** The notification center. */
 export function BellIcon({ size = 20 }) {
-  return (
-    <svg {...mark} width={size} height={size}>
-      <path d="M5.5 8.5a4.5 4.5 0 0 1 9 0c0 3.2 1.2 4.9 2 5.8.3.3.1.7-.3.7H3.8c-.4 0-.6-.4-.3-.7.8-.9 2-2.6 2-5.8Z" />
-      <path d="M8.3 17.2a1.9 1.9 0 0 0 3.4 0" />
-    </svg>
-  )
+  return <Bell size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 /** Sliders rather than a gear: these are preferences, not machinery. */
 export function SettingsIcon() {
-  return (
-    <svg {...mark}>
-      <path d="M3 6h7M14 6h3M3 14h3M10 14h7" />
-      <circle cx="12" cy="6" r="2" />
-      <circle cx="8" cy="14" r="2" />
-    </svg>
-  )
+  return <SlidersHorizontal size={20} strokeWidth={STROKE} {...quiet} />
 }
 
-/** A folder, drawn in the same line as the tab bar's marks. */
 export function FolderIcon({ size = 16 }) {
-  return (
-    <svg {...mark} width={size} height={size}>
-      <path d="M2.5 5.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2H16a1.5 1.5 0 0 1 1.5 1.5v7.5A1.5 1.5 0 0 1 16 16.5H4A1.5 1.5 0 0 1 2.5 15Z" />
-    </svg>
-  )
+  return <Folder size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 /** A disclosure chevron, pointing down when what it controls is open. */
 export function ChevronIcon({ size = 14 }) {
-  return (
-    <svg {...mark} width={size} height={size}>
-      <path d="m5 7.5 5 5 5-5" />
-    </svg>
-  )
+  return <ChevronDown size={size} strokeWidth={STROKE} {...quiet} />
 }
