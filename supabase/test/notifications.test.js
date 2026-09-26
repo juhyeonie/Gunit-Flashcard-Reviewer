@@ -206,6 +206,31 @@ describe('who can see and change them', () => {
   })
 })
 
+describe('clearing', () => {
+  it('removes the caller’s own — the given ones, or all — and never anyone else’s', async () => {
+    const d = await share('deck', DECK)
+    const f = await share('folder', FOLDER)
+    await invite(d, AMY)
+    await invite(f, AMY)
+    await invite(d, BEN)
+    const [first] = await list(AMY)
+    const [bens] = await list(BEN)
+
+    // One of hers, and one of his sent along with it.
+    await rpc(db, AMY, 'notifications_clear', [[first.id, bens.id]])
+    expect(await list(AMY)).toHaveLength(1)
+    expect(await list(BEN)).toHaveLength(1)
+
+    await rpc(db, AMY, 'notifications_clear', [null])
+    expect(await list(AMY)).toEqual([])
+    expect(await list(BEN)).toHaveLength(1)
+  })
+
+  it('is not open to anyone signed out', async () => {
+    await expect(rpc(db, null, 'notifications_clear', [null])).rejects.toThrow(/permission denied for function/)
+  })
+})
+
 describe('Realtime', () => {
   it('adds the table to Supabase’s publication where there is one, and runs cleanly where there is not', async () => {
     // Where there is not: this database, which ran every migration already.

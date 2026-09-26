@@ -170,6 +170,9 @@ written only by triggers on the sharing tables, and added to Supabase's
 Realtime publication where there is one. Before it has run, the notification
 center shows this device's own notices and nothing from the account.
 
+`0008` adds `notifications_clear`, the one way a reader can delete their own
+notifications — see [Notifications](#notifications).
+
 `0002` matters more than it looks. A change set goes up as one call to
 `sync_library`, which is one statement to Postgres and therefore one
 transaction — so a push either lands completely or not at all. Sent as separate
@@ -296,6 +299,13 @@ renaming or opening a deck, editing a card — make nothing.
 
 Offline, the list is the one last seen, and a notification marked read is
 read at once and told to the account when the connection returns.
+
+**Clearing** — the × on one, or Clear all — takes notifications off the list
+at once, and removes the account's from the account through
+`notifications_clear` in `0008`, which deletes only the caller's own. Clear
+all sends the ids that were on screen, never "everything", so a notification
+that arrived while offline is not deleted unseen. Before `0008` has run, a
+cleared notification stays cleared on the device it was cleared on.
 
 ### What it costs
 

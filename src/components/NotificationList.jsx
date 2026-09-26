@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { X } from 'lucide-react'
 import Button from './Button.jsx'
 import Mascot from './Mascot.jsx'
 import { useNotifications } from '../data/notificationsContext.js'
@@ -8,7 +9,7 @@ import { formatRelative } from '../data/activity.js'
 import { describe } from '../data/describeNotification.js'
 
 function Item({ item, onDone }) {
-  const { markRead, decline, applyUpdate } = useNotifications()
+  const { markRead, clear, decline, applyUpdate } = useNotifications()
   const navigate = useNavigate()
   const [problem, setProblem] = useState(null)
   const { title, message, actions } = describe(item)
@@ -47,15 +48,26 @@ function Item({ item, onDone }) {
             {unread && <span className="sr-only">Unread: </span>}
             {title}
           </p>
-          {unread && (
+          <span className="flex shrink-0 items-center gap-2.5">
+            {unread && (
+              <button
+                type="button"
+                onClick={() => markRead(item.id)}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[11px] font-medium whitespace-nowrap text-ink-3 transition-colors hover:text-ink"
+              >
+                Mark as read
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => markRead(item.id)}
-              className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-medium whitespace-nowrap text-ink-3 transition-colors hover:text-ink"
+              onClick={() => clear(item.id)}
+              aria-label={`Dismiss: ${title}`}
+              title="Dismiss"
+              className="-m-1 grid cursor-pointer place-items-center rounded-md border-0 bg-transparent p-1 text-ink-3 transition-colors hover:bg-raised hover:text-ink"
             >
-              Mark as read
+              <X size={14} strokeWidth={1.75} aria-hidden="true" focusable="false" />
             </button>
-          )}
+          </span>
         </div>
         <p className={`m-0 text-[13px] leading-[1.45] text-pretty ${unread ? 'text-ink-2' : 'text-ink-3'}`}>{message}</p>
         {Number.isFinite(item.createdAt) && item.createdAt > 0 && (
@@ -89,12 +101,12 @@ function Item({ item, onDone }) {
 }
 
 /**
- * The notification center itself: a heading with Mark all as read, then the
- * list, or a note that there is nothing. Used by the bell's panel on a wide
+ * The notification center itself: a heading with Mark all as read and Clear
+ * all, then the list, or a note that there is nothing. Used by the bell's panel on a wide
  * screen and by its own page on a phone.
  */
 export default function NotificationList({ onDone, headingLevel = 2 }) {
-  const { items, unread, offline, markAllRead, signedIn } = useNotifications()
+  const { items, unread, offline, markAllRead, clearAll, signedIn } = useNotifications()
   const Heading = `h${headingLevel}`
 
   return (
@@ -104,14 +116,24 @@ export default function NotificationList({ onDone, headingLevel = 2 }) {
           Notifications
           {unread > 0 && <span className="ml-2 font-mono text-[11px] font-medium text-accent">{unread} new</span>}
         </Heading>
-        <button
-          type="button"
-          onClick={markAllRead}
-          disabled={!unread}
-          className="cursor-pointer border-0 bg-transparent p-0 text-[12px] font-medium text-ink-2 transition-colors hover:text-ink disabled:cursor-default disabled:opacity-50"
-        >
-          Mark all as read
-        </button>
+        <span className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={markAllRead}
+            disabled={!unread}
+            className="cursor-pointer border-0 bg-transparent p-0 text-[12px] font-medium text-ink-2 transition-colors hover:text-ink disabled:cursor-default disabled:opacity-50"
+          >
+            Mark all as read
+          </button>
+          <button
+            type="button"
+            onClick={clearAll}
+            disabled={!items.length}
+            className="cursor-pointer border-0 bg-transparent p-0 text-[12px] font-medium text-ink-2 transition-colors hover:text-ink disabled:cursor-default disabled:opacity-50"
+          >
+            Clear all
+          </button>
+        </span>
       </div>
 
       {offline && signedIn && (

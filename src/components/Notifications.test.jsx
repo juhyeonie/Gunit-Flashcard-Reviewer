@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({
   fetchNotifications: vi.fn(),
   markNotificationsRead: vi.fn(),
+  clearNotifications: vi.fn(),
   listenForNotifications: vi.fn(),
   leaveShare: vi.fn(),
   isConfigured: true,
@@ -21,6 +22,7 @@ const net = vi.hoisted(() => ({
 vi.mock('../data/notifications.js', () => ({
   fetchNotifications: net.fetchNotifications,
   markNotificationsRead: net.markNotificationsRead,
+  clearNotifications: net.clearNotifications,
   listenForNotifications: net.listenForNotifications,
 }))
 vi.mock('../data/sharing.js', async (importOriginal) => ({ ...(await importOriginal()), leaveShare: net.leaveShare }))
@@ -108,7 +110,7 @@ beforeEach(() => {
   localStorage.setItem(SEEN_KEY, '99.0.0')
   resetLaunch()
   resetPwaState()
-  for (const fn of [net.fetchNotifications, net.markNotificationsRead, net.listenForNotifications, net.leaveShare]) fn.mockReset()
+  for (const fn of [net.fetchNotifications, net.markNotificationsRead, net.clearNotifications, net.listenForNotifications, net.leaveShare]) fn.mockReset()
   net.fetchNotifications.mockImplementation(async () =>
     server.down ? { data: null, error: 'Failed to fetch' } : { data: structuredClone(server.rows), error: null },
   )
@@ -116,6 +118,11 @@ beforeEach(() => {
     if (server.down || server.marksFail) return { data: null, error: 'Failed to fetch' }
     const stamp = new Date().toISOString()
     server.rows = server.rows.map((n) => (ids === null || ids.includes(n.id) ? { ...n, read_at: n.read_at ?? stamp } : n))
+    return { data: null, error: null }
+  })
+  net.clearNotifications.mockImplementation(async (ids) => {
+    if (server.down || server.clearsFail) return { data: null, error: 'Failed to fetch' }
+    server.rows = server.rows.filter((n) => !ids.includes(n.id))
     return { data: null, error: null }
   })
   net.leaveShare.mockResolvedValue({ data: null, error: null })
@@ -270,6 +277,62 @@ describe('a read the account has not heard about yet', () => {
     await waitFor(() => expect(net.fetchNotifications).toHaveBeenCalledTimes(2))
     expect(unread()).toBe(0)
     expect(readNotices(USER.id).pendingRead).toEqual(['n1'])
+  })
+})
+
+describe('clearing', () => {
+  it('dismisses one, here at once and from the account', async () => {
+    server.rows = [deckShared(), folderShared()]
+    show()
+    const n1 = (await screen.findByText('Maria shared “CC 116 Algorithms” with you.')).closest('li')
+    await userEvent.click(within(n1).getByRole('button', { name: /^Dismiss/ }))
+    expect(screen.queryByText('Maria shared “CC 116 Algorithms” with you.')).toBeNull()
+    expect(screen.getByText('Maria shared “Midterm Reviewers” with you.')).toBeTruthy()
+    await waitFor(() => expect(net.clearNotifications).toHaveBeenCalledWith(['n1']))
+    expect(server.rows.map((n) => n.id)).toEqual(['n2'])
+  })
+
+  it('clears everything, the device’s own notices too, and only what was on screen', async () => {
+    server.rows = [deckShared(), folderShared()]
+    addNotice(USER.id, { kind: 'study-goal', title: 'Goal reached', message: 'Done for today.' })
+    show()
+    await screen.findByText('Maria shared “CC 116 Algorithms” with you.')
+    await userEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+
+    expect(await screen.findByText('You’re all caught up')).toBeTruthy()
+    expect(unread()).toBe(0)
+    // By id: a notification the account wrote since was never on screen.
+    await waitFor(() => expect(net.clearNotifications).toHaveBeenCalledWith(expect.arrayContaining(['n1', 'n2'])))
+    expect(net.clearNotifications.mock.calls[0][0]).toHaveLength(2)
+    expect(readNotices(USER.id).local).toEqual([])
+    expect(screen.getByRole('button', { name: 'Clear all' }).disabled).toBe(true)
+  })
+
+  it('holds a clear made offline, keeps it cleared, and sends it on reconnecting', async () => {
+    server.rows = [deckShared()]
+    show()
+    await screen.findByText('Maria shared “CC 116 Algorithms” with you.')
+
+    // The list can be read but the clear cannot be sent: it stays cleared here.
+    server.clearsFail = true
+    await userEvent.click(screen.getByRole('button', { name: /^Dismiss/ }))
+    await waitFor(() => expect(net.fetchNotifications).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Maria shared “CC 116 Algorithms” with you.')).toBeNull()
+    expect(readNotices(USER.id).pendingClear).toEqual(['n1'])
+
+    server.clearsFail = false
+    await act(async () => window.dispatchEvent(new Event('online')))
+    await waitFor(() => expect(readNotices(USER.id).pendingClear).toEqual([]))
+    expect(server.rows).toEqual([])
+  })
+
+  it('dismisses an update notice too', async () => {
+    show()
+    await screen.findByText('You’re all caught up')
+    act(() => offerUpdate(() => {}))
+    const update = (await screen.findByText('Update ready')).closest('li')
+    await userEvent.click(within(update).getByRole('button', { name: /^Dismiss/ }))
+    expect(screen.queryByText('Update ready')).toBeNull()
   })
 })
 

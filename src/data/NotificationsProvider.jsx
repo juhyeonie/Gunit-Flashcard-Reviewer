@@ -7,9 +7,11 @@ import { isDue, isNew } from './scheduler.js'
 import { dayKey, minutesToday } from './activity.js'
 import { launchWhatsNew } from './whatsNew.js'
 import { leaveShare } from './sharing.js'
-import { fetchNotifications, listenForNotifications, markNotificationsRead } from './notifications.js'
+import { clearNotifications, fetchNotifications, listenForNotifications, markNotificationsRead } from './notifications.js'
 import {
   addNotice,
+  clearNotices,
+  clearPendingClear,
   clearPendingRead,
   markRead as markStoredRead,
   mergedNotices,
@@ -64,6 +66,13 @@ export default function NotificationsProvider({ children }) {
 
   const refresh = useCallback(async () => {
     if (!userId) return
+    // Anything cleared here goes from the account first, so it cannot come
+    // back in the list about to be read.
+    const clearing = readNotices(userId).pendingClear
+    if (clearing.length) {
+      const { error } = await clearNotifications(clearing)
+      if (!error) clearPendingClear(userId, clearing)
+    }
     const waiting = readNotices(userId).pendingRead
     if (waiting === 'all' || waiting.length) {
       const { error } = await markNotificationsRead(waiting === 'all' ? null : waiting)
@@ -162,10 +171,11 @@ export default function NotificationsProvider({ children }) {
    * never stored: once the reader reloads into it there is nothing to say.
    */
   const [updateRead, setUpdateRead] = useState(false)
+  const [updateCleared, setUpdateCleared] = useState(false)
 
   const items = useMemo(() => {
     const merged = mergedNotices(store)
-    if (!update) return merged
+    if (!update || updateCleared) return merged
     return [
       {
         id: 'update-ready',
@@ -182,7 +192,7 @@ export default function NotificationsProvider({ children }) {
       },
       ...merged,
     ]
-  }, [store, update, updateRead])
+  }, [store, update, updateRead, updateCleared])
 
   const unread = items.filter((n) => !n.read).length
 
@@ -204,6 +214,25 @@ export default function NotificationsProvider({ children }) {
     if (userId) refresh()
   }, [userId, refresh])
 
+  /** Takes one out of the list, here at once and from the account after. */
+  const clear = useCallback(
+    (id) => {
+      if (id === 'update-ready') {
+        setUpdateCleared(true)
+        return
+      }
+      clearNotices(userId, [id])
+      if (userId) refresh()
+    },
+    [userId, refresh],
+  )
+
+  const clearAll = useCallback(() => {
+    setUpdateCleared(true)
+    clearNotices(userId, null)
+    if (userId) refresh()
+  }, [userId, refresh])
+
   /** Declining a share is leaving it: the existing way to hand access back. */
   const decline = useCallback(
     async (item) => {
@@ -217,8 +246,20 @@ export default function NotificationsProvider({ children }) {
   )
 
   const value = useMemo(
-    () => ({ items, unread, offline, signedIn: Boolean(userId), refresh, markRead, markAllRead, decline, applyUpdate: update }),
-    [items, unread, offline, userId, refresh, markRead, markAllRead, decline, update],
+    () => ({
+      items,
+      unread,
+      offline,
+      signedIn: Boolean(userId),
+      refresh,
+      markRead,
+      markAllRead,
+      clear,
+      clearAll,
+      decline,
+      applyUpdate: update,
+    }),
+    [items, unread, offline, userId, refresh, markRead, markAllRead, clear, clearAll, decline, update],
   )
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>
