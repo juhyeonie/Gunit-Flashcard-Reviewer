@@ -18,7 +18,7 @@ export default function UpdateNotice() {
   return (
     <div
       role="status"
-      className="toast-in fixed bottom-[calc(56px+env(safe-area-inset-bottom)+14px)] left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-[7px] bg-ink py-[9px] pr-[9px] pl-[18px] text-paper shadow-sh3 sm:bottom-7"
+      className="toast-in fixed bottom-[calc(env(safe-area-inset-bottom)+80px)] left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-[7px] bg-ink py-[9px] pr-[9px] pl-[18px] text-paper shadow-sh3 sm:bottom-7"
     >
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
       <span className="text-[13px] leading-snug font-medium">A new version of Gunit is ready.</span>

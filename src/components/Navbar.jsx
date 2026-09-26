@@ -1,4 +1,6 @@
-import { Link, NavLink } from 'react-router-dom'
+import { useRef } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import useHideOnScroll from '../hooks/useHideOnScroll.js'
 import { useApp } from '../data/useApp.js'
 import { streak } from '../data/activity.js'
 import { isConfigured } from '../data/supabase.js'
@@ -120,56 +122,82 @@ const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, alerts: Be
  * Icons beside the labels rather than instead of them. A tab bar of words is
  * slower to read at a glance than a shape, and a bar of unlabelled shapes is a
  * guessing game — both together is the arrangement that has won.
+ *
+ * It floats: a pill inset from the edges and lifted clear of the home
+ * indicator by the safe-area inset, rather than a strip welded to the bottom
+ * of the screen. It steps aside while the reader scrolls down and comes back
+ * as soon as they scroll up (useHideOnScroll). Hidden, it is moved, not
+ * removed — the page keeps the same space for it at the bottom either way, so
+ * nothing jumps, and it cannot be tapped while out of sight. With reduced
+ * motion it fades rather than slides.
+ *
+ * The tabs are the same NavLinks as ever, so a quiz with answers in it still
+ * asks before one of them takes the reader away.
  */
 export function BottomNav() {
   const { unread } = useNotifications()
+  const { pathname } = useLocation()
+  const ref = useRef(null)
+  useHideOnScroll(ref, { resetKey: pathname })
+
   return (
-    <nav
-      className="sticky bottom-0 z-20 flex border-t border-line-soft pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] backdrop-saturate-150 sm:hidden"
-      style={{ background: 'var(--glass)' }}
-    >
-      {ITEMS.map((item) => {
-        const Icon = ICONS[item.icon]
-        return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `relative flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 px-1 transition-colors ${
-                isActive ? 'text-accent' : 'text-ink-2'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {/*
-                  A mark above the active tab as well as the colour. Colour on
-                  its own is not a state anyone can see in greyscale, and
-                  NavLink's aria-current only speaks to a screen reader.
-                */}
-                <span
-                  aria-hidden="true"
-                  className={`absolute top-0 h-[2px] w-7 rounded-b-full transition-colors ${
-                    isActive ? 'bg-accent' : 'bg-transparent'
-                  }`}
-                />
-                <span className="relative">
-                  <Icon />
-                  {item.icon === 'alerts' && unread > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-paper bg-accent">
-                      <span className="sr-only">{unread} unread</span>
-                    </span>
-                  )}
-                </span>
-                <span className="font-mono text-[10px] leading-none font-medium tracking-[0.06em] uppercase">
-                  {item.short}
-                </span>
-              </>
-            )}
-          </NavLink>
-        )
-      })}
-    </nav>
+    <>
+      {/* The room it floats in, kept whether it is showing or not. */}
+      <div aria-hidden="true" className="h-[calc(56px+22px+env(safe-area-inset-bottom))] shrink-0 sm:hidden" />
+      <nav
+        ref={ref}
+        data-hidden="false"
+        className={
+          'fixed right-[max(12px,env(safe-area-inset-right))] bottom-[calc(env(safe-area-inset-bottom)+10px)] left-[max(12px,env(safe-area-inset-left))] z-20 flex overflow-hidden rounded-full border border-line-soft px-1.5 shadow-sh3 backdrop-blur-[14px] backdrop-saturate-150 sm:hidden ' +
+          'transition-[translate,opacity] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ' +
+          'data-[hidden=true]:pointer-events-none data-[hidden=true]:translate-y-[calc(100%+10px+env(safe-area-inset-bottom))] data-[hidden=true]:opacity-0 ' +
+          'motion-reduce:transition-opacity motion-reduce:duration-150 motion-reduce:data-[hidden=true]:translate-y-0'
+        }
+        style={{ background: 'var(--glass)' }}
+      >
+        {ITEMS.map((item) => {
+          const Icon = ICONS[item.icon]
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `relative flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 px-1 transition-colors ${
+                  isActive ? 'text-accent' : 'text-ink-2'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {/*
+                    A mark above the active tab as well as the colour. Colour on
+                    its own is not a state anyone can see in greyscale, and
+                    NavLink's aria-current only speaks to a screen reader.
+                  */}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute top-1 h-[2px] w-7 rounded-full transition-colors ${
+                      isActive ? 'bg-accent' : 'bg-transparent'
+                    }`}
+                  />
+                  <span className="relative">
+                    <Icon />
+                    {item.icon === 'alerts' && unread > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-paper bg-accent">
+                        <span className="sr-only">{unread} unread</span>
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono text-[10px] leading-none font-medium tracking-[0.06em] uppercase">
+                    {item.short}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          )
+        })}
+      </nav>
+    </>
   )
 }

@@ -134,8 +134,12 @@ describe('the tab bar on a phone', () => {
     // A class rather than an inline style, and not only for tidiness: jsdom
     // drops an env() declaration on parse, so inline it could not be checked
     // here at all.
+    //
+    // It floats now, lifted by the inset rather than padded by it, and the
+    // room left for it at the bottom of the page counts the inset too.
     const nav = screen.getByRole('navigation')
-    expect(nav.className).toContain('pb-[env(safe-area-inset-bottom)]')
+    expect(nav.className).toContain('bottom-[calc(env(safe-area-inset-bottom)+10px)]')
+    expect(nav.previousElementSibling.className).toContain('env(safe-area-inset-bottom)')
   })
 
   it('draws an icon beside each label, not instead of it', () => {
