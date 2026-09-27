@@ -8,7 +8,7 @@ import { BottomNav, TopNav } from './Navbar.jsx'
 import Quiz from '../pages/Quiz.jsx'
 import { deck, seed } from '../../test/render-app.jsx'
 import { reloadPage } from '../hooks/reloadPage.js'
-import { REFRESH_MS, REFRESH_REDUCED_MS } from '../hooks/useHomeRefresh.js'
+import { REFRESH_MS } from '../hooks/useHomeRefresh.js'
 
 // jsdom cannot reload; what matters is whether, and when, the app asks to.
 vi.mock('../hooks/reloadPage.js', () => ({ reloadPage: vi.fn() }))
@@ -162,7 +162,9 @@ describe('the floating tab bar', () => {
 
 describe('Home, tapped while already home', () => {
   const home = () => screen.getByRole('link', { name: 'Home' })
-  const icon = () => home().querySelector('svg').parentElement
+  const glyph = () => home().querySelector('svg')
+  const house = () => glyph().classList.contains('lucide-house')
+  const spinner = () => glyph().classList.contains('lucide-loader-circle')
   const tap = () => fireEvent.click(home())
 
   beforeEach(() => {
@@ -171,15 +173,17 @@ describe('Home, tapped while already home', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('turns the icon, then reloads once it has turned, without navigating anywhere', () => {
+  it('puts a turning spinner where the house was, then reloads, without navigating anywhere', () => {
     const router = show('/')
     const before = router.state.historyAction
+    expect(house()).toBe(true)
     tap()
 
-    expect(icon().className).toContain('home-refresh')
+    // The house is gone rather than moved: nothing about it animates.
+    expect(house()).toBe(false)
+    expect(spinner()).toBe(true)
+    expect(glyph().getAttribute('class')).toMatch(/\banimate-spin\b/)
     expect(home().getAttribute('aria-busy')).toBe('true')
-    // The mark above the tab widens a little, too.
-    expect(home().querySelector('[aria-hidden="true"].absolute').className).toContain('w-9')
 
     act(() => vi.advanceTimersByTime(REFRESH_MS - 1))
     expect(reloadPage).not.toHaveBeenCalled()
@@ -187,6 +191,19 @@ describe('Home, tapped while already home', () => {
     expect(reloadPage).toHaveBeenCalledTimes(1)
     expect(router.state.location.pathname).toBe('/')
     expect(router.state.historyAction).toBe(before)
+  })
+
+  it('keeps the tab exactly as it was around the spinner, so nothing in the bar moves', () => {
+    show('/')
+    const tabBefore = home().className
+    const markBefore = home().querySelector('span.absolute').className
+    const wrapperBefore = glyph().parentElement.className
+    const sizeBefore = [glyph().getAttribute('width'), glyph().getAttribute('height')]
+    tap()
+    expect(home().className).toBe(tabBefore)
+    expect(home().querySelector('span.absolute').className).toBe(markBefore)
+    expect(glyph().parentElement.className).toBe(wrapperBefore)
+    expect([glyph().getAttribute('width'), glyph().getAttribute('height')]).toEqual(sizeBefore)
   })
 
   it('reloads once, however many times it is tapped', () => {
@@ -199,24 +216,19 @@ describe('Home, tapped while already home', () => {
     expect(reloadPage).toHaveBeenCalledTimes(1)
   })
 
-  it('only dims the icon for a moment, and reloads sooner, when reduced motion is asked for', () => {
-    window.matchMedia = vi.fn((query) => ({
-      matches: query.includes('reduce'),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }))
+  it('holds the spinner still when reduced motion is asked for, and still reloads', () => {
     show('/')
     tap()
-    expect(icon().className).toContain('home-refresh')
-    act(() => vi.advanceTimersByTime(REFRESH_REDUCED_MS))
+    expect(glyph().getAttribute('class')).toMatch(/\bmotion-reduce:animate-none\b/)
+    act(() => vi.advanceTimersByTime(REFRESH_MS))
     expect(reloadPage).toHaveBeenCalledTimes(1)
   })
 
-  it('is an ordinary link from anywhere else: no turn, no reload', () => {
+  it('is an ordinary link from anywhere else: no spinner, no reload', () => {
     const router = show('/decks')
     tap()
     expect(router.state.location.pathname).toBe('/')
-    expect(icon().className).not.toContain('home-refresh')
+    expect(house()).toBe(true)
     act(() => vi.advanceTimersByTime(REFRESH_MS * 2))
     expect(reloadPage).not.toHaveBeenCalled()
   })
@@ -237,7 +249,7 @@ describe('Home, tapped while already home', () => {
     await userEvent.click(home())
     expect(screen.getByRole('dialog', { name: 'Leave quiz?' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/decks/republic/quiz')
-    expect(icon().className).not.toContain('home-refresh')
+    expect(house()).toBe(true)
     expect(reloadPage).not.toHaveBeenCalled()
   })
 })
