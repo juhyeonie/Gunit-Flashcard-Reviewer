@@ -234,27 +234,6 @@ select {
   }
 }
 
-/*
- * Home, tapped while already home: one turn of the icon, swelling a touch at
- * the middle of it, then the page reloads (useHomeRefresh waits for it).
- * Quick and small, like the rest of the tab bar's movement.
- */
-@keyframes homeRefresh {
-  from {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.12);
-  }
-  to {
-    transform: rotate(360deg) scale(1);
-  }
-}
-
-.home-refresh {
-  animation: homeRefresh 0.5s var(--ease-in-out-quart) both;
-}
-
 /* Held back, then faded in: for a loading indicator that should not appear at
    all when the wait is short. See PageLoading. A pure fade, because a spinner
    that also slides into place is movement with nothing to explain. */
@@ -310,18 +289,6 @@ select {
   @keyframes toastIn {
     from {
       opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  /* No turn: the Home icon only dims for a moment before the reload. */
-  @keyframes homeRefresh {
-    from {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.45;
     }
     to {
       opacity: 1;

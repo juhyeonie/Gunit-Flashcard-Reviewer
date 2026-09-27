@@ -7,6 +7,7 @@ import {
   Folder,
   GalleryVerticalEnd,
   House,
+  LoaderCircle,
   Pencil,
   User,
   Users,
@@ -85,6 +86,18 @@ export function BellIcon({ size = 20 }) {
 /** The cog: settings, as every app draws them. */
 export function SettingsIcon({ size = 20 }) {
   return <Cog size={size} strokeWidth={STROKE} {...quiet} />
+}
+
+/**
+ * Something is on its way: an arc turning steadily, once a second. Standing
+ * still for a reader who asks for reduced motion — `motion-reduce:animate-none`
+ * rather than the app-wide rule in index.css, which only shortens animations
+ * and would spin this six times a second.
+ */
+export function LoadingIcon({ size = 20 }) {
+  return (
+    <LoaderCircle size={size} strokeWidth={STROKE} className="animate-spin motion-reduce:animate-none" {...quiet} />
+  )
 }
 
 /** Someone, unnamed: the profile picture before there is one, or a name. */
