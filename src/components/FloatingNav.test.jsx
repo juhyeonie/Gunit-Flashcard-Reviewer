@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProvider } from '../data/AppContext.jsx'
-import { BottomNav } from './Navbar.jsx'
+import { BottomNav, TopNav } from './Navbar.jsx'
 import Quiz from '../pages/Quiz.jsx'
 import { deck, seed } from '../../test/render-app.jsx'
+import { reloadPage } from '../hooks/reloadPage.js'
+import { REFRESH_MS, REFRESH_REDUCED_MS } from '../hooks/useHomeRefresh.js'
+
+// jsdom cannot reload; what matters is whether, and when, the app asks to.
+vi.mock('../hooks/reloadPage.js', () => ({ reloadPage: vi.fn() }))
 
 /**
  * The phone's floating tab bar: out of the way while the page scrolls down,
@@ -152,5 +157,87 @@ describe('the floating tab bar', () => {
     await userEvent.click(screen.getByRole('link', { name: /Decks/ }))
     expect(screen.getByRole('dialog', { name: 'Leave quiz?' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/decks/republic/quiz')
+  })
+})
+
+describe('Home, tapped while already home', () => {
+  const home = () => screen.getByRole('link', { name: 'Home' })
+  const icon = () => home().querySelector('svg').parentElement
+  const tap = () => fireEvent.click(home())
+
+  beforeEach(() => {
+    reloadPage.mockClear()
+    vi.useFakeTimers()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('turns the icon, then reloads once it has turned, without navigating anywhere', () => {
+    const router = show('/')
+    const before = router.state.historyAction
+    tap()
+
+    expect(icon().className).toContain('home-refresh')
+    expect(home().getAttribute('aria-busy')).toBe('true')
+    // The mark above the tab widens a little, too.
+    expect(home().querySelector('[aria-hidden="true"].absolute').className).toContain('w-9')
+
+    act(() => vi.advanceTimersByTime(REFRESH_MS - 1))
+    expect(reloadPage).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(reloadPage).toHaveBeenCalledTimes(1)
+    expect(router.state.location.pathname).toBe('/')
+    expect(router.state.historyAction).toBe(before)
+  })
+
+  it('reloads once, however many times it is tapped', () => {
+    show('/')
+    tap()
+    act(() => vi.advanceTimersByTime(100))
+    tap()
+    tap()
+    act(() => vi.advanceTimersByTime(REFRESH_MS * 3))
+    expect(reloadPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('only dims the icon for a moment, and reloads sooner, when reduced motion is asked for', () => {
+    window.matchMedia = vi.fn((query) => ({
+      matches: query.includes('reduce'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }))
+    show('/')
+    tap()
+    expect(icon().className).toContain('home-refresh')
+    act(() => vi.advanceTimersByTime(REFRESH_REDUCED_MS))
+    expect(reloadPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('is an ordinary link from anywhere else: no turn, no reload', () => {
+    const router = show('/decks')
+    tap()
+    expect(router.state.location.pathname).toBe('/')
+    expect(icon().className).not.toContain('home-refresh')
+    act(() => vi.advanceTimersByTime(REFRESH_MS * 2))
+    expect(reloadPage).not.toHaveBeenCalled()
+  })
+
+  it('does not reload the wide screen’s top bar', () => {
+    show('/', <TopNav />)
+    tap()
+    act(() => vi.advanceTimersByTime(REFRESH_MS * 2))
+    expect(reloadPage).not.toHaveBeenCalled()
+  })
+
+  it('leaves a quiz only through its own question, never by reloading', async () => {
+    vi.useRealTimers()
+    seed({ decks: [deck({ count: 5 })] })
+    const router = show('/decks/republic/quiz')
+    const right = new RegExp(`Answer ${screen.getByRole('heading', { level: 1 }).textContent.match(/Question (\d+)\?/)[1]}\\.`)
+    await userEvent.click(screen.getAllByRole('button').find((b) => right.test(b.textContent)))
+    await userEvent.click(home())
+    expect(screen.getByRole('dialog', { name: 'Leave quiz?' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/decks/republic/quiz')
+    expect(icon().className).not.toContain('home-refresh')
+    expect(reloadPage).not.toHaveBeenCalled()
   })
 })
