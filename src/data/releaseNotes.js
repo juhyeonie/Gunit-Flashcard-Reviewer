@@ -22,6 +22,19 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.5.2',
+    improved: [
+      {
+        title: 'A clearer refresh from Home',
+        detail: 'Tapping Home on Home now shows a spinner while Gunit refreshes.',
+        fil: {
+          title: 'Mas malinaw na pag-refresh mula sa Tahanan',
+          detail: 'Kapag pinindot ang Tahanan habang nasa Tahanan, may spinner na habang nire-refresh ang Gunit.',
+        },
+      },
+    ],
+  },
+  {
     version: '1.5.1',
     improved: [
       {
