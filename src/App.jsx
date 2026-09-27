@@ -28,6 +28,7 @@ import ResetPassword from './pages/ResetPassword.jsx'
 import SharedArea from './pages/SharedArea.jsx'
 import SharedWithMe from './pages/SharedWithMe.jsx'
 import Notifications from './pages/Notifications.jsx'
+import useT from './i18n/useT.js'
 
 const CLOSED = { kind: null }
 
@@ -47,6 +48,7 @@ function Shell() {
     say,
     toast,
   } = useApp()
+  const { t } = useT()
 
   // One value rather than a flag per modal, so the Create -> Import handoff is
   // a single swap and two modals can never be open at once.
@@ -181,10 +183,10 @@ function Shell() {
           onSave={(draft) => {
             if (modal.kind === 'deck-edit') {
               updateDeck(modal.deck.id, draft)
-              say('Deck updated')
+              say(t('toast.deckUpdated'))
             } else {
               const deck = addDeck(draft)
-              say('Deck created — add your first card')
+              say(t('toast.deckCreated'))
               navigate(`/decks/${deck.id}`)
             }
           }}
@@ -197,15 +199,15 @@ function Shell() {
 
       <ConfirmModal
         open={modal.kind === 'deck-delete'}
-        kicker="Delete deck"
-        title={`Delete “${modal.deck?.title ?? ''}”?`}
-        body="Its cards and review history will be removed. This cannot be undone."
-        confirmLabel="Delete deck"
+        kicker={t('deckModal.delete')}
+        title={t('toast.deleteDeckTitle', { title: modal.deck?.title ?? '' })}
+        body={t('toast.deleteDeckBody')}
+        confirmLabel={t('deckModal.delete')}
         onClose={close}
         onConfirm={() => {
           const { id, title } = modal.deck
           removeDeck(id)
-          say(`Deleted “${title}”`)
+          say(t('toast.deletedDeck', { title }))
           // Leaving the deleted deck's own page open would strand the user on a
           // "no longer exists" screen.
           if (pathname.startsWith(`/decks/${id}`)) navigate('/decks')
@@ -214,14 +216,14 @@ function Shell() {
 
       <ConfirmModal
         open={modal.kind === 'deck-reset'}
-        kicker="Reset progress"
-        title={`Reset progress for “${modal.deck?.title ?? ''}”?`}
-        body="Every card becomes new again and the deck drops to 0% known. The cards, and the days you have already studied, are kept."
-        confirmLabel="Reset progress"
+        kicker={t('deckDetail.reset')}
+        title={t('toast.resetTitle', { title: modal.deck?.title ?? '' })}
+        body={t('toast.resetBody')}
+        confirmLabel={t('deckDetail.reset')}
         onClose={close}
         onConfirm={() => {
           resetDeck(modal.deck.id)
-          say(`Reset “${modal.deck.title}”`)
+          say(t('toast.reset', { title: modal.deck.title }))
         }}
       />
 
@@ -234,7 +236,7 @@ function Shell() {
           onMove={(folderId) => {
             moveDeckToFolder(modal.deck.id, folderId)
             const name = folders.find((f) => f.id === folderId)?.name
-            say(name ? `Moved to “${name}”` : 'Moved to Ungrouped')
+            say(name ? t('toast.moved', { name }) : t('toast.movedUngrouped'))
           }}
         />
       )}
@@ -271,10 +273,10 @@ function Shell() {
           onSave={(card) => {
             if (modal.kind === 'card-edit') {
               updateCard(modal.deck.id, modal.index, card)
-              say('Card saved')
+              say(t('toast.cardSaved'))
             } else {
               addCards(modal.deck.id, [card])
-              say('Card added')
+              say(t('toast.cardAdded'))
             }
           }}
         />
@@ -282,14 +284,14 @@ function Shell() {
 
       <ConfirmModal
         open={modal.kind === 'card-delete'}
-        kicker="Delete card"
-        title="Delete this card?"
-        body="It will be removed from the deck and from your review queue."
-        confirmLabel="Delete card"
+        kicker={t('deckDetail.deleteCard')}
+        title={t('toast.deleteCardTitle')}
+        body={t('toast.deleteCardBody')}
+        confirmLabel={t('deckDetail.deleteCard')}
         onClose={close}
         onConfirm={() => {
           removeCard(modal.deck.id, modal.index)
-          say('Card deleted')
+          say(t('toast.cardDeleted'))
         }}
       />
 

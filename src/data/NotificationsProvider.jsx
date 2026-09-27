@@ -133,9 +133,8 @@ export default function NotificationsProvider({ children }) {
     const today = dayKey(Date.now())
     addNotice(userId, {
       kind: 'study-due',
-      title: 'Cards to review',
-      message: `You have ${due} ${due === 1 ? 'card' : 'cards'} due for review.`,
-      action: { type: 'navigate', to: '/', label: 'Start reviewing' },
+      params: { count: due },
+      action: { type: 'navigate', to: '/' },
       once: `due:${today}`,
     })
   }, [ready, userId, due])
@@ -147,8 +146,7 @@ export default function NotificationsProvider({ children }) {
     const today = dayKey(Date.now())
     addNotice(userId, {
       kind: 'study-goal',
-      title: 'Goal reached',
-      message: `You completed today’s study goal of ${goal} minutes.`,
+      params: { goal },
       once: `goal:${today}`,
     })
   }, [ready, userId, doneToday, goal])
@@ -159,9 +157,8 @@ export default function NotificationsProvider({ children }) {
     if (!entries.length) return
     addNotice(userId, {
       kind: 'whats-new',
-      title: `Gunit v${version}`,
-      message: 'New features are available. Check out What’s New.',
-      action: { type: 'whats-new', label: 'See what’s new' },
+      params: { version },
+      action: { type: 'whats-new' },
       once: `whatsnew:${version}`,
     })
   }, [ready, userId])
@@ -184,11 +181,7 @@ export default function NotificationsProvider({ children }) {
         // First, and with no time: it is true now, for as long as it waits.
         createdAt: Number.POSITIVE_INFINITY,
         read: updateRead,
-        data: {
-          title: 'Update ready',
-          message: 'A new version of Gunit is ready. Reload to start using it.',
-          action: { type: 'reload', label: 'Reload' },
-        },
+        data: { kind: 'update', params: {}, action: { type: 'reload' } },
       },
       ...merged,
     ]

@@ -12,6 +12,9 @@
  * "this reader's cards, soonest due" can be built over.
  */
 
+import { isLanguage } from '../i18n/index.js'
+import { FONT_SIZES } from './preferences.js'
+
 /**
  * Local ids are eight random characters; Postgres wants a uuid. Anything that
  * already looks like one is kept, so ids stay stable once a library has been
@@ -193,8 +196,27 @@ export const settingsToProfile = (settings, theme) => ({
   auto_reveal: settings.autoReveal,
   shuffle_first: settings.shuffleFirst,
   theme,
+  // 0009. See PROFILE_PREFERENCE_COLUMNS for a project that has not run it.
+  language: settings.language,
+  font_size: settings.fontSize,
 })
 
+/**
+ * The columns migration 0009 added to the row. A project that has not run it
+ * yet refuses an update naming them, so the sync sends the row without them
+ * rather than failing to save the name and theme along with them.
+ */
+export const PROFILE_PREFERENCE_COLUMNS = ['language', 'font_size']
+
+export const withoutPreferenceColumns = (row) =>
+  Object.fromEntries(Object.entries(row).filter(([k]) => !PROFILE_PREFERENCE_COLUMNS.includes(k)))
+
+/**
+ * A language or size the account has never had chosen (null, from a new
+ * account, or a project before 0009) is left out, so the one on this device
+ * stands rather than being reset. One this version does not know is left out
+ * too, for the same reason.
+ */
 export const profileToSettings = (profile) => ({
   settings: {
     name: profile.name,
@@ -202,6 +224,8 @@ export const profileToSettings = (profile) => ({
     cardsPer: profile.cards_per,
     autoReveal: profile.auto_reveal,
     shuffleFirst: profile.shuffle_first,
+    ...(isLanguage(profile.language) ? { language: profile.language } : {}),
+    ...(FONT_SIZES.includes(profile.font_size) ? { fontSize: profile.font_size } : {}),
   },
   theme: profile.theme === 'dark' ? 'dark' : 'light',
 })

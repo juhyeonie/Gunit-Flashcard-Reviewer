@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Modal from './Modal.jsx'
 import { FolderIcon } from './Icons.jsx'
+import useT from '../i18n/useT.js'
 
 /**
  * Where a deck lives: one of the folders, or none.
@@ -14,11 +15,12 @@ import { FolderIcon } from './Icons.jsx'
  * and its history go with it untouched.
  */
 export default function MoveDeckModal({ deck, folders = [], onClose, onMove }) {
+  const { t } = useT()
   const [target, setTarget] = useState(deck?.folderId ?? null)
   const current = deck?.folderId ?? null
 
   const options = [
-    { id: null, name: 'Ungrouped', hint: 'Not in any folder' },
+    { id: null, name: t('folders.ungrouped'), hint: t('moveDeck.notInFolder') },
     ...[...folders]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((f) => ({ id: f.id, name: f.name, hint: null })),
@@ -28,14 +30,12 @@ export default function MoveDeckModal({ deck, folders = [], onClose, onMove }) {
     <Modal
       open
       onClose={onClose}
-      kicker="Move deck"
-      title={`Move “${deck?.title ?? ''}”`}
+      kicker={t('moveDeck.kicker')}
+      title={t('moveDeck.title', { title: deck?.title ?? '' })}
       body={
-        folders.length
-          ? 'Its cards and review history come with it.'
-          : 'There are no folders yet. Make one from the library, then file decks in it here.'
+        folders.length ? t('moveDeck.body') : t('moveDeck.noFolders')
       }
-      confirmLabel="Move deck"
+      confirmLabel={t('moveDeck.confirm')}
       confirmDisabled={target === current}
       maxWidth={420}
       onConfirm={() => {
@@ -45,7 +45,7 @@ export default function MoveDeckModal({ deck, folders = [], onClose, onMove }) {
       }}
     >
       <fieldset className="m-0 mb-6 flex flex-col gap-1.5 border-0 p-0">
-        <legend className="kicker mb-2.5 !tracking-[0.12em]">Folder</legend>
+        <legend className="kicker mb-2.5 !tracking-[0.12em]">{t('moveDeck.folder')}</legend>
         {options.map((option) => {
           const checked = target === option.id
           return (
@@ -70,7 +70,7 @@ export default function MoveDeckModal({ deck, folders = [], onClose, onMove }) {
                 {option.hint && <span className="text-xs text-ink-3">{option.hint}</span>}
               </span>
               {option.id === current && (
-                <span className="kicker shrink-0 !tracking-[0.1em]">Now</span>
+                <span className="kicker shrink-0 !tracking-[0.1em]">{t('moveDeck.now')}</span>
               )}
             </label>
           )

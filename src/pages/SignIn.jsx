@@ -7,6 +7,7 @@ import { useAuth } from '../data/useAuth.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import Spinner from '../components/Spinner.jsx'
 import useOnline from '../hooks/useOnline.js'
+import useT from '../i18n/useT.js'
 
 /**
  * One page for the three ways in: signing in, signing up, and asking for a
@@ -24,29 +25,14 @@ import useOnline from '../hooks/useOnline.js'
  * machines.
  */
 
-const COPY = {
-  in: {
-    title: 'Welcome back',
-    lede: 'Sign in to continue studying.',
-    action: 'Sign in',
-    busy: 'Signing in…',
-    document: 'Sign in',
-  },
-  up: {
-    title: 'Make an account',
-    lede: 'It keeps your decks and your review history across machines.',
-    action: 'Create account',
-    busy: 'Creating…',
-    document: 'Make an account',
-  },
-  forgot: {
-    title: 'Forgotten your password',
-    lede: 'We will email you a link that lets you choose a new one.',
-    action: 'Send reset link',
-    busy: 'Sending…',
-    document: 'Send a reset link',
-  },
-}
+/** One mode's words, from the dictionary: signIn.<mode>.title and so on. */
+const copyFor = (t, mode) => ({
+  title: t(`signIn.${mode}.title`),
+  lede: t(`signIn.${mode}.lede`),
+  action: t(`signIn.${mode}.action`),
+  busy: t(`signIn.${mode}.busy`),
+  document: t(`signIn.${mode}.document`),
+})
 
 /**
  * The wordmark, and the one piece of decoration on the page.
@@ -56,10 +42,11 @@ const COPY = {
  * wants it. Same typeface the deck titles use.
  */
 function Wordmark() {
+  const { t } = useT()
   return (
     <div className="flex flex-col items-center gap-1.5">
       <img src="/assets/gunit-logo.png" alt="Gunit" className="block h-9 w-auto" />
-      <p className="kicker m-0 !tracking-[0.14em] text-ink-3">Your study space</p>
+      <p className="kicker m-0 !tracking-[0.14em] text-ink-3">{t('signIn.tagline')}</p>
     </div>
   )
 }
@@ -128,7 +115,7 @@ function Centred({ children }) {
  * only a width, and a 3px outline with no style is 3px of nothing.
  */
 const input =
-  'w-full rounded-[10px] border border-line bg-surface px-3.5 py-[13px] text-[15px] text-ink ' +
+  'w-full rounded-[10px] border border-line bg-surface px-3.5 py-[13px] fs-15 text-ink ' +
   'outline-none transition-colors placeholder:text-ink-3/70 ' +
   'focus:border-accent focus:outline-2 focus:outline-accent-soft'
 
@@ -154,7 +141,9 @@ export default function SignIn() {
    */
   const { state } = useLocation()
   const [mode, setMode] = useState(state?.mode === 'up' ? 'up' : 'in')
-  useDocumentTitle(COPY[mode].document)
+  const { t } = useT()
+  const copy = copyFor(t, mode)
+  useDocumentTitle(copy.document)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -163,8 +152,6 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
-
-  const copy = COPY[mode]
 
   const change = (next) => {
     setMode(next)
@@ -201,16 +188,15 @@ export default function SignIn() {
       <Centred>
         <Wordmark />
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="kicker">No accounts here</div>
-          <h1 className="m-0 font-serif text-[30px] leading-[1.12] tracking-[-0.02em]">
-            This copy of Gunit is local only
+          <div className="kicker">{t('signIn.localKicker')}</div>
+          <h1 className="m-0 font-serif fs-30 leading-[1.12] tracking-[-0.02em]">
+            {t('signIn.localTitle')}
           </h1>
-          <p className="m-0 max-w-[360px] text-[15px] leading-[1.55] text-ink-2 text-pretty">
-            Your decks live in this browser. Nothing is missing — back them up from Settings to move
-            them to another machine.
+          <p className="m-0 max-w-[360px] fs-15 leading-[1.55] text-ink-2 text-pretty">
+            {t('signIn.localBody')}
           </p>
           <Button as={Link} to="/" className="mt-1">
-            Back to studying
+            {t('signIn.backToStudying')}
           </Button>
         </div>
       </Centred>
@@ -222,12 +208,12 @@ export default function SignIn() {
       <Centred>
         <Wordmark />
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="kicker">Already signed in</div>
-          <h1 className="m-0 font-serif text-[30px] leading-[1.12] tracking-[-0.02em]">
-            You are signed in as {user.email}
+          <div className="kicker">{t('signIn.alreadyKicker')}</div>
+          <h1 className="m-0 font-serif fs-30 leading-[1.12] tracking-[-0.02em]">
+            {t('signIn.alreadyTitle', { email: user.email })}
           </h1>
           <Button as={Link} to={safeNext(searchParams.get('next'))} className="mt-1">
-            Back to studying
+            {t('signIn.backToStudying')}
           </Button>
         </div>
       </Centred>
@@ -240,27 +226,27 @@ export default function SignIn() {
 
       <div className="flex w-full flex-col gap-7">
         <header className="text-center">
-          <h1 className="m-0 mb-2 font-serif text-[30px] leading-[1.12] tracking-[-0.02em]">
+          <h1 className="m-0 mb-2 font-serif fs-30 leading-[1.12] tracking-[-0.02em]">
             {copy.title}
           </h1>
-          <p className="m-0 text-[15px] leading-[1.55] text-ink-2 text-pretty">{copy.lede}</p>
+          <p className="m-0 fs-15 leading-[1.55] text-ink-2 text-pretty">{copy.lede}</p>
         </header>
 
         {sent ? (
           <div
             role="status"
-            className="rounded-[10px] border border-ok-line bg-ok-soft px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2"
+            className="rounded-[10px] border border-ok-line bg-ok-soft px-4 py-3.5 fs-13 leading-[1.5] text-ink-2"
           >
-            <div className="mb-1 font-semibold text-ink">Check your email</div>
-            If an account exists for {email}, a reset link is on its way. It expires after an hour.
+            <div className="mb-1 font-semibold text-ink">{t('signIn.checkEmail')}</div>
+            {t('signIn.resetSent', { email })}
           </div>
         ) : (
           <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
             {mode === 'up' && (
               <Row
                 id="auth-name"
-                label="Your name"
-                hint={<span className="text-[12px] text-ink-3">optional</span>}
+                label={t('signIn.name')}
+                hint={<span className="fs-12 text-ink-3">{t('field.optional')}</span>}
               >
                 <input
                   id="auth-name"
@@ -268,12 +254,12 @@ export default function SignIn() {
                   autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Shown on the dashboard greeting"
+                  placeholder={t('signIn.namePlaceholder')}
                 />
               </Row>
             )}
 
-            <Row id="auth-email" label="Email">
+            <Row id="auth-email" label={t('signIn.email')}>
               <input
                 id="auth-email"
                 className={input}
@@ -288,15 +274,15 @@ export default function SignIn() {
             {mode !== 'forgot' && (
               <Row
                 id="auth-password"
-                label="Password"
+                label={t('signIn.password')}
                 hint={
                   mode === 'in' && (
                     <button
                       type="button"
                       onClick={() => change('forgot')}
-                      className="cursor-pointer border-0 bg-transparent p-0 text-[12px] text-ink-3 underline-offset-2 transition-colors hover:text-accent hover:underline"
+                      className="cursor-pointer border-0 bg-transparent p-0 fs-12 text-ink-3 underline-offset-2 transition-colors hover:text-accent hover:underline"
                     >
-                      Forgot password?
+                      {t('signIn.forgotLink')}
                     </button>
                   )
                 }
@@ -318,7 +304,7 @@ export default function SignIn() {
                     onClick={() => setReveal((v) => !v)}
                     // The name says what pressing it does, and `pressed` says
                     // which state it is in — the icon alone says neither.
-                    aria-label={reveal ? 'Hide password' : 'Show password'}
+                    aria-label={reveal ? t('signIn.hidePassword') : t('signIn.showPassword')}
                     aria-pressed={reveal}
                     aria-controls="auth-password"
                     className="absolute top-1/2 right-1.5 grid h-8 w-8 -translate-y-1/2 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-ink-3 transition-colors hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -330,9 +316,8 @@ export default function SignIn() {
             )}
 
             {mode === 'up' && (
-              <p className="m-0 text-[13px] leading-[1.5] text-ink-3">
-                Eight characters or more. There is no confirmation email — you are in as soon as you
-                choose one.
+              <p className="m-0 fs-13 leading-[1.5] text-ink-3">
+                {t('signIn.passwordRule')}
               </p>
             )}
 
@@ -342,7 +327,7 @@ export default function SignIn() {
             */}
             <div role="status" aria-live="polite">
               {error && (
-                <div className="rounded-[10px] border border-err bg-err-soft px-4 py-3 text-[13px] leading-[1.5] text-ink">
+                <div className="rounded-[10px] border border-err bg-err-soft px-4 py-3 fs-13 leading-[1.5] text-ink">
                   {error}
                 </div>
               )}
@@ -354,9 +339,8 @@ export default function SignIn() {
               to them. Said before they type, instead.
             */}
             {!online && (
-              <p role="status" className="m-0 text-[13px] leading-[1.5] text-ink-2 text-pretty">
-                You’re offline. Signing in needs a connection — your decks on this device work
-                without one.
+              <p role="status" className="m-0 fs-13 leading-[1.5] text-ink-2 text-pretty">
+                {t('signIn.offline')}
               </p>
             )}
             <Button
@@ -371,33 +355,33 @@ export default function SignIn() {
           </form>
         )}
 
-        <div className="flex flex-col items-center gap-2.5 border-t border-line-soft pt-6 text-[13px] text-ink-2">
+        <div className="flex flex-col items-center gap-2.5 border-t border-line-soft pt-6 fs-13 text-ink-2">
           {mode === 'in' && (
             <p className="m-0">
-              Don&rsquo;t have an account?{' '}
+              {t('signIn.noAccount')}{' '}
               <button
                 type="button"
                 onClick={() => change('up')}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-accent underline-offset-2 hover:underline"
+                className="cursor-pointer border-0 bg-transparent p-0 fs-13 font-semibold text-accent underline-offset-2 hover:underline"
               >
-                Create one
+                {t('signIn.createOne')}
               </button>
             </p>
           )}
           {mode !== 'in' && (
             <p className="m-0">
-              Already have an account?{' '}
+              {t('signIn.haveAccount')}{' '}
               <button
                 type="button"
                 onClick={() => change('in')}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-accent underline-offset-2 hover:underline"
+                className="cursor-pointer border-0 bg-transparent p-0 fs-13 font-semibold text-accent underline-offset-2 hover:underline"
               >
-                Sign in
+                {t('common.signIn')}
               </button>
             </p>
           )}
           <Link to="/" className="text-ink-3 underline-offset-2 hover:underline">
-            Keep studying without an account
+            {t('signIn.withoutAccount')}
           </Link>
         </div>
       </div>

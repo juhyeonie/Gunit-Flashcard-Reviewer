@@ -3,6 +3,7 @@ import Menu from './Menu.jsx'
 import NotificationList from './NotificationList.jsx'
 import { BellIcon } from './Icons.jsx'
 import { useNotifications } from '../data/notificationsContext.js'
+import useT from '../i18n/useT.js'
 
 /**
  * The bell in the top bar, beside the streak: a dot when something is unread,
@@ -13,6 +14,7 @@ import { useNotifications } from '../data/notificationsContext.js'
  */
 export default function NotificationBell() {
   const { unread, refresh } = useNotifications()
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const close = useCallback(() => setOpen(false), [])
 
@@ -24,7 +26,7 @@ export default function NotificationBell() {
           if (!open) refresh()
           setOpen((v) => !v)
         }}
-        aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-label={unread ? t('notifications.bellUnread', { count: unread }) : t('notifications.title')}
         aria-expanded={open}
         aria-haspopup="dialog"
         className={`relative grid h-9 w-9 cursor-pointer place-items-center rounded-full border bg-surface text-ink-2 transition-colors hover:border-ink-3 hover:text-ink ${
@@ -40,7 +42,7 @@ export default function NotificationBell() {
         )}
       </button>
       <Menu open={open} onClose={close} align="right" width={360} className="w-[360px] !gap-0 overflow-hidden !p-0">
-        <div role="dialog" aria-label="Notifications" className="max-h-[min(70vh,560px)] overflow-y-auto">
+        <div role="dialog" aria-label={t('notifications.title')} className="max-h-[min(70vh,560px)] overflow-y-auto">
           <NotificationList onDone={close} />
         </div>
       </Menu>

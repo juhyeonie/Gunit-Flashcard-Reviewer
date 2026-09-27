@@ -12,6 +12,7 @@ import { fileNameFor, toTransfer } from '../data/transfer.js'
 import MissingDeck from '../components/MissingDeck.jsx'
 import { useOwnShares } from '../data/ownShares.js'
 import Mascot from '../components/Mascot.jsx'
+import useT from '../i18n/useT.js'
 
 export default function DeckDetail({
   onEditDeck,
@@ -28,6 +29,7 @@ export default function DeckDetail({
   const { decks, folders, say, setCardSuspended } = useApp()
   const deck = decks.find((d) => d.id === id)
   const folder = folders.find((f) => f.id === deck?.folderId) ?? null
+  const { t } = useT()
   useDocumentTitle(deck?.title)
   const shares = useOwnShares()
 
@@ -42,26 +44,26 @@ export default function DeckDetail({
   const due = dueCount(deck)
   const suspended = suspendedCount(deck)
   const stats = [
-    { label: 'Cards', value: String(deck.cards.length) },
-    { label: 'Due now', value: String(due), accent: due > 0 },
-    { label: 'Known', value: `${Math.round(deck.progress * 100)}%` },
-    { label: 'Last studied', value: formatRelative(deck.studiedAt) },
+    { label: t('summary.cards'), value: String(deck.cards.length) },
+    { label: t('dashboard.stats.due'), value: String(due), accent: due > 0 },
+    { label: t('summary.known'), value: `${Math.round(deck.progress * 100)}%` },
+    { label: t('deckDetail.lastStudied'), value: formatRelative(deck.studiedAt) },
     // Shown only when it applies. A deck whose cards are all suspended reads
     // "0 due" otherwise, which looks like the scheduler has stopped working.
-    ...(suspended ? [{ label: 'Suspended', value: String(suspended) }] : []),
+    ...(suspended ? [{ label: t('deckDetail.suspended'), value: String(suspended) }] : []),
   ]
 
   const toggleSuspend = (card, index) => {
     setCardMenu(null)
     const off = isSuspended(entryFor(deck, card))
     setCardSuspended(deck.id, card.id, !off)
-    say(off ? `Card ${index + 1} is back in the rotation` : `Card ${index + 1} suspended`)
+    say(off ? t('deckDetail.unsuspended', { n: index + 1 }) : t('deckDetail.suspendedToast', { n: index + 1 }))
   }
 
   const guard = (go) => () => {
     setStudyMenu(false)
     if (!hasCards) {
-      say('Add a card to this deck before studying')
+      say(t('deckDetail.addFirst'))
       return
     }
     go()
@@ -84,7 +86,7 @@ export default function DeckDetail({
     link.click()
     // Revoking in the same tick can cancel the save before it starts.
     setTimeout(() => URL.revokeObjectURL(url), 0)
-    say(`Saved ${name}`)
+    say(t('deckDetail.saved', { name }))
   }
 
   // Quiz has a higher bar than flashcards: without other cards to draw wrong
@@ -92,7 +94,7 @@ export default function DeckDetail({
   const quizGuard = () => {
     setStudyMenu(false)
     if (!canQuiz(deck)) {
-      say(`A quiz needs ${MIN_QUIZ_CARDS} cards — this deck has ${deck.cards.length}`)
+      say(t('deckDetail.quizNeeds', { min: MIN_QUIZ_CARDS, count: deck.cards.length }))
       return
     }
     navigate(`/decks/${deck.id}/quiz`)
@@ -104,24 +106,24 @@ export default function DeckDetail({
         to="/decks"
         className="self-start border-0 bg-transparent p-0 text-xs font-medium whitespace-nowrap text-ink-3 transition-colors hover:text-ink"
       >
-        ← All decks
+        {t('deckDetail.back')}
       </Link>
 
       <header className="flex flex-wrap items-end justify-between gap-[22px] border-b border-line pb-[26px]">
         <div className="min-w-0 max-w-[520px]">
           <div className="kicker mb-3.5">
             {deck.subject}
-            {shares.deck(deck.id) && <span className="text-accent"> · Shared</span>}
+            {shares.deck(deck.id) && <span className="text-accent"> · {t('deck.shared')}</span>}
           </div>
           <div className="m-0 mb-3 flex min-w-0 items-start gap-3">
-            <h1 className="m-0 min-w-0 font-serif text-[32px] leading-[1.05] tracking-[-0.02em] text-pretty sm:text-[42px]">
+            <h1 className="m-0 min-w-0 font-serif fs-32 leading-[1.05] tracking-[-0.02em] text-pretty sm:fs-42">
               {deck.title}
             </h1>
             <button
               type="button"
               onClick={() => onEditDeck(deck)}
-              title="Edit deck"
-              aria-label="Edit deck"
+              title={t('deck.editDeck')}
+              aria-label={t('deck.editDeck')}
               className="mt-2 grid h-[30px] w-[30px] shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-transparent p-0 text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
             >
               <PencilIcon />
@@ -129,9 +131,9 @@ export default function DeckDetail({
             <button
               type="button"
               onClick={exportDeck}
-              title="Export deck"
-              aria-label="Export deck"
-              className="mt-2 grid h-[30px] w-[30px] shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-transparent p-0 text-[15px] text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
+              title={t('deckDetail.export')}
+              aria-label={t('deckDetail.export')}
+              className="mt-2 grid h-[30px] w-[30px] shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-transparent p-0 fs-15 text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
             >
               ↓
             </button>
@@ -139,11 +141,11 @@ export default function DeckDetail({
               <button
                 type="button"
                 onClick={() => setDeckMenu((v) => !v)}
-                title="Deck options"
-                aria-label="Deck options"
+                title={t('deckDetail.options')}
+                aria-label={t('deckDetail.options')}
                 aria-expanded={deckMenu}
                 aria-haspopup="true"
-                className={`grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-lg border bg-transparent p-0 text-[15px] leading-none text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink ${
+                className={`grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-lg border bg-transparent p-0 fs-15 leading-none text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink ${
                   deckMenu ? 'border-ink-3 bg-raised' : 'border-line'
                 }`}
               >
@@ -167,24 +169,24 @@ export default function DeckDetail({
                   nowhere on this page.
                 */}
                 <MenuItem
-                  title="Move to folder"
-                  hint={folder ? `In “${folder.name}”` : 'Not in a folder'}
+                  title={t('deckDetail.move')}
+                  hint={folder ? t('deckDetail.inFolder', { name: folder.name }) : t('deckDetail.notInFolder')}
                   onClick={() => {
                     setDeckMenu(false)
                     onMoveDeck?.(deck)
                   }}
                 />
                 <MenuItem
-                  title="Share"
-                  hint="A link to study it, or to edit it with you."
+                  title={t('deckDetail.share')}
+                  hint={t('deckDetail.shareHint')}
                   onClick={() => {
                     setDeckMenu(false)
                     onShareDeck?.(deck)
                   }}
                 />
                 <MenuItem
-                  title="Reset progress"
-                  hint="Every card new again. The cards themselves stay."
+                  title={t('deckDetail.reset')}
+                  hint={t('deckDetail.resetHint')}
                   danger
                   onClick={() => {
                     setDeckMenu(false)
@@ -194,7 +196,7 @@ export default function DeckDetail({
               </Menu>
             </div>
           </div>
-          <p className="m-0 text-[15px] text-ink-2 text-pretty">{deck.desc}</p>
+          <p className="m-0 fs-15 text-ink-2 text-pretty">{deck.desc}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -205,9 +207,9 @@ export default function DeckDetail({
               aria-expanded={studyMenu}
               aria-haspopup="true"
             >
-              <span>Study this deck</span>
+              <span>{t('deckDetail.study')}</span>
               <span
-                className="text-[10px] opacity-70 transition-transform duration-150"
+                className="fs-10 opacity-70 transition-transform duration-150"
                 style={{ transform: studyMenu ? 'rotate(180deg)' : 'none' }}
               >
                 ▾
@@ -215,13 +217,13 @@ export default function DeckDetail({
             </Button>
             <Menu open={studyMenu} onClose={() => setStudyMenu(false)} align="responsive">
               <MenuItem
-                title="Flashcards"
-                hint="Flip through the deck at your own pace."
+                title={t('deckDetail.flashcards')}
+                hint={t('deckDetail.flashcardsHint')}
                 onClick={guard(() => navigate(`/decks/${deck.id}/review`))}
               />
               <MenuItem
-                title="Quiz"
-                hint="Answer multiple choice and get scored."
+                title={t('deckDetail.quiz')}
+                hint={t('deckDetail.quizHint')}
                 onClick={quizGuard}
               />
             </Menu>
@@ -234,9 +236,9 @@ export default function DeckDetail({
               aria-expanded={addMenu}
               aria-haspopup="true"
             >
-              <span>Add cards</span>
+              <span>{t('deckDetail.addCards')}</span>
               <span
-                className="text-[10px] opacity-70 transition-transform duration-150"
+                className="fs-10 opacity-70 transition-transform duration-150"
                 style={{ transform: addMenu ? 'rotate(180deg)' : 'none' }}
               >
                 ▾
@@ -255,16 +257,16 @@ export default function DeckDetail({
             */}
             <Menu open={addMenu} onClose={() => setAddMenu(false)} width={240} align="right">
               <MenuItem
-                title="Write your own"
-                hint="Type a question and answer by hand."
+                title={t('deckDetail.writeOwn')}
+                hint={t('deckDetail.writeOwnHint')}
                 onClick={() => {
                   setAddMenu(false)
                   onNewCard(deck)
                 }}
               />
               <MenuItem
-                title="Import a file"
-                hint="Read a document and split it into cards."
+                title={t('deckModal.source.import.label')}
+                hint={t('deckModal.source.import.hint')}
                 onClick={() => {
                   setAddMenu(false)
                   onImport(deck)
@@ -279,7 +281,7 @@ export default function DeckDetail({
         {stats.map((s) => (
           <div key={s.label} className="py-0.5 pr-5">
             <div
-              className="mb-[7px] font-serif text-[26px] leading-none"
+              className="mb-[7px] font-serif fs-26 leading-none"
               style={s.accent ? { color: 'var(--color-accent)' } : undefined}
             >
               {s.value}
@@ -301,18 +303,18 @@ export default function DeckDetail({
               }`}
             >
               <div className="flex items-start gap-[18px]">
-                <span className="w-[26px] shrink-0 pt-1 font-mono text-[11px] leading-[1.5] font-medium tracking-[0.06em] text-ink-3">
+                <span className="w-[26px] shrink-0 pt-1 font-mono fs-11 leading-[1.5] font-medium tracking-[0.06em] text-ink-3">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <div
-                  className={`min-w-0 flex-1 font-serif text-[19px] leading-[1.32] text-pretty ${
+                  className={`min-w-0 flex-1 font-serif fs-19 leading-[1.32] text-pretty ${
                     off ? 'text-ink-3' : ''
                   }`}
                 >
                   {card.front}
                   {off && (
-                    <span className="ml-2.5 rounded-[5px] border border-line px-1.5 py-[3px] align-middle font-mono text-[10px] leading-none font-medium tracking-[0.06em] whitespace-nowrap text-ink-3 uppercase">
-                      Suspended
+                    <span className="ml-2.5 rounded-[5px] border border-line px-1.5 py-[3px] align-middle font-mono fs-10 leading-none font-medium tracking-[0.06em] whitespace-nowrap text-ink-3 uppercase">
+                      {t('deckDetail.suspended')}
                     </span>
                   )}
                 </div>
@@ -320,8 +322,8 @@ export default function DeckDetail({
                   <button
                     type="button"
                     onClick={() => setCardMenu(cardMenu === i ? null : i)}
-                    title="Card options"
-                    aria-label="Card options"
+                    title={t('deckDetail.cardOptions')}
+                    aria-label={t('deckDetail.cardOptions')}
                     className={`grid h-7 w-7 cursor-pointer place-items-center rounded-[5px] border bg-transparent text-sm leading-none font-medium text-ink-3 transition-colors hover:border-ink-3 hover:text-ink ${
                       cardMenu === i ? 'border-ink-3 bg-raised' : 'border-line'
                     }`}
@@ -330,23 +332,19 @@ export default function DeckDetail({
                   </button>
                   <Menu open={cardMenu === i} onClose={() => setCardMenu(null)} width={210}>
                     <MenuItem
-                      title="Edit card"
+                      title={t('cardModal.editKicker')}
                       onClick={() => {
                         setCardMenu(null)
                         onEditCard(deck, i, card)
                       }}
                     />
                     <MenuItem
-                      title={off ? 'Unsuspend card' : 'Suspend card'}
-                      hint={
-                        off
-                          ? 'Study it again from where it left off.'
-                          : 'Keep it and its history, but stop being asked.'
-                      }
+                      title={off ? t('deckDetail.unsuspend') : t('deckDetail.suspend')}
+                      hint={off ? t('deckDetail.unsuspendHint') : t('deckDetail.suspendHint')}
                       onClick={() => toggleSuspend(card, i)}
                     />
                     <MenuItem
-                      title="Delete card"
+                      title={t('deckDetail.deleteCard')}
                       danger
                       onClick={() => {
                         setCardMenu(null)
@@ -370,16 +368,16 @@ export default function DeckDetail({
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
           <Mascot pose="thinking" size={92} className="mb-1" />
-          <div className="font-serif text-[24px] leading-[1.2]">No cards yet</div>
+          <div className="font-serif fs-24 leading-[1.2]">{t('deckDetail.emptyTitle')}</div>
           <p className="m-0 max-w-[360px] text-sm text-ink-3 text-pretty">
-            Write the first card by hand, or upload a reading and let the deck fill itself.
+            {t('deckDetail.emptyBody')}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button size="sm" onClick={() => onNewCard(deck)}>
-              Add a card
+              {t('deckDetail.addCard')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => onImport(deck)}>
-              Upload material
+              {t('deckDetail.upload')}
             </Button>
           </div>
         </div>

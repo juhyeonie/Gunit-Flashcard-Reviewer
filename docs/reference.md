@@ -173,6 +173,14 @@ center shows this device's own notices and nothing from the account.
 `0008` adds `notifications_clear`, the one way a reader can delete their own
 notifications — see [Notifications](#notifications).
 
+`0009` adds the reader's language, text size and profile picture — see
+[Language, text size and picture](#language-text-size-and-picture). Three
+columns on `profiles`, under the same "own profile" policy as the rest of the
+row, and a private Storage bucket, `avatars`, with policies that let each
+reader reach only the folder named after their own account. Before it has
+run, the name and theme still sync, the language and size stay on each device,
+and uploading a picture says pictures are not set up yet.
+
 `0002` matters more than it looks. A change set goes up as one call to
 `sync_library`, which is one statement to Postgres and therefore one
 transaction — so a push either lands completely or not at all. Sent as separate
@@ -306,6 +314,62 @@ at once, and removes the account's from the account through
 all sends the ids that were on screen, never "everything", so a notification
 that arrived while offline is not deleted unseen. Before `0008` has run, a
 cleared notification stays cleared on the device it was cleared on.
+
+### Language, text size and picture
+
+Settings → **Language & text** chooses the language Gunit speaks — English or
+Filipino — and the text size: Small, Default or Large. Both apply the moment
+they are picked, and Cancel puts them back.
+
+**Language.** Every word the app itself shows is in a dictionary under
+`src/i18n/locales/`, one file per language, looked up by key — `t('settings.title')`.
+Components call `useT()`; code outside React, such as a toast worded in a
+callback or a file parser's error, calls `t()` from `src/i18n/index.js`, which
+reads the language the provider last set. What a reader wrote — deck names,
+descriptions, cards — is never passed through it. A key missing from a
+dictionary falls back to English. Plurals are objects with `one` and `other`
+(and any other CLDR form a language needs), chosen with `Intl.PluralRules`.
+
+Adding a language touches no component: copy `locales/en.js` to
+`locales/<code>.js`, translate the values, and add it to `LANGUAGES` and
+`MESSAGES` in `src/i18n/index.js`. `src/i18n/i18n.test.js` fails on a key that
+is missing or extra, on a placeholder that has gone, and on any key the code
+asks for that no dictionary has. No migration is needed: the database checks
+the column's shape, not a list. Release notes can carry their own words per
+language (`src/data/releaseNotes.js`).
+
+**Text size** is text only. `<html data-font-size>` sets `--text-scale`, and
+every size in the app is an `fs-*` token (`fs-13` is 13px at Default) defined
+in `src/index.css` rather than a fixed `text-[13px]`. Spacing, borders and
+widths do not move, which is what keeps the layout intact. Only the first 20px
+of a size scales, so large headings grow by a few pixels rather than
+wrapping, and Small never goes under 11px. When long words or large text leave
+the top bar too little room on a tablet, the streak label steps out first
+(`useTightBar`), and the tabs scroll inside their pill as a last resort.
+
+**Syncing.** Both live in the settings, so a guest's are kept in this browser
+and an account's go to its profile row with the name and theme. A new account
+keeps what its first device already had — its row starts with nulls, meaning
+nobody has chosen. A change is marked unsent before it goes up
+(`gunit.sync.prefs.unsent.<id>`), and while the mark is set, or when a read of
+the account began before the change, the account's copy is not installed over
+this device's: a language picked offline survives reconnecting, and goes up
+then. While a session is being restored after a reload, the last language and
+size on screen stand in, so a signed-in reader never sees a frame of the
+guest's.
+
+**Profile picture.** Under Settings → Profile, and in the top bar. The picture
+is cropped to its middle square and shrunk to 256 pixels in the browser
+(`src/data/avatarImage.js`) before anything is stored: JPG, PNG or WebP, up to
+10 MB picked, a few kilobytes kept. A guest's stays in this browser. An
+account's goes to the private `avatars` bucket as `<account id>/<random>.webp`,
+`profiles.avatar_path` names the current one, and the one it replaced is
+removed. The bucket is private because nothing in Gunit shows a reader anyone
+else's picture, so a public URL would serve no one and expose every picture.
+The app downloads its own with the reader's session and keeps a copy on the
+device (`gunit.avatar.<id>`), so it shows offline; changing it needs the
+connection, and Settings says so. Signing out takes that copy off the machine
+with the library.
 
 ### What it costs
 
@@ -449,6 +513,15 @@ they need:
 - `Quiz.test.jsx` — answering, scoring, and the deck too small to quiz
 - `Summary.test.jsx` — both of its states
 - `Settings.test.jsx` — backing the library up and restoring it
+- `Preferences.test.jsx` — language and text size on screen and after a
+  reload, Save and Cancel, and the profile picture as a guest
+- `preferencesSync.test.jsx` — language, size and picture to and from the
+  account, offline, across a reload, and against a read that overlaps a change
+- `avatar.test.js` — what may be picked, and where an account's picture goes
+- `src/i18n/i18n.test.js` — every dictionary complete, and every key the code
+  asks for present
+- `supabase/test/profile.test.js` — the 0009 columns and the avatars bucket's
+  policies, against Postgres itself
 
 The migrations themselves run under `supabase/test`, in PGlite — Postgres
 compiled to WebAssembly — with Supabase's `auth.uid()`, `auth.jwt()` and roles

@@ -4,6 +4,8 @@
  * Pure, so the question shapes can be checked without rendering anything.
  */
 
+import { t } from '../i18n/index.js'
+
 /**
  * A quiz needs four cards: the answer plus three distractors drawn from the
  * deck's other backs. Below that the "choice" is not a choice — a one-card deck
@@ -38,7 +40,7 @@ export const buildQuestions = (cards) =>
 
 export const verdictFor = (score, total) => {
   const ratio = total ? score / total : 0
-  if (ratio >= 0.85) return 'Strong recall across the deck. Ready to move to a longer interval.'
-  if (ratio >= 0.5) return 'A solid pass. Another flashcard run will close the remaining gaps.'
-  return 'Worth another pass through the deck before quizzing again.'
+  if (ratio >= 0.85) return t('quiz.verdict.strong')
+  if (ratio >= 0.5) return t('quiz.verdict.solid')
+  return t('quiz.verdict.again')
 }

@@ -36,6 +36,8 @@ import Review from './Review.jsx'
 import Quiz from './Quiz.jsx'
 import Summary from './Summary.jsx'
 import { SharedDeckView, SharedFolderView } from './SharedViews.jsx'
+import { t } from '../i18n/index.js'
+import useT from '../i18n/useT.js'
 
 /** How long progress waits before going up, so a run of grades is one request. */
 const QUIET_MS = 1000
@@ -185,7 +187,7 @@ export default function SharedArea() {
       return
     }
     setAnswer((a) => ({ ...a, joined: false }))
-    app.say('Removed from Shared with me')
+    app.say(t('sharedArea.removed'))
   }, [answer, app])
 
   const study = useCallback(
@@ -246,8 +248,8 @@ export default function SharedArea() {
         app.say(error)
         return false
       }
-      if (data?.refused?.length) app.say('Someone else changed this deck — showing it as it is now')
-      setRefreshTick((t) => t + 1)
+      if (data?.refused?.length) app.say(t('sharedArea.changedElsewhere'))
+      setRefreshTick((n) => n + 1)
       return true
     },
     [token, app],
@@ -326,74 +328,50 @@ export default function SharedArea() {
   )
 }
 
-const NOTICES = {
-  not_found: {
-    kicker: 'Link unavailable',
-    title: (noun) => `This shared ${noun} is no longer available`,
-    body: 'The link may have been reset or mistyped, or the owner deleted it. Ask them for a new one.',
-  },
-  revoked: {
-    kicker: 'Sharing turned off',
-    title: (noun) => `This shared ${noun} is no longer available`,
-    body: 'Its owner stopped sharing it. If you added a copy to your Gunit, that copy is still yours.',
-  },
-  sign_in: {
-    kicker: 'Invited people only',
-    title: () => 'Sign in to open this',
-    body: 'It is shared with specific people. Sign in with the email address it was sent to.',
-  },
-  no_access: {
-    kicker: 'Invited people only',
-    title: () => 'This isn’t shared with this account',
-    body: 'It is shared with specific people, and this account is not one of them. If it was sent to another address of yours, sign in with that one — or ask the owner to invite you.',
-  },
-  no_accounts: {
-    kicker: 'Local-only Gunit',
-    title: () => 'This copy of Gunit can’t open shared links',
-    body: 'It keeps everything in this browser, with no accounts to share between. Open the link on the main Gunit site instead.',
-  },
-  error: {
-    kicker: 'Couldn’t open the link',
-    title: () => 'Nothing to show yet',
-    body: 'Shared decks need a connection the first time they are opened. Once opened, they can be studied offline.',
-  },
-}
+/** Worded under sharedArea.notice.<phase> in the dictionaries. */
+const NOTICES = ['not_found', 'revoked', 'sign_in', 'no_access', 'no_accounts', 'error']
 
 /** What a link says when it will not open, and the way out of it. */
 function SharedNotice({ phase, kind, answer, signInPath }) {
-  useDocumentTitle(kind === 'folder' ? 'Shared folder' : 'Shared deck')
+  const { t } = useT()
+  const noun = kind === 'folder' ? 'folder' : 'deck'
+  useDocumentTitle(t(`sharedArea.title.${noun}`))
   if (phase === 'loading') {
     return (
       <div className="flex items-center justify-center gap-2.5 py-24 text-sm text-ink-3" role="status">
         <Spinner />
-        Opening the shared {kind === 'folder' ? 'folder' : 'deck'}…
+        {t(`sharedArea.opening.${noun}`)}
       </div>
     )
   }
-  const notice = NOTICES[phase] ?? NOTICES.not_found
-  const noun = kind === 'folder' ? 'folder' : 'deck'
+  const key = `sharedArea.notice.${NOTICES.includes(phase) ? phase : 'not_found'}`
+  const notice = {
+    kicker: t(`${key}.kicker`),
+    title: t(`${key}.title`, { noun: t(`notices.noun.${noun}`) }),
+    body: t(`${key}.body`),
+  }
   return (
     <div className="rise-in mx-auto flex max-w-xl flex-col items-center py-16 text-center">
       <Mascot pose="thinking" size={96} className="mb-5" />
       <div className="kicker mb-3">{notice.kicker}</div>
-      <h1 className="m-0 font-serif text-[28px] leading-[1.15] font-normal text-pretty">{notice.title(noun)}</h1>
-      <p className="mt-3 mb-0 max-w-[420px] text-[15px] text-ink-2 text-pretty">
+      <h1 className="m-0 font-serif fs-28 leading-[1.15] font-normal text-pretty">{notice.title}</h1>
+      <p className="mt-3 mb-0 max-w-[420px] fs-15 text-ink-2 text-pretty">
         {phase === 'error' && answer?.error ? `${answer.error} ${notice.body}` : notice.body}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         {phase === 'sign_in' && (
           <Button as={Link} to={signInPath}>
-            Sign in
+            {t('common.signIn')}
           </Button>
         )}
         {/* Signed in already: switching accounts starts from signing out. */}
         {phase === 'no_access' && (
           <Button as={Link} to="/settings">
-            Switch account
+            {t('sharedArea.switchAccount')}
           </Button>
         )}
         <Button as={Link} to="/" variant="outline">
-          Go to Gunit
+          {t('sharedArea.goToGunit')}
         </Button>
       </div>
     </div>

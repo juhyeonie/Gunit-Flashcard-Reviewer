@@ -5,9 +5,12 @@ import { getSupabase } from './supabase.js'
 import { registerPendingSync } from './pendingSync.js'
 import {
   GUEST_KEY,
+  clearPrefsUnsent,
   clearUnsent,
   hasDeclinedImport,
+  hasPrefsUnsent,
   hasUnsent,
+  markPrefsUnsent,
   markUnsent,
   readConfirmed,
   rememberConfirmed,
@@ -30,9 +33,12 @@ import {
   toPayload,
   toRows,
   withoutDeletedElsewhere,
+  withoutPreferenceColumns,
   withoutRefused,
   withoutRefusedRows,
 } from './sync.js'
+import { t } from '../i18n/index.js'
+import { rememberAccountAvatar } from './avatar.js'
 
 /**
  * Keeps the signed-in account's library and this browser's in step.
@@ -105,18 +111,8 @@ const readGuestLibrary = () => {
  * toasts that come and go. One each way, replacing each other: the newer is
  * the truth.
  */
-const SAVED_OFFLINE = {
-  kind: 'sync-offline',
-  group: 'sync',
-  title: 'Saved on this device',
-  message: 'Your changes are saved here and will sync when you’re back online.',
-}
-const SYNCED = {
-  kind: 'sync-done',
-  group: 'sync',
-  title: 'Changes synced',
-  message: 'Changes saved on this device have reached your account.',
-}
+const SAVED_OFFLINE = { kind: 'sync-offline', group: 'sync', params: {} }
+const SYNCED = { kind: 'sync-done', group: 'sync', params: {} }
 
 /** How long the library has to sit still before a push is worth making. */
 const QUIET_MS = 1200
@@ -184,8 +180,32 @@ async function readAccount(supabase, userId) {
       folders: folderRes.data ?? [],
     },
     profile: profileRes.data ? profileToSettings(profileRes.data) : {},
+    // The row as it is, for telling what the account actually holds from
+    // what this device would merge it into.
+    profileRow: profileRes.data ?? null,
   }
 }
+
+/**
+ * The preferences the account holds, in the shape `settingsToProfile` sends,
+ * so the two can be compared as text.
+ *
+ * A column that is there but empty reads as null — nobody has chosen, and
+ * this device's choice is owed to it. A column that is not there at all — a
+ * project before 0009 — reads as whatever this device has: there is nowhere
+ * to send it, and counting it as different would send the row again on every
+ * read.
+ */
+const accountPrefs = (row, shape) =>
+  JSON.stringify(
+    Object.fromEntries(
+      Object.keys(shape).map((key) => [key, row && key in row ? (row[key] ?? null) : shape[key]]),
+    ),
+  )
+
+/** PostgREST refusing a column the table does not have: 0009 not run yet. */
+const missingColumn = (error) =>
+  error?.code === 'PGRST204' || /could not find the .* column|column .* does not exist/i.test(error?.message ?? '')
 
 async function selectAll(supabase, table) {
   const rows = []
@@ -284,7 +304,7 @@ export default function LibrarySync() {
        */
       say(
         typeof navigator !== 'undefined' && navigator.onLine === false
-          ? 'You’re offline — changes are saved on this device and sync when you reconnect'
+          ? t('sync.offline')
           : message,
       )
     },
@@ -326,6 +346,83 @@ export default function LibrarySync() {
     [confirm, forgetDeletedElsewhere, say],
   )
 
+  /*
+   * Preferences — the profile row: name, theme, language, text size and the
+   * review settings.
+   *
+   * `prefs` is what this device has, as of the last render. `prefsAccount` is
+   * what the account holds as far as this device knows: read from the row, or
+   * written to it — and, until the first read lands, what this device started
+   * with, so an unchanged launch offline is not mistaken for a change.
+   *
+   * A change is marked unsent before it is sent (storageKeys.js), exactly as
+   * a library change is, and while the mark is set the account's copy is
+   * never installed over this device's: the next read that works sends this
+   * device's up instead. Before, a language picked offline was put back by the
+   * first read after reconnecting.
+   */
+  const prefs = useRef({ settings, theme })
+  const prefsAccount = useRef(null)
+  /** Set once the project turns out not to have 0009's columns yet. */
+  const legacyProfile = useRef(false)
+  /**
+   * When a preference last changed on this device. A read of the account that
+   * started before then is older than what is here, even if the change has
+   * already gone up and its mark been cleared by the time the read lands.
+   */
+  const prefsTouched = useRef(0)
+
+  /**
+   * Sends this device's preferences, and answers `{ error }`.
+   *
+   * Awaited, and that is the whole point. A PostgREST query builder is a lazy
+   * thenable: `from(...).update(...).eq(...)` builds a request and sends
+   * nothing until something calls `then` on it. Written without the await this
+   * silently did nothing at all — the row kept its defaults while the browser
+   * showed the reader's own settings, and signing in on a second machine
+   * pulled those defaults back over them.
+   */
+  const pushPrefs = useCallback(async (uid) => {
+    const supabase = await getSupabase()
+    if (!supabase) return { error: new Error('No project configured') }
+    const row = settingsToProfile(prefs.current.settings, prefs.current.theme)
+    const sent = JSON.stringify(row)
+    const update = (values) => supabase.from('profiles').update(values).eq('id', uid)
+    let { error } = await update(legacyProfile.current ? withoutPreferenceColumns(row) : row)
+    if (error && !legacyProfile.current && missingColumn(error)) {
+      // A project that has not run 0009: the name and theme still go up.
+      legacyProfile.current = true
+      ;({ error } = await update(withoutPreferenceColumns(row)))
+    }
+    if (error) return { error }
+    prefsAccount.current = { userId: uid, json: sent }
+    // A change made while this was in flight is still owed, and stays marked.
+    const now = JSON.stringify(settingsToProfile(prefs.current.settings, prefs.current.theme))
+    if (now === sent) clearPrefsUnsent(uid)
+    return { error: null }
+  }, [])
+
+  /**
+   * What a read of the account, begun at `readAt`, does with the profile row:
+   * installs its preferences, unless this device has its own waiting to go up
+   * — then sends those instead — or changed them after the read began. Answers
+   * what to install.
+   */
+  const receivePrefs = useCallback(
+    (uid, profile, profileRow, readAt) => {
+      // Stale: this device's copy is newer, and has been or is being sent.
+      if (prefsTouched.current >= readAt) return {}
+      const shape = settingsToProfile(prefs.current.settings, prefs.current.theme)
+      prefsAccount.current = { userId: uid, json: accountPrefs(profileRow, shape) }
+      if (!hasPrefsUnsent(uid)) return profile
+      pushPrefs(uid).then(({ error }) => {
+        if (error && alive.current) trouble(t('sync.prefsNotSaved'))
+      })
+      return {}
+    },
+    [pushPrefs, trouble],
+  )
+
   /**
    * Signing in: read the account's library into this browser's copy of it.
    *
@@ -343,7 +440,7 @@ export default function LibrarySync() {
       complained.current = false
       if (wasSignedInAs.current) {
         wasSignedInAs.current = null
-        say('Signed out — your own decks are back')
+        say(t('sync.signedOut'))
       }
       return undefined
     }
@@ -358,11 +455,12 @@ export default function LibrarySync() {
       const supabase = await getSupabase()
       if (!supabase || cancelled) return
 
-      let { error, rows, profile } = await select(supabase)
+      const readAt = Date.now()
+      let { error, rows, profile, profileRow } = await select(supabase)
       if (error) {
         // The account's own key may already hold a copy from last time, which
         // is what the reader is looking at. Studying carries on offline.
-        trouble('Signed in, but your library could not be refreshed')
+        trouble(t('sync.notRefreshed'))
         return
       }
       if (cancelled || !alive.current) return
@@ -421,19 +519,20 @@ export default function LibrarySync() {
              * compare against, and the nearest thing to one — the rows just
              * fetched — is exactly the comparison that would send deletions.
              */
-            trouble('Signed in — a change made here last time has not gone up yet')
+            trouble(t('sync.carryFailed'))
             return
           }
           clearUnsent(userId)
 
           const again = await select(supabase)
           if (again.error) {
-            trouble('Signed in, but your library could not be refreshed')
+            trouble(t('sync.notRefreshed'))
             return
           }
           if (cancelled || !alive.current) return
           rows = again.rows
           profile = again.profile
+          profileRow = again.profileRow
           carriedUp = true
           addNotice(userId, SYNCED)
         }
@@ -441,7 +540,8 @@ export default function LibrarySync() {
 
       const library = fromRows(rows)
       confirm(toRows(library, userId), library, userId)
-      installLibrary({ ...library, ...profile })
+      installLibrary({ ...library, ...receivePrefs(userId, profile, profileRow, readAt) })
+      rememberAccountAvatar(userId, profileRow ? (profileRow.avatar_path ?? null) : undefined, readAt)
       lastRead.current = Date.now()
 
       /*
@@ -464,8 +564,8 @@ export default function LibrarySync() {
       // this machine instead of in the account is worth hearing about once.
       say(
         carriedUp
-          ? 'Signed in — your last changes are up to date'
-          : `Signed in — ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'}`,
+          ? t('sync.upToDate')
+          : t('sync.signedIn', { count: rows.decks.length }),
       )
     }
 
@@ -476,7 +576,7 @@ export default function LibrarySync() {
     // Keyed on the account alone, and now honestly so: the library this reads
     // comes from its key rather than from props, so there is nothing missing
     // from this list. It used to need a lint exception to say the same thing.
-  }, [available, userId, installLibrary, say, trouble, pullTick, confirm])
+  }, [available, userId, installLibrary, say, trouble, pullTick, confirm, receivePrefs])
 
   /*
    * The latest library, for the flush below to read.
@@ -512,9 +612,20 @@ export default function LibrarySync() {
     } = latest.current
     if (!available || !nowUser || !synced.current) return { error: null }
 
+    // Preferences first: signing out takes them off this machine with the library.
+    let prefsSent = false
+    if (hasPrefsUnsent(nowUser)) {
+      const { error } = await pushPrefs(nowUser)
+      if (error) {
+        say(t('sync.prefsNotSaved'))
+        return { error }
+      }
+      prefsSent = true
+    }
+
     const next = toRows({ decks: nowDecks, folders: nowFolders, sessions: nowSessions }, nowUser)
     const change = changesBetween(synced.current, next)
-    if (isEmptyChange(change)) return { error: null }
+    if (isEmptyChange(change)) return { error: null, sent: prefsSent }
 
     const supabase = await getSupabase()
     const { error, refused } = await write(supabase, change)
@@ -522,13 +633,13 @@ export default function LibrarySync() {
       // Said plainly rather than through `trouble`, which is worded for a
       // change that is still safely on this device. After signing out it will
       // not be — the library is about to be swapped away.
-      say('Your last changes could not be saved to your account')
+      say(t('sync.lastNotSaved'))
       return { error }
     }
     settle(next, { decks: nowDecks, folders: nowFolders }, nowUser, refused)
     clearUnsent(nowUser)
     return { error: null, sent: true }
-  }, [available, say, settle])
+  }, [available, say, settle, pushPrefs])
 
   /*
    * Asked when a session ends without going through the sign-out button, to
@@ -538,7 +649,10 @@ export default function LibrarySync() {
    * this page. A change lost to a closed tab is outstanding when the browser
    * opens again, and that is exactly the copy that must not be swept up.
    */
-  const outstanding = useCallback((id) => hasUnsent(id ?? latest.current.userId), [])
+  const outstanding = useCallback((id) => {
+    const who = id ?? latest.current.userId
+    return hasUnsent(who) || hasPrefsUnsent(who)
+  }, [])
   useEffect(() => registerPendingSync(flushNow, outstanding), [flushNow, outstanding])
 
   /**
@@ -573,7 +687,7 @@ export default function LibrarySync() {
         synced.current = toRows({ decks: b.decks, folders: b.folders, sessions: b.sessions }, userId)
         noteSynced(await flushNow())
       }
-      if (alive.current) setPullTick((t) => t + 1)
+      if (alive.current) setPullTick((n) => n + 1)
     }
 
     window.addEventListener('online', reconnect)
@@ -645,11 +759,13 @@ export default function LibrarySync() {
       try {
         const supabase = await getSupabase()
         if (!supabase) return
-        const { error, rows, profile } = await readAccount(supabase, userId)
+        const readAt = Date.now()
+        const { error, rows, profile, profileRow } = await readAccount(supabase, userId)
         if (error || !alive.current || !settled()) return
         const library = fromRows(rows)
         confirm(toRows(library, userId), library, userId)
-        installLibrary({ ...library, ...profile })
+        installLibrary({ ...library, ...receivePrefs(userId, profile, profileRow, readAt) })
+        rememberAccountAvatar(userId, profileRow ? (profileRow.avatar_path ?? null) : undefined, readAt)
         lastRead.current = Date.now()
       } finally {
         reading = false
@@ -658,7 +774,7 @@ export default function LibrarySync() {
 
     document.addEventListener('visibilitychange', refresh)
     return () => document.removeEventListener('visibilitychange', refresh)
-  }, [available, userId, confirm, installLibrary])
+  }, [available, userId, confirm, installLibrary, receivePrefs])
 
   /** Carries whatever changed since the last confirmed push. */
   useEffect(() => {
@@ -722,7 +838,7 @@ export default function LibrarySync() {
       if (error) {
         // synced.current is left where it was, so the next change retries all
         // of this rather than skipping past it.
-        trouble('Your last change is saved on this device but not to your account')
+        trouble(t('sync.changeNotSaved'))
         if (typeof navigator !== 'undefined' && navigator.onLine === false && !toldOffline.current) {
           toldOffline.current = true
           addNotice(userId, SAVED_OFFLINE)
@@ -738,26 +854,40 @@ export default function LibrarySync() {
   }, [available, userId, decks, folders, sessions, trouble, settle])
 
   /**
-   * Preferences are small and change rarely; no diffing earns its keep.
+   * A preference changed. Preferences are small and change rarely; no diffing
+   * earns its keep — the whole row goes up.
    *
-   * Awaited, and that is the whole point. A PostgREST query builder is a lazy
-   * thenable: `from(...).update(...).eq(...)` builds a request and sends
-   * nothing until something calls `then` on it. Written without the await this
-   * silently did nothing at all — the row kept its defaults while the browser
-   * showed the reader's own settings, and signing in on a second machine
-   * pulled those defaults back over them.
+   * Marked unsent first, and sent only once the account has been read: before
+   * that there is nothing confirmed to compare with, and the read that follows
+   * sends it anyway (`receivePrefs`).
    */
   useEffect(() => {
-    if (!available || !userId || !synced.current) return
-    getSupabase().then(async (supabase) => {
-      if (!supabase) return
-      const { error } = await supabase
-        .from('profiles')
-        .update(settingsToProfile(settings, theme))
-        .eq('id', userId)
-      if (error) trouble('Your preferences are saved on this device but not to your account')
+    prefs.current = { settings, theme }
+    if (!available || !userId) {
+      prefsAccount.current = null
+      return
+    }
+    const now = JSON.stringify(settingsToProfile(settings, theme))
+    const known = prefsAccount.current
+    if (!known || known.userId !== userId) {
+      // Where this device started, for this account.
+      prefsAccount.current = { userId, json: now }
+      return
+    }
+    if (known.json === now) return
+    prefsTouched.current = Date.now()
+    markPrefsUnsent(userId)
+    if (!synced.current) {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false && !toldOffline.current) {
+        toldOffline.current = true
+        addNotice(userId, SAVED_OFFLINE)
+      }
+      return
+    }
+    pushPrefs(userId).then(({ error }) => {
+      if (error && alive.current) trouble(t('sync.prefsNotSaved'))
     })
-  }, [available, userId, settings, theme, trouble])
+  }, [available, userId, settings, theme, trouble, pushPrefs])
 
   /**
    * Yes: the guest library is copied into the account.
@@ -785,20 +915,20 @@ export default function LibrarySync() {
     })
     if (!alive.current) return
     if (error) {
-      trouble('Your decks could not be brought into this account')
+      trouble(t('sync.importFailed'))
       return
     }
     const adopted = fromRows(rows)
     confirm(rows, adopted, uid)
     installLibrary(adopted)
-    say(`Brought ${rows.decks.length} ${rows.decks.length === 1 ? 'deck' : 'decks'} in`)
+    say(t('sync.broughtIn', { count: rows.decks.length }))
   }, [installLibrary, say, trouble, confirm])
 
   /** No: remembered, so signing in again does not ask the same thing forever. */
   const declineOffer = useCallback(() => {
     setOffer(null)
     if (latest.current.userId) rememberDeclinedImport(latest.current.userId)
-    say('Left your own decks where they were')
+    say(t('sync.leftDecks'))
   }, [say])
 
   /*
@@ -815,15 +945,11 @@ export default function LibrarySync() {
        */
       open={Boolean(offer) && Boolean(userId)}
       onClose={declineOffer}
-      kicker="Your decks"
-      title={
-        offer?.decks === 1
-          ? 'Bring your deck into this account?'
-          : `Bring your ${offer?.decks ?? 0} decks into this account?`
-      }
-      body="This account is empty. Copying them in makes them available on your other machines — they also stay on this browser either way."
-      confirmLabel="Bring them in"
-      cancelLabel="Not now"
+      kicker={t('sync.offer.kicker')}
+      title={t('sync.offer.title', { count: offer?.decks ?? 0 })}
+      body={t('sync.offer.body')}
+      confirmLabel={t('sync.offer.confirm')}
+      cancelLabel={t('common.notNow')}
       onConfirm={acceptOffer}
       maxWidth={420}
     />
@@ -846,12 +972,10 @@ async function write(supabase, change) {
 
 /** Said once, about the largest thing that went: a deck's cards go with it. */
 function deletedElsewhere({ folders, decks, cards }) {
-  const [n, one, many] = decks.length
-    ? [decks.length, 'deck', 'decks']
+  const [count, kind] = decks.length
+    ? [decks.length, 'decks']
     : folders.length
-      ? [folders.length, 'folder', 'folders']
-      : [cards.length, 'card', 'cards']
-  return n === 1
-    ? `A ${one} deleted on another device was removed here`
-    : `${n} ${many} deleted on another device were removed here`
+      ? [folders.length, 'folders']
+      : [cards.length, 'cards']
+  return t(`sync.deletedElsewhere.${kind}`, { count })
 }

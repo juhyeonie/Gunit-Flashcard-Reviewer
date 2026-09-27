@@ -1,3 +1,5 @@
+import useT from '../i18n/useT.js'
+
 /**
  * The app's one loading indicator: a thin ring with a single arc, turning.
  *
@@ -37,7 +39,8 @@ export default function Spinner({ size = 14, className = '' }) {
  * The status text is in the document from the first frame, so a screen reader
  * hears it at once; only the drawing waits.
  */
-export function PageLoading({ label = 'Loading' }) {
+export function PageLoading({ label }) {
+  const { t } = useT()
   return (
     <div role="status" className="grid min-h-[40vh] place-items-center">
       {/* The delay lives on a wrapper: an element has one `animation`, and
@@ -45,7 +48,7 @@ export function PageLoading({ label = 'Loading' }) {
       <span className="reveal-late inline-flex text-ink-3">
         <Spinner size={22} />
       </span>
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{label ?? t('common.loading')}</span>
     </div>
   )
 }

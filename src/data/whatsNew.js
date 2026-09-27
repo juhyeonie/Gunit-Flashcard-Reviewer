@@ -20,12 +20,8 @@ import { RELEASE_NOTES } from './releaseNotes.js'
 
 export const SEEN_KEY = 'gunit.whatsNew.seen'
 
-export const CATEGORIES = [
-  { key: 'new', label: 'New' },
-  { key: 'improved', label: 'Improved' },
-  { key: 'fixed', label: 'Fixed' },
-  { key: 'removed', label: 'Removed' },
-]
+/** In the order they are shown. Their headings are in the dictionaries, under whatsNew.category. */
+export const CATEGORIES = [{ key: 'new' }, { key: 'improved' }, { key: 'fixed' }, { key: 'removed' }]
 
 /** "1.10.0" after "1.9.2". Anything that is not a version sorts before them all. */
 export function compareVersions(a, b) {
@@ -38,13 +34,25 @@ export function compareVersions(a, b) {
   return 0
 }
 
+/**
+ * An item in the reader's language: its own translation where it has one
+ * (`{ title, detail, fil: { title, detail } }`), English where it does not.
+ */
+const inLanguage = (item, language) => {
+  if (typeof item === 'string') return { title: item, detail: null }
+  if (!item) return item
+  const own = language && item[language]
+  return own?.title
+    ? { title: own.title, detail: own.detail ?? null }
+    : { title: item.title, detail: item.detail ?? null }
+}
+
 /** An entry's lists, cleaned: only the categories that have something in them. */
-export function sectionsOf(entry) {
-  return CATEGORIES.map(({ key, label }) => ({
+export function sectionsOf(entry, language) {
+  return CATEGORIES.map(({ key }) => ({
     key,
-    label,
     items: (Array.isArray(entry?.[key]) ? entry[key] : [])
-      .map((item) => (typeof item === 'string' ? { title: item, detail: null } : item))
+      .map((item) => inLanguage(item, language))
       .filter((item) => item && typeof item.title === 'string' && item.title.trim()),
   })).filter((section) => section.items.length > 0)
 }

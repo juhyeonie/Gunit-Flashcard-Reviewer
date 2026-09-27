@@ -8,8 +8,10 @@ import {
   GalleryVerticalEnd,
   House,
   Pencil,
+  User,
   Users,
 } from 'lucide-react'
+import useT from '../i18n/useT.js'
 
 /*
  * Gunit's icons, from Lucide.
@@ -35,11 +37,12 @@ export function PencilIcon({ size = 13 }) {
 }
 
 export function EditButton({ className = '', size = 26, ...props }) {
+  const { t } = useT()
   return (
     <button
       type="button"
-      title="Edit deck"
-      aria-label="Edit deck"
+      title={t('deck.editDeck')}
+      aria-label={t('deck.editDeck')}
       style={{ width: size, height: size }}
       className={`grid shrink-0 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent p-0 text-ink-3 transition-colors hover:border-line hover:bg-raised hover:text-ink ${className}`}
       {...props}
@@ -82,6 +85,11 @@ export function BellIcon({ size = 20 }) {
 /** The cog: settings, as every app draws them. */
 export function SettingsIcon({ size = 20 }) {
   return <Cog size={size} strokeWidth={STROKE} {...quiet} />
+}
+
+/** Someone, unnamed: the profile picture before there is one, or a name. */
+export function PersonIcon({ size = 16 }) {
+  return <User size={size} strokeWidth={STROKE} {...quiet} />
 }
 
 export function FolderIcon({ size = 16 }) {

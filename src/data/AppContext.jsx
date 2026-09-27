@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { uid } from './seed.js'
 import { grade, newEntry } from './scheduler.js'
 import { MAX_SESSIONS, appendSession } from './activity.js'
@@ -16,11 +16,14 @@ import { AppContext } from './appContext.js'
 import { AuthContext } from './authContext.js'
 import {
   GUEST_KEY,
+  READING_KEY,
   SALVAGE_KEY,
   forgetSyncStateFor,
   keyFor,
   migrateLegacyStorage,
 } from './storageKeys.js'
+import I18nProvider from '../i18n/I18nProvider.jsx'
+import { t } from '../i18n/index.js'
 
 /**
  * Reads the library at one key.
@@ -50,7 +53,7 @@ const load = (key) => {
     forgetSyncStateFor(key)
     return key === GUEST_KEY
       ? normalizeState(DEFAULT_STATE)
-      : normalizeState({ decks: [], sessions: [] })
+      : normalizeState({ decks: [], sessions: [], settings: readingPreferences() })
   }
 
   const { state, ok } = parseStoredState(raw)
@@ -65,6 +68,37 @@ const load = (key) => {
   // Written back by the persist effect on the first render, so this happens
   // once per browser rather than on every load.
   return key === GUEST_KEY ? retireDefaultDecks(state) : state
+}
+
+/**
+ * The language and text size this browser's guest was reading in, for an
+ * account arriving here for the first time.
+ *
+ * Signing in on a new device used to start from the defaults and wait for the
+ * account's row: a reader who had set Filipino and large text as a guest saw
+ * the app snap back to small English until the pull landed, and for a new
+ * account — whose row has chosen nothing — stay there. These carry across
+ * instead, and an account that has chosen its own replaces them when it is
+ * read.
+ */
+function readingPreferences() {
+  try {
+    const guest = JSON.parse(localStorage.getItem(GUEST_KEY) ?? 'null')
+    const { language, fontSize } = guest?.settings ?? {}
+    return { language, fontSize }
+  } catch {
+    return {}
+  }
+}
+
+/** What `READING_KEY` holds, or null. */
+function readLastReading() {
+  try {
+    const last = JSON.parse(localStorage.getItem(READING_KEY) ?? 'null')
+    return last && typeof last === 'object' ? last : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -143,6 +177,41 @@ export function AppProvider({ children }) {
     document.documentElement.setAttribute('data-theme', state.theme)
   }, [state.theme])
 
+  /*
+   * The language and size to show.
+   *
+   * Normally the library's own. But after a reload, a signed-in reader's
+   * session takes a moment to be restored, and until it is, the library
+   * open is the guest's — so the page came up in the guest's English at the
+   * default size, then jumped to Filipino in large text. For that moment the
+   * last ones this browser showed stand in; they are almost always the
+   * reader's own. normalizeState repairs anything unreadable in them.
+   */
+  const restoring = auth?.status === 'loading'
+  const [lastReading] = useState(readLastReading)
+  const reading =
+    restoring && lastReading
+      ? normalizeState({ decks: [], settings: lastReading }).settings
+      : state.settings
+
+  useEffect(() => {
+    if (restoring) return
+    try {
+      localStorage.setItem(
+        READING_KEY,
+        JSON.stringify({ language: state.settings.language, fontSize: state.settings.fontSize }),
+      )
+    } catch {
+      // Then the next reload shows the guest's for a moment, as it used to.
+    }
+  }, [restoring, state.settings.language, state.settings.fontSize])
+
+  // The reader's text size, as `--text-scale` in index.css reads it. Before
+  // paint, so a large-text reader never sees a frame of small text.
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute('data-font-size', reading.fontSize)
+  }, [reading.fontSize])
+
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
   const say = useCallback((message) => {
@@ -163,7 +232,7 @@ export function AppProvider({ children }) {
     const deck = {
       id: uid(),
       title: title.trim(),
-      subject: subject.trim() || 'General',
+      subject: subject.trim() || t('importFile.defaultSubject'),
       desc: desc.trim(),
       folderId: folderId ?? null,
       studiedAt: null,
@@ -613,5 +682,10 @@ export function AppProvider({ children }) {
     ],
   )
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+  return (
+    <AppContext.Provider value={value}>
+      {/* The language lives in the settings, so it follows the library's owner. */}
+      <I18nProvider language={reading.language}>{children}</I18nProvider>
+    </AppContext.Provider>
+  )
 }

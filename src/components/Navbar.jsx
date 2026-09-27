@@ -8,28 +8,26 @@ import { NAV } from './navItems.js'
 import { BellIcon, DecksIcon, HomeIcon, SettingsIcon, SharedIcon } from './Icons.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import { useNotifications } from '../data/notificationsContext.js'
+import useT from '../i18n/useT.js'
+import Avatar from './Avatar.jsx'
+import useAvatar from '../data/useAvatar.js'
+import useTightBar from '../hooks/useTightBar.js'
 
 const ITEMS = NAV.filter((item) => !item.accounts || isConfigured)
 const TOP_ITEMS = ITEMS.filter((item) => !item.phoneOnly)
 
-/** Empty when there is no name, which is the ordinary state of a new reader. */
-const initialsOf = (name = '') =>
-  name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-
 /** Desktop and tablet: sticky glass bar with a pill nav group. */
 export function TopNav() {
   const { settings, sessions } = useApp()
+  const { t } = useT()
+  const { src } = useAvatar()
   const days = streak(sessions)
+  const bar = useRef(null)
+  const tight = useTightBar(bar)
 
   return (
     <nav
+      ref={bar}
       className="sticky top-0 z-20 hidden h-[70px] items-center justify-between gap-5 border-b border-line-soft px-6 backdrop-blur-[14px] backdrop-saturate-150 sm:flex"
       style={{ background: 'var(--glass)' }}
     >
@@ -43,12 +41,18 @@ export function TopNav() {
         streak that reads "No streak yet" or "12 day streak" on the other. The
         pill sat 55px left of centre, which is half the difference between
         them, and moved every time the streak's wording changed.
+
+        When the words get longer — Filipino, or large text — something has to
+        give on a narrow screen, and it gives in order of how little it is
+        missed: first the streak label steps out (useTightBar); last, the tabs
+        scroll inside their pill rather than push the page sideways. The logo
+        and the picture never shrink.
       */}
-      <Link to="/" className="flex flex-1 shrink-0 items-center gap-[11px]">
-        <img src="/assets/gunit-logo.png" alt="Gunit" className="block h-10 w-auto" />
+      <Link to="/" className="flex min-w-fit flex-1 shrink-0 items-center gap-[11px]">
+        <img src="/assets/gunit-logo.png" alt="Gunit" className="block h-10 w-auto shrink-0" />
       </Link>
 
-      <div className="flex shrink-0 gap-[3px] overflow-auto rounded-full border border-line-soft bg-raised p-1">
+      <div className="flex min-w-0 gap-[3px] overflow-x-auto rounded-full border border-line-soft bg-raised p-1 [scrollbar-width:none]">
         {TOP_ITEMS.map((item) => (
           <NavLink
             key={item.to}
@@ -57,12 +61,12 @@ export function TopNav() {
             className={({ isActive }) =>
               `cursor-pointer rounded-full px-4 py-[9px] whitespace-nowrap transition-colors ${
                 isActive
-                  ? 'bg-surface text-ink shadow-sh1 font-semibold text-[13.5px]'
-                  : 'text-ink-3 hover:text-ink text-[13.5px] font-medium'
+                  ? 'bg-surface text-ink shadow-sh1 font-semibold fs-13.5'
+                  : 'text-ink-3 hover:text-ink fs-13.5 font-medium'
               }`
             }
           >
-            {item.label}
+            {t(`nav.${item.icon}`)}
           </NavLink>
         ))}
       </div>
@@ -78,17 +82,22 @@ export function TopNav() {
       */}
       <div className="flex flex-1 shrink-0 items-center justify-end gap-2.5">
         {isConfigured && <NotificationBell />}
-        <div className="flex items-center gap-[9px] rounded-full border border-line bg-surface py-1 pr-3 pl-1">
-          {/* Dropped rather than drawn empty: a blank disc reads as a missing
-              avatar, and there is nothing missing. */}
-          {initialsOf(settings.name) && (
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-accent-line bg-accent-soft text-[11px] leading-none font-semibold text-accent">
-              {initialsOf(settings.name)}
+        <div
+          className={`flex items-center gap-[9px] rounded-full border border-line bg-surface py-1 pl-1 ${
+            tight ? 'pr-1' : 'pr-3'
+          }`}
+        >
+          {/*
+            The reader's picture, or their initials, or a plain figure: always
+            something, so the chip reads as theirs. Named for a screen reader
+            only when it is a picture — initials say nothing a reader needs.
+          */}
+          <Avatar src={src} name={settings.name} size={28} alt={src ? t('avatar.yours') : undefined} />
+          {!tight && (
+            <span data-streak className="kicker !tracking-[0.1em] whitespace-nowrap">
+              {days ? t('nav.streak', { count: days }) : t('nav.noStreak')}
             </span>
           )}
-          <span className="kicker !tracking-[0.1em] whitespace-nowrap">
-            {days ? `${days} day streak` : 'No streak yet'}
-          </span>
         </div>
       </div>
     </nav>
@@ -137,6 +146,7 @@ const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, alerts: Be
  */
 export function BottomNav() {
   const { unread } = useNotifications()
+  const { t } = useT()
   const { pathname } = useLocation()
   const ref = useRef(null)
   useHideOnScroll(ref, { resetKey: pathname })
@@ -186,11 +196,11 @@ export function BottomNav() {
                     <Icon size={22} />
                     {item.icon === 'alerts' && unread > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-paper bg-accent">
-                        <span className="sr-only">{unread} unread</span>
+                        <span className="sr-only">{t('nav.unread', { count: unread })}</span>
                       </span>
                     )}
                   </span>
-                  <span className="sr-only">{item.short}</span>
+                  <span className="sr-only">{t(`nav.short.${item.icon}`)}</span>
                 </>
               )}
             </NavLink>

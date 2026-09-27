@@ -11,6 +11,7 @@
  * rather than a Postgres message.
  */
 import { getSupabase } from './supabase.js'
+import { t } from '../i18n/index.js'
 
 /** The link a reader is handed. The token, never an id. */
 export const shareUrl = (kind, token, origin = globalThis.location?.origin ?? '') =>
@@ -24,24 +25,24 @@ function explain(error) {
   if (!error) return null
   const text = `${error.message ?? ''} ${error.details ?? ''}`
   if (error.code === 'PGRST202' || error.code === '42883' || /could not find the function/i.test(text)) {
-    return 'Sharing isn’t set up on this Gunit project yet.'
+    return t('shareErrors.notSetUp')
   }
-  if (/that is you/.test(text)) return 'That’s your own address — you already have this.'
-  if (/not an email/.test(text)) return 'That doesn’t look like an email address.'
-  if (/share is off/.test(text)) return 'Turn sharing back on before inviting anyone.'
+  if (/that is you/.test(text)) return t('shareErrors.yourself')
+  if (/not an email/.test(text)) return t('shareErrors.notEmail')
+  if (/share is off/.test(text)) return t('shareErrors.off')
   if (/not your (deck|folder)/.test(text)) {
-    return 'This hasn’t reached your account yet. Give it a moment and try again.'
+    return t('shareErrors.notYet')
   }
   if (/not an editor|sign in to edit|deck is not in this share/.test(text)) {
-    return 'You can study this, but not change it.'
+    return t('shareErrors.readOnly')
   }
-  if (/failed to fetch|network/i.test(text)) return 'You’re offline. Sharing needs a connection.'
-  return 'Something went wrong. Try again in a moment.'
+  if (/failed to fetch|network/i.test(text)) return t('shareErrors.offline')
+  return t('common.somethingWrong')
 }
 
 async function call(name, args) {
   const supabase = await getSupabase()
-  if (!supabase) return { data: null, error: 'Sharing needs a Gunit account, and this copy has none.' }
+  if (!supabase) return { data: null, error: t('shareErrors.noAccounts') }
   try {
     const { data, error } = await supabase.rpc(name, args)
     return { data: error ? null : data, error: explain(error) }

@@ -93,8 +93,17 @@ describe('keeping the pill on the middle of the bar', () => {
   it('keeps the pill at its own width rather than stretching it', () => {
     // A pill that grew to fill the middle would be centred and wrong.
     show()
-    expect(sides().middle.className).toMatch(/shrink-0/)
     expect(sides().middle.className).not.toMatch(/\bflex-1\b/)
+    expect(sides().middle.className).not.toMatch(/\bgrow\b/)
+  })
+
+  it('lets the pill scroll, rather than push the page sideways, when nothing else can give', () => {
+    // Long words and large text on a tablet. The streak label goes first
+    // (useTightBar); this is the last resort.
+    show()
+    expect(sides().middle.className).toMatch(/\bmin-w-0\b/)
+    expect(sides().middle.className).toMatch(/\boverflow-x-auto\b/)
+    expect(sides().left.className).toMatch(/\bmin-w-fit\b/)
   })
 
   it('still spaces the three apart', () => {

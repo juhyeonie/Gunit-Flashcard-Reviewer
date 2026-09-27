@@ -11,6 +11,8 @@
  * subtly wrong is how someone else's ease factors end up on your cards.
  */
 
+import { t } from '../i18n/index.js'
+
 /** Stamped into the file so a stray .json is recognised as not one of ours. */
 export const FORMAT = 'gunit.deck'
 
@@ -82,33 +84,33 @@ export function fromTransfer(source) {
   try {
     data = typeof source === 'string' ? JSON.parse(source) : source
   } catch {
-    return { deck: null, error: 'That file is not readable JSON', skipped: 0 }
+    return { deck: null, error: t('transfer.notJson'), skipped: 0 }
   }
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return { deck: null, error: 'That file does not hold a deck', skipped: 0 }
+    return { deck: null, error: t('transfer.notDeck'), skipped: 0 }
   }
   if (data.format !== FORMAT) {
-    return { deck: null, error: 'That file was not exported from Gunit', skipped: 0 }
+    return { deck: null, error: t('transfer.notGunit'), skipped: 0 }
   }
   if (numberOr(data.version, 0) > VERSION) {
     return {
       deck: null,
       // Better to say so than to import half of a shape we do not understand.
-      error: 'That deck was exported by a newer version of Gunit',
+      error: t('transfer.newerDeck'),
       skipped: 0,
     }
   }
   if (!Array.isArray(data.cards)) {
-    return { deck: null, error: 'That deck has no cards in it', skipped: 0 }
+    return { deck: null, error: t('transfer.noCards'), skipped: 0 }
   }
 
   const usable = data.cards.filter((c) => c && text(c.front) && text(c.back))
 
   return {
     deck: {
-      title: text(data.title) || 'Imported deck',
-      subject: text(data.subject) || 'General',
+      title: text(data.title) || t('transfer.importedDeck'),
+      subject: text(data.subject) || t('importFile.defaultSubject'),
       desc: text(data.desc),
       cards: usable.map((c) => ({
         front: text(c.front),
@@ -189,11 +191,11 @@ export function fromLibraryTransfer(source) {
   try {
     data = typeof source === 'string' ? JSON.parse(source) : source
   } catch {
-    return { library: null, error: 'That file is not readable JSON', skippedDecks: 0, skippedCards: 0 }
+    return { library: null, error: t('transfer.notJson'), skippedDecks: 0, skippedCards: 0 }
   }
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return { library: null, error: 'That file does not hold a library', skippedDecks: 0, skippedCards: 0 }
+    return { library: null, error: t('transfer.notLibrary'), skippedDecks: 0, skippedCards: 0 }
   }
   if (data.format !== LIBRARY_FORMAT) {
     const single = data.format === FORMAT
@@ -201,8 +203,8 @@ export function fromLibraryTransfer(source) {
       library: null,
       // Worth naming: the two files look alike, and one is easy to reach for.
       error: single
-        ? 'That is a single deck — import it from the library page'
-        : 'That file was not exported from Gunit',
+        ? t('transfer.singleDeck')
+        : t('transfer.notGunit'),
       skippedDecks: 0,
       skippedCards: 0,
     }
@@ -210,13 +212,13 @@ export function fromLibraryTransfer(source) {
   if (numberOr(data.version, 0) > VERSION) {
     return {
       library: null,
-      error: 'That backup was exported by a newer version of Gunit',
+      error: t('transfer.newerBackup'),
       skippedDecks: 0,
       skippedCards: 0,
     }
   }
   if (!Array.isArray(data.decks)) {
-    return { library: null, error: 'That backup has no decks in it', skippedDecks: 0, skippedCards: 0 }
+    return { library: null, error: t('transfer.noDecks'), skippedDecks: 0, skippedCards: 0 }
   }
 
   let skippedDecks = 0

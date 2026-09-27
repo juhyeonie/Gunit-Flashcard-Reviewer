@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Modal from './Modal.jsx'
 import Field from './Field.jsx'
 import { FOLDER_NAME_MAX } from '../data/normalize.js'
+import useT from '../i18n/useT.js'
 
 /**
  * Naming a folder, new or existing. One field, because a folder is only a name.
@@ -14,6 +15,7 @@ import { FOLDER_NAME_MAX } from '../data/normalize.js'
  * useState rather than being reset by an effect — as DeckModal does.
  */
 export default function FolderModal({ mode = 'create', folder, folders = [], onClose, onSave }) {
+  const { t } = useT()
   const [name, setName] = useState(mode === 'rename' && folder ? folder.name : '')
   const clean = name.trim()
   const isRename = mode === 'rename'
@@ -28,14 +30,10 @@ export default function FolderModal({ mode = 'create', folder, folders = [], onC
     <Modal
       open
       onClose={onClose}
-      kicker={isRename ? 'Rename folder' : 'New folder'}
-      title={isRename ? 'Rename this folder' : 'Create a folder'}
-      body={
-        isRename
-          ? 'Every deck in it moves with it — nothing else changes.'
-          : 'Group decks by course, term or anything else. A deck can sit in one folder, or in none.'
-      }
-      confirmLabel={isRename ? 'Save name' : 'Create folder'}
+      kicker={isRename ? t('folderModal.renameKicker') : t('folderModal.newKicker')}
+      title={isRename ? t('folderModal.renameTitle') : t('folderModal.newTitle')}
+      body={isRename ? t('folderModal.renameBody') : t('folderModal.newBody')}
+      confirmLabel={isRename ? t('folderModal.saveName') : t('folderModal.create')}
       confirmDisabled={!valid}
       maxWidth={420}
       onConfirm={() => {
@@ -47,18 +45,18 @@ export default function FolderModal({ mode = 'create', folder, folders = [], onC
       <div className="mb-6 flex flex-col gap-2">
         <Field
           id="folder-name"
-          label="Folder name"
+          label={t('folderModal.name')}
           required
           value={name}
           maxLength={FOLDER_NAME_MAX}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Biology 101"
+          placeholder={t('folderModal.placeholder')}
           aria-invalid={taken || undefined}
           aria-describedby={taken ? 'folder-name-taken' : undefined}
         />
         {taken && (
-          <p id="folder-name-taken" className="m-0 text-[13px] text-err">
-            There is already a folder called “{clean}”.
+          <p id="folder-name-taken" className="m-0 fs-13 text-err">
+            {t('folderModal.taken', { name: clean })}
           </p>
         )}
       </div>

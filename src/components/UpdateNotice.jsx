@@ -1,4 +1,5 @@
 import usePwa from '../pwa/usePwa.js'
+import useT from '../i18n/useT.js'
 
 /**
  * A new version of Gunit is ready.
@@ -13,6 +14,7 @@ import usePwa from '../pwa/usePwa.js'
  */
 export default function UpdateNotice() {
   const { update } = usePwa()
+  const { t } = useT()
   if (!update) return null
 
   return (
@@ -21,13 +23,13 @@ export default function UpdateNotice() {
       className="toast-in fixed bottom-[calc(env(safe-area-inset-bottom)+80px)] left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-[7px] bg-ink py-[9px] pr-[9px] pl-[18px] text-paper shadow-sh3 sm:bottom-7"
     >
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-      <span className="text-[13px] leading-snug font-medium">A new version of Gunit is ready.</span>
+      <span className="fs-13 leading-snug font-medium">{t('update.ready')}</span>
       <button
         type="button"
         onClick={update}
-        className="shrink-0 cursor-pointer rounded-[5px] border border-paper/30 bg-transparent px-3 py-1.5 text-[13px] leading-none font-semibold text-paper transition-colors hover:bg-paper/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="shrink-0 cursor-pointer rounded-[5px] border border-paper/30 bg-transparent px-3 py-1.5 fs-13 leading-none font-semibold text-paper transition-colors hover:bg-paper/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        Reload
+        {t('update.reload')}
       </button>
     </div>
   )

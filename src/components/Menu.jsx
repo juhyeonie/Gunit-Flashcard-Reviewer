@@ -65,7 +65,7 @@ export function MenuItem({ title, hint, danger = false, ...props }) {
       }`}
       {...props}
     >
-      <span className={`text-[13px] font-semibold leading-tight ${danger ? 'text-err' : 'text-ink'}`}>
+      <span className={`fs-13 font-semibold leading-tight ${danger ? 'text-err' : 'text-ink'}`}>
         {title}
       </span>
       {hint && <span className="text-xs leading-[1.4] text-ink-3">{hint}</span>}

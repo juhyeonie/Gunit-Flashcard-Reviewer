@@ -6,6 +6,7 @@ import { streak } from '../data/activity.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import MissingDeck from '../components/MissingDeck.jsx'
 import Mascot from '../components/Mascot.jsx'
+import useT from '../i18n/useT.js'
 
 export default function Summary() {
   const { id } = useParams()
@@ -13,9 +14,10 @@ export default function Summary() {
   const navigate = useNavigate()
   const { decks, sessions, deckPath } = useApp()
   const deck = decks.find((d) => d.id === id)
+  const { t } = useT()
   // The route announcer reads this out on arrival, so it has to be true of the
   // page that actually rendered.
-  useDocumentTitle(typeof state?.reviewed === 'number' ? 'Session complete' : 'Nothing to report')
+  useDocumentTitle(typeof state?.reviewed === 'number' ? t('summary.complete') : t('summary.nothing'))
 
   if (!deck) return <MissingDeck />
 
@@ -39,15 +41,15 @@ export default function Summary() {
 
   const stats = session
     ? [
-        { label: 'Reviewed', value: String(session.reviewed), color: 'var(--color-ink)' },
-        { label: 'Known', value: String(session.known), color: 'var(--color-ok)' },
-        { label: 'Again', value: String(session.again), color: 'var(--color-err)' },
-        { label: 'Streak', value: String(days), color: 'var(--color-ink)' },
+        { label: t('summary.reviewed'), value: String(session.reviewed), color: 'var(--color-ink)' },
+        { label: t('summary.known'), value: String(session.known), color: 'var(--color-ok)' },
+        { label: t('summary.again'), value: String(session.again), color: 'var(--color-err)' },
+        { label: t('summary.streak'), value: String(days), color: 'var(--color-ink)' },
       ]
     : // Both of these are the deck's standing, and true either way.
       [
-        { label: 'Cards', value: String(deck.cards.length), color: 'var(--color-ink)' },
-        { label: 'Streak', value: String(days), color: 'var(--color-ink)' },
+        { label: t('summary.cards'), value: String(deck.cards.length), color: 'var(--color-ink)' },
+        { label: t('summary.streak'), value: String(days), color: 'var(--color-ink)' },
       ]
 
   return (
@@ -55,24 +57,24 @@ export default function Summary() {
       <div className="flex flex-col items-center text-center">
         {session && <Mascot pose="celebrate" size={112} className="mb-5" />}
         <div className="kicker mb-4 text-accent">
-          {session ? 'Session complete' : 'Nothing to report'}
+          {session ? t('summary.complete') : t('summary.nothing')}
         </div>
-        <h1 className="m-0 mb-3 font-serif text-[34px] leading-[1.06] tracking-[-0.02em] sm:text-[46px]">
+        <h1 className="m-0 mb-3 font-serif fs-34 leading-[1.06] tracking-[-0.02em] sm:fs-46">
           {session
-            ? `${session.reviewed} ${session.reviewed === 1 ? 'card' : 'cards'} reviewed`
+            ? t('summary.cardsReviewed', { count: session.reviewed })
             : deck.title}
         </h1>
-        <p className="m-0 text-[16px] text-ink-2 text-pretty">
+        <p className="m-0 fs-16 text-ink-2 text-pretty">
           {session
-            ? `Session on ${deck.title} · ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
-            : 'This page reports a session as it ends. Opened on its own — from a link, or a new tab — there is no session behind it. Whatever you have studied is already in the deck.'}
+            ? t('summary.sessionOn', { title: deck.title, minutes: t('activity.minutes', { count: minutes }) })
+            : t('summary.noSession')}
         </p>
       </div>
 
       <div className="grid grid-cols-2 border-t border-ink border-b-line sm:grid-cols-[repeat(auto-fit,minmax(130px,1fr))]">
         {stats.map((s) => (
           <div key={s.label} className="border-r border-line-soft p-[18px] text-center">
-            <div className="mb-2 font-serif text-[32px] leading-none" style={{ color: s.color }}>
+            <div className="mb-2 font-serif fs-32 leading-none" style={{ color: s.color }}>
               {s.value}
             </div>
             <div className="kicker !tracking-[0.12em]">{s.label}</div>
@@ -81,25 +83,25 @@ export default function Summary() {
       </div>
 
       <div>
-        <div className="mb-2.5 flex justify-between font-mono text-[11px] leading-none font-medium tracking-[0.08em] text-ink-3 uppercase">
-          <span>Deck progress</span>
+        <div className="mb-2.5 flex justify-between font-mono fs-11 leading-none font-medium tracking-[0.08em] text-ink-3 uppercase">
+          <span>{t('summary.progress')}</span>
           <span>{pct}%</span>
         </div>
         <ProgressBar
           value={pct}
           height={5}
           track="var(--color-line-soft)"
-          label="Deck progress"
+          label={t('summary.progress')}
         />
       </div>
 
       <div className="flex flex-wrap justify-center gap-2">
-        <Button onClick={() => navigate(deckPath(deck.id, '/review'))}>Review again</Button>
+        <Button onClick={() => navigate(deckPath(deck.id, '/review'))}>{t('summary.reviewAgain')}</Button>
         <Button variant="outline" onClick={() => navigate(deckPath(deck.id, '/quiz'))}>
-          Take the quiz
+          {t('summary.takeQuiz')}
         </Button>
         <Button variant="ghost" onClick={() => navigate('/')}>
-          Back to dashboard
+          {t('errorBoundary.home')}
         </Button>
       </div>
     </div>

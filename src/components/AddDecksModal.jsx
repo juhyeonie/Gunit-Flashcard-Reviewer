@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
+import useT from '../i18n/useT.js'
 
 /**
  * Filing several decks into one folder at once.
@@ -18,6 +19,7 @@ import Modal from './Modal.jsx'
 const FILTER_FROM = 8
 
 export default function AddDecksModal({ folder, decks = [], folders = [], fresh = false, onClose, onAdd }) {
+  const { t } = useT()
   const [picked, setPicked] = useState(() => new Set())
   const [query, setQuery] = useState('')
 
@@ -50,18 +52,18 @@ export default function AddDecksModal({ folder, decks = [], folders = [], fresh 
     <Modal
       open
       onClose={onClose}
-      kicker={fresh ? 'Folder created' : 'Add decks'}
-      title={`Add decks to “${folder.name}”`}
+      kicker={fresh ? t('addDecks.createdKicker') : t('addDecks.kicker')}
+      title={t('addDecks.title', { name: folder.name })}
       body={
         candidates.length
           ? fresh
-            ? 'Pick what belongs here now, or skip it and add decks later from the folder’s menu.'
-            : 'Ticking a deck from another folder moves it here. Its cards and history come with it.'
-          : 'Every deck is already in this folder.'
+            ? t('addDecks.freshBody')
+            : t('addDecks.body')
+          : t('addDecks.allIn')
       }
-      confirmLabel={count ? `Add ${count} ${count === 1 ? 'deck' : 'decks'}` : 'Add decks'}
+      confirmLabel={count ? t('addDecks.addCount', { count }) : t('addDecks.kicker')}
       confirmDisabled={!count}
-      cancelLabel={fresh ? 'Skip for now' : 'Cancel'}
+      cancelLabel={fresh ? t('addDecks.skip') : t('common.cancel')}
       maxWidth={460}
       onConfirm={() => {
         if (!count) return
@@ -75,15 +77,15 @@ export default function AddDecksModal({ folder, decks = [], folders = [], fresh 
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find a deck"
-          aria-label="Find a deck"
+          placeholder={t('addDecks.find')}
+          aria-label={t('addDecks.find')}
           className="mb-3 w-full rounded-lg border border-line bg-paper px-3 py-[10px] text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent"
         />
       )}
 
       {candidates.length > 0 && (
         <fieldset className="m-0 mb-6 border-0 p-0">
-          <legend className="sr-only">Decks to add</legend>
+          <legend className="sr-only">{t('addDecks.legend')}</legend>
           <div className="-mx-1 flex max-h-[min(46vh,360px)] flex-col gap-1 overflow-y-auto px-1 py-0.5">
             {shown.map((deck) => {
               const checked = picked.has(deck.id)
@@ -103,14 +105,14 @@ export default function AddDecksModal({ folder, decks = [], folders = [], fresh 
                   />
                   <span className="truncate text-sm font-medium text-ink">{deck.title}</span>
                   <span className="truncate text-xs text-ink-3">
-                    {deck.cards.length} {deck.cards.length === 1 ? 'card' : 'cards'} ·{' '}
-                    {where ? `in ${where}` : 'ungrouped'}
+                    {t('deck.cardCount', { count: deck.cards.length })} ·{' '}
+                    {where ? t('addDecks.inFolder', { name: where }) : t('addDecks.ungrouped')}
                   </span>
                 </label>
               )
             })}
             {shown.length === 0 && (
-              <p className="m-0 px-1 py-3 text-sm text-ink-3">Nothing matches “{query.trim()}”.</p>
+              <p className="m-0 px-1 py-3 text-sm text-ink-3">{t('common.noMatch', { query: query.trim() })}</p>
             )}
           </div>
         </fieldset>

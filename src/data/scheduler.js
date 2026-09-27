@@ -10,6 +10,8 @@
  * six-month mature interval use one unit.
  */
 
+import { t } from '../i18n/index.js'
+
 export const MINUTE = 1
 export const HOUR = 60
 export const DAY = 1440
@@ -109,7 +111,8 @@ export function grade(entry, g, now = Date.now()) {
 /** The interval a grade would produce, for labelling the rating buttons. */
 export const preview = (entry, g, now = Date.now()) => grade(entry, g, now).interval
 
-const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'}`
+/** Wording only, in the reader's language; nothing here changes a schedule. */
+const plural = (n, unit) => t(`time.${unit}`, { count: n })
 
 /** "10 minutes", "3 days", "2 months" — the human form of an interval. */
 export function formatInterval(minutes) {
@@ -122,10 +125,10 @@ export function formatInterval(minutes) {
 
 /** "Due now", "Due in 3 days", "Due in 2 hours". */
 export function formatDue(entry, now = Date.now()) {
-  if (isSuspended(entry)) return 'Suspended'
-  if (isNew(entry)) return 'New'
-  if (entry.due <= now) return 'Due now'
-  return `Due in ${formatInterval((entry.due - now) / 60_000)}`
+  if (isSuspended(entry)) return t('deckDetail.suspended')
+  if (isNew(entry)) return t('time.new')
+  if (entry.due <= now) return t('time.dueNow')
+  return t('time.dueIn', { interval: formatInterval((entry.due - now) / 60_000) })
 }
 
 export const scheduleOf = (deck) => deck.schedule ?? {}

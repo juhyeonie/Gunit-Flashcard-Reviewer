@@ -5,6 +5,7 @@ import Field from '../components/Field.jsx'
 import { useAuth } from '../data/useAuth.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import Spinner from '../components/Spinner.jsx'
+import useT from '../i18n/useT.js'
 
 /**
  * Where a reset link lands.
@@ -21,7 +22,8 @@ import Spinner from '../components/Spinner.jsx'
 export default function ResetPassword() {
   const { available, status, user, updatePassword } = useAuth()
   const navigate = useNavigate()
-  useDocumentTitle('Choose a new password')
+  const { t } = useT()
+  useDocumentTitle(t('resetPassword.title'))
 
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -44,11 +46,11 @@ export default function ResetPassword() {
   if (!available) {
     return (
       <div className="rise-in mx-auto max-w-[460px] py-24 text-center">
-        <h1 className="m-0 font-serif text-[28px] leading-[1.15]">
-          This copy of Gunit has no accounts
+        <h1 className="m-0 font-serif fs-28 leading-[1.15]">
+          {t('resetPassword.noAccounts')}
         </h1>
         <Button as={Link} to="/" className="mt-5">
-          Back to studying
+          {t('signIn.backToStudying')}
         </Button>
       </div>
     )
@@ -60,7 +62,7 @@ export default function ResetPassword() {
     return (
       <div className="rise-in mx-auto flex max-w-[460px] items-center justify-center gap-2.5 py-24">
         <Spinner className="text-ink-3" />
-        <p className="m-0 text-[15px] text-ink-2">Checking your link…</p>
+        <p className="m-0 fs-15 text-ink-2">{t('resetPassword.checking')}</p>
       </div>
     )
   }
@@ -68,16 +70,15 @@ export default function ResetPassword() {
   if (!user) {
     return (
       <div className="rise-in mx-auto flex max-w-[460px] flex-col items-center gap-4 py-24 text-center">
-        <div className="kicker">Link expired</div>
-        <h1 className="m-0 font-serif text-[30px] leading-[1.1] tracking-[-0.02em]">
-          That link cannot be used
+        <div className="kicker">{t('resetPassword.expiredKicker')}</div>
+        <h1 className="m-0 font-serif fs-30 leading-[1.1] tracking-[-0.02em]">
+          {t('resetPassword.expiredTitle')}
         </h1>
-        <p className="m-0 max-w-[380px] text-[15px] text-ink-2 text-pretty">
-          Reset links last an hour and work once. Ask for another and it will still be the same
-          account waiting.
+        <p className="m-0 max-w-[380px] fs-15 text-ink-2 text-pretty">
+          {t('resetPassword.expiredBody')}
         </p>
         <Button as={Link} to="/sign-in" className="mt-2">
-          Ask for a new link
+          {t('resetPassword.askAgain')}
         </Button>
       </div>
     )
@@ -86,19 +87,19 @@ export default function ResetPassword() {
   return (
     <div className="rise-in mx-auto flex max-w-[420px] flex-col gap-6 py-12">
       <header>
-        <div className="kicker mb-3.5">Almost done</div>
-        <h1 className="m-0 mb-2.5 font-serif text-[32px] leading-[1.08] tracking-[-0.02em]">
-          Choose a new password
+        <div className="kicker mb-3.5">{t('resetPassword.kicker')}</div>
+        <h1 className="m-0 mb-2.5 font-serif fs-32 leading-[1.08] tracking-[-0.02em]">
+          {t('resetPassword.title')}
         </h1>
-        <p className="m-0 text-[15px] leading-[1.55] text-ink-2 text-pretty">
-          For {user.email}. You will stay signed in on this device afterwards.
+        <p className="m-0 fs-15 leading-[1.55] text-ink-2 text-pretty">
+          {t('resetPassword.forEmail', { email: user.email })}
         </p>
       </header>
 
       <form onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
         <Field
           id="new-password"
-          label="New password"
+          label={t('resetPassword.newPassword')}
           type="password"
           required
           autoComplete="new-password"
@@ -106,11 +107,11 @@ export default function ResetPassword() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <p className="m-0 text-[13px] leading-[1.5] text-ink-3">Eight characters or more.</p>
+        <p className="m-0 fs-13 leading-[1.5] text-ink-3">{t('resetPassword.rule')}</p>
 
         <div role="status" aria-live="polite">
           {error && (
-            <div className="rounded-lg border border-err bg-err-soft px-4 py-3 text-[13px] leading-[1.5] text-ink">
+            <div className="rounded-lg border border-err bg-err-soft px-4 py-3 fs-13 leading-[1.5] text-ink">
               {error}
             </div>
           )}
@@ -118,7 +119,7 @@ export default function ResetPassword() {
 
         <Button type="submit" disabled={busy} className="mt-1">
           {busy && <Spinner />}
-          {busy ? 'Saving…' : 'Save password'}
+          {busy ? t('resetPassword.saving') : t('resetPassword.save')}
         </Button>
       </form>
     </div>

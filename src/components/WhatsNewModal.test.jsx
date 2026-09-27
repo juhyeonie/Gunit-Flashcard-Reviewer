@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import pkg from '../../package.json'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { t } from '../i18n/index.js'
 
 /**
  * What's New: shown once per version, on the version actually running, to
@@ -107,7 +108,7 @@ describe('the dialog on launch', () => {
     expect(within(dialog).getByText(`Gunit v${RUNNING}`)).toBeTruthy()
     // Whichever section this release's notes open with — not every release has something new.
     const [first] = sectionsOf(RELEASE_NOTES.find((entry) => entry.version === RUNNING))
-    expect(within(dialog).getByRole('heading', { name: first.label })).toBeTruthy()
+    expect(within(dialog).getByRole('heading', { name: t(`whatsNew.category.${first.key}`) })).toBeTruthy()
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Got it' }))
     expect(screen.queryByRole('dialog')).toBeNull()

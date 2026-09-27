@@ -7,7 +7,10 @@ import { nextDueLabel, openingQueue, shuffle, summarise } from '../data/session.
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import MissingDeck from '../components/MissingDeck.jsx'
 import Mascot from '../components/Mascot.jsx'
+import useT from '../i18n/useT.js'
 
+// Each hint's word is review.keys.<label> in the dictionaries. The keys
+// themselves are the keys on the keyboard, and stay as they are.
 const NAV_HINTS = [
   { key: 'Space', label: 'flip', w: 'auto' },
   { key: '←', label: 'back', w: 22 },
@@ -24,11 +27,11 @@ const RATE_HINTS = [
   { key: 'Esc', label: 'exit', w: 'auto' },
 ]
 
-// Tones lifted from the prototype's `ratings` table.
+// Tones lifted from the prototype's `ratings` table. Named by review.rate.<key>.
 const RATINGS = [
-  { key: 'again', label: 'Again', className: 'border-err text-err hover:bg-err-soft' },
-  { key: 'good', label: 'Good', className: 'border-line text-ink hover:bg-raised' },
-  { key: 'easy', label: 'Easy', className: 'border-ok-line bg-ok-soft text-ok hover:bg-ok-soft' },
+  { key: 'again', className: 'border-err text-err hover:bg-err-soft' },
+  { key: 'good', className: 'border-line text-ink hover:bg-raised' },
+  { key: 'easy', className: 'border-ok-line bg-ok-soft text-ok hover:bg-ok-soft' },
 ]
 
 const AUTO_REVEAL_MS = 4000
@@ -38,7 +41,8 @@ export default function Review() {
   const navigate = useNavigate()
   const { decks, settings, say, recordGrades, restoreSchedule, recordSession, deckPath } = useApp()
   const deck = decks.find((d) => d.id === id)
-  useDocumentTitle(deck ? `Reviewing ${deck.title}` : 'Review')
+  const { t } = useT()
+  useDocumentTitle(deck ? t('review.title', { title: deck.title }) : t('review.titlePlain'))
 
   // Reviewing ahead pulls in cards that aren't due yet.
   const [ahead, setAhead] = useState(false)
@@ -154,7 +158,7 @@ export default function Review() {
       const merged = { ...grades, [card.id]: level }
       gradesRef.current = merged
       setGrades(merged)
-      say(`Scheduled — due in ${formatInterval(previews[level])}`)
+      say(t('review.scheduled', { interval: formatInterval(previews[level]) }))
       if (idx >= order.length - 1) {
         finish(merged)
         return
@@ -162,7 +166,7 @@ export default function Review() {
       setIdx((i) => i + 1)
       setFlipped(false)
     },
-    [card, deck, recordGrades, id, grades, say, previews, idx, order.length, finish],
+    [card, deck, recordGrades, id, grades, say, previews, idx, order.length, finish, t],
   )
 
   /**
@@ -183,8 +187,8 @@ export default function Review() {
 
     setIdx(last.at)
     setFlipped(false)
-    say('Rating undone')
-  }, [undoable, restoreSchedule, id, grades, say])
+    say(t('review.undone'))
+  }, [undoable, restoreSchedule, id, grades, say, t])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -237,23 +241,23 @@ export default function Review() {
           later", which is exactly what the page is saying.
         */}
         <Mascot pose={deck.cards.length ? 'resting' : 'thinking'} size={112} className="mb-1" />
-        <div className="kicker text-accent">{deck.cards.length ? 'All caught up' : 'Empty deck'}</div>
-        <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
-          {deck.cards.length ? 'Nothing is due right now' : 'No cards yet'}
+        <div className="kicker text-accent">{deck.cards.length ? t('review.caughtUp') : t('review.emptyDeck')}</div>
+        <h1 className="m-0 font-serif fs-34 leading-[1.1] tracking-[-0.02em]">
+          {deck.cards.length ? t('review.nothingDue') : t('deckDetail.emptyTitle')}
         </h1>
-        <p className="m-0 max-w-[380px] text-[15px] text-ink-2 text-pretty">
+        <p className="m-0 max-w-[380px] fs-15 text-ink-2 text-pretty">
           {deck.cards.length
             ? waiting
-              ? `The next card in ${deck.title} comes due in ${waiting}. You can review ahead, but spacing works better if you wait.`
-              : `Every card in ${deck.title} has been scheduled.`
-            : 'Add a card or import a file before studying this deck.'}
+              ? t('review.nextIn', { title: deck.title, waiting })
+              : t('review.allScheduled', { title: deck.title })
+            : t('review.addFirst')}
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-2">
           {deck.cards.length > 0 && (
-            <Button onClick={startAhead}>Review ahead</Button>
+            <Button onClick={startAhead}>{t('review.ahead')}</Button>
           )}
           <Button as={Link} to={deckPath(deck.id)} variant="outline">
-            Back to deck
+            {t('review.backToDeck')}
           </Button>
         </div>
       </div>
@@ -283,7 +287,7 @@ export default function Review() {
     <div className="rise-in flex min-h-[calc(100vh-160px)] flex-col gap-[18px] sm:gap-[26px]">
       <header className="flex items-center justify-between gap-4">
         <Button variant="quiet" size="sm" onClick={exit}>
-          ← Exit
+          {t('review.exit')}
         </Button>
         <div className="min-w-0 text-center">
           {/*
@@ -291,10 +295,10 @@ export default function Review() {
             session was the one screen in the app with no heading on it at all
             — nothing to jump to, and nothing to say where you had landed.
           */}
-          <h1 className="m-0 truncate font-serif text-[18px] leading-[1.2] font-normal">
+          <h1 className="m-0 truncate font-serif fs-18 leading-[1.2] font-normal">
             {deck.title}
           </h1>
-          {ahead && <div className="kicker mt-1">Reviewing ahead</div>}
+          {ahead && <div className="kicker mt-1">{t('review.reviewingAhead')}</div>}
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs font-medium tracking-[0.08em] text-ink-3">
@@ -303,14 +307,14 @@ export default function Review() {
           <Button
             variant="quiet"
             size="sm"
-            title="Shuffle"
-            aria-label="Shuffle"
+            title={t('review.shuffle')}
+            aria-label={t('review.shuffle')}
             onClick={() => {
               const shuffledOrder = shuffle(order)
               setOrder(shuffledOrder)
               setIdx(0)
               setFlipped(false)
-              say(`Shuffled ${shuffledOrder.length} cards`)
+              say(t('review.shuffled', { count: shuffledOrder.length }))
             }}
           >
             ⇄
@@ -349,7 +353,7 @@ export default function Review() {
               read out with it, which defeats the point of a flashcard.
             */}
             <div className={`${face} border border-line`} aria-hidden={flipped}>
-              <div className="kicker">Question</div>
+              <div className="kicker">{t('review.question')}</div>
               {/*
                 min-h-0 lets this shrink below its content so the overflow has
                 somewhere to go; `safe center` centres the text when it fits
@@ -358,20 +362,20 @@ export default function Review() {
                 scroll.
               */}
               <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
-                <p className="m-0 text-center font-serif text-[24px] leading-[1.28] tracking-[-0.01em] text-pretty [overflow-wrap:anywhere] sm:text-[34px]">
+                <p className="m-0 text-center font-serif fs-24 leading-[1.28] tracking-[-0.01em] text-pretty [overflow-wrap:anywhere] sm:fs-34">
                   {card.front}
                 </p>
               </div>
-              <div className="kicker text-center !tracking-[0.1em]">Click card or press space</div>
+              <div className="kicker text-center !tracking-[0.1em]">{t('review.flipHint')}</div>
             </div>
 
             <div
               className={`${face} border border-accent-line [transform:rotateY(180deg)]`}
               aria-hidden={!flipped}
             >
-              <div className="kicker text-accent">Answer</div>
+              <div className="kicker text-accent">{t('review.answer')}</div>
               <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] place-items-center overflow-y-auto py-[22px] [align-content:safe_center]">
-                <p className="m-0 text-center font-serif text-[18px] leading-[1.42] text-pretty [overflow-wrap:anywhere] sm:text-[22px]">
+                <p className="m-0 text-center font-serif fs-18 leading-[1.42] text-pretty [overflow-wrap:anywhere] sm:fs-22">
                   {card.back}
                 </p>
               </div>
@@ -386,10 +390,10 @@ export default function Review() {
           <div
             ref={ratingsRef}
             tabIndex={-1}
-            aria-label="How well did you know it?"
+            aria-label={t('review.howWell')}
             className="flex flex-col items-center gap-2.5 outline-none"
           >
-            <span className="kicker">How well did you know it?</span>
+            <span className="kicker">{t('review.howWell')}</span>
             <div className="flex flex-wrap justify-center gap-2">
               {RATINGS.map((r) => (
                 <button
@@ -397,13 +401,13 @@ export default function Review() {
                   type="button"
                   // The visible text is two lines; read together they run into
                   // one another as "Again10 minutes".
-                  aria-label={`${r.label} — next due in ${formatInterval(previews[r.key])}`}
+                  aria-label={t('review.rateLabel', { rating: t(`review.rate.${r.key}`), interval: formatInterval(previews[r.key]) })}
                   onClick={() => rate(r.key)}
                   className={`flex min-w-[104px] cursor-pointer flex-col items-center gap-1.5 rounded-lg border bg-transparent px-[22px] py-2.5 transition-colors active:scale-[0.975] ${r.className}`}
                 >
-                  <span className="text-sm leading-none font-semibold">{r.label}</span>
+                  <span className="text-sm leading-none font-semibold">{t(`review.rate.${r.key}`)}</span>
                   {/* The real next interval for this card, not a fixed label. */}
-                  <span className="font-mono text-[10px] leading-none tracking-[0.06em] opacity-70">
+                  <span className="font-mono fs-10 leading-none tracking-[0.06em] opacity-70">
                     {formatInterval(previews[r.key])}
                   </span>
                 </button>
@@ -412,7 +416,7 @@ export default function Review() {
           </div>
         ) : (
           <Button className="px-[26px] py-[13px]" onClick={() => setFlipped(true)}>
-            Reveal answer
+            {t('review.reveal')}
           </Button>
         )}
       </div>
@@ -420,7 +424,7 @@ export default function Review() {
       <footer className="flex items-center justify-between gap-3 border-t border-line-soft pt-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={prev} disabled={idx === 0}>
-            ← Previous
+            {t('review.previous')}
           </Button>
           {/*
             Only offered once there is something to take back. A keyboard-only
@@ -428,7 +432,7 @@ export default function Review() {
           */}
           {undoable.length > 0 && (
             <Button variant="quiet" size="sm" onClick={undo}>
-              Undo rating
+              {t('review.undo')}
             </Button>
           )}
         </div>
@@ -444,16 +448,16 @@ export default function Review() {
               */}
               <kbd
                 style={{ minWidth: k.w }}
-                className="inline-grid h-[22px] place-items-center rounded border border-b-2 border-line bg-surface px-[7px] font-mono text-[11px] leading-none font-medium text-ink-2 shadow-sh1"
+                className="inline-grid h-[22px] place-items-center rounded border border-b-2 border-line bg-surface px-[7px] font-mono fs-11 leading-none font-medium text-ink-2 shadow-sh1"
               >
                 {k.key}
               </kbd>
-              <span className="kicker !tracking-[0.1em]">{k.label}</span>
+              <span className="kicker !tracking-[0.1em]">{t(`review.keys.${k.label}`)}</span>
             </div>
           ))}
         </div>
         <Button variant="outline" size="sm" onClick={next}>
-          {idx >= order.length - 1 ? 'Finish →' : 'Next →'}
+          {idx >= order.length - 1 ? t('review.finish') : t('review.next')}
         </Button>
       </footer>
     </div>

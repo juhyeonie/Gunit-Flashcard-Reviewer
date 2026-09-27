@@ -3,6 +3,8 @@ import { AuthContext } from './authContext.js'
 import { getSupabase, isConfigured } from './supabase.js'
 import { flushPendingSync, hasOutstandingChanges } from './pendingSync.js'
 import { forgetAccountLibrary } from './storageKeys.js'
+import { authMessage } from './authMessages.js'
+import { t } from '../i18n/index.js'
 
 /**
  * Who is signed in, if anyone, and the four things you can do about it.
@@ -88,12 +90,12 @@ export function AuthProvider({ children }) {
    */
   const call = useCallback(async (run) => {
     const supabase = await getSupabase()
-    if (!supabase) return { error: 'Accounts are not set up in this copy of Gunit' }
+    if (!supabase) return { error: t('auth.errors.noAccounts') }
     try {
       const { error } = await run(supabase)
-      return { error: error ? error.message : null }
+      return { error: error ? authMessage(error.message) : null }
     } catch (err) {
-      return { error: err?.message || 'Something went wrong' }
+      return { error: authMessage(err?.message) }
     }
   }, [])
 

@@ -1,5 +1,8 @@
 import { Component } from 'react'
 import Mascot from './Mascot.jsx'
+// The plain function rather than the hook: this is a class, and it sits above
+// the provider anyway. It reads the language the provider last set.
+import { parts, t } from '../i18n/index.js'
 
 /**
  * Catches render and lifecycle errors so a crash shows something a reader can
@@ -35,7 +38,7 @@ const libraryKeys = () =>
 
 const btn =
   'inline-flex cursor-pointer items-center justify-center rounded-lg border px-4 py-2.5 ' +
-  'text-[13px] leading-none font-semibold transition-colors'
+  'fs-13 leading-none font-semibold transition-colors'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -92,17 +95,16 @@ export default class ErrorBoundary extends Component {
           and the panda should not contradict them.
         */}
         <Mascot pose="thinking" size={96} className="mb-1" />
-        <div className="kicker text-err">Something broke</div>
-        <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
-          This page stopped working
+        <div className="kicker text-err">{t('errorBoundary.kicker')}</div>
+        <h1 className="m-0 font-serif fs-34 leading-[1.1] tracking-[-0.02em]">
+          {t('errorBoundary.title')}
         </h1>
-        <p className="m-0 max-w-[400px] text-[15px] text-ink-2 text-pretty">
-          Your decks are saved and were not affected. Trying again usually clears
-          it; if it keeps happening, the saved data may be the cause.
+        <p className="m-0 max-w-[400px] fs-15 text-ink-2 text-pretty">
+          {t('errorBoundary.body')}
         </p>
 
         {this.state.error?.message && (
-          <p className="m-0 max-w-[420px] font-mono text-[12px] leading-[1.5] text-ink-3 break-words">
+          <p className="m-0 max-w-[420px] font-mono fs-12 leading-[1.5] text-ink-3 break-words">
             {this.state.error.message}
           </p>
         )}
@@ -113,20 +115,24 @@ export default class ErrorBoundary extends Component {
             onClick={this.retry}
             className={`${btn} border-ink bg-ink text-paper hover:bg-ink-2`}
           >
-            Try again
+            {t('errorBoundary.retry')}
           </button>
           <a href="/" className={`${btn} border-line bg-transparent text-ink hover:bg-raised`}>
-            Back to dashboard
+            {t('errorBoundary.home')}
           </a>
         </div>
 
         <div className="mt-6 border-t border-line-soft pt-5">
           {confirmingReset ? (
             <div className="flex flex-col items-center gap-3">
-              <p className="m-0 max-w-[380px] text-[13px] text-ink-2 text-pretty">
-                This clears the decks stored in this browser. A copy is kept under{' '}
-                <span className="font-mono text-[12px]">{SALVAGE_KEY}</span> so nothing is
-                destroyed outright.
+              <p className="m-0 max-w-[380px] fs-13 text-ink-2 text-pretty">
+                {parts('errorBoundary.resetWarning', {
+                  key: (
+                    <span key="key" className="font-mono fs-12">
+                      {SALVAGE_KEY}
+                    </span>
+                  ),
+                })}
               </p>
               <div className="flex gap-2">
                 <button
@@ -134,14 +140,14 @@ export default class ErrorBoundary extends Component {
                   onClick={this.resetData}
                   className={`${btn} border-err bg-err text-paper hover:opacity-90`}
                 >
-                  Yes, reset saved data
+                  {t('errorBoundary.resetConfirm')}
                 </button>
                 <button
                   type="button"
                   onClick={() => this.setState({ confirmingReset: false })}
                   className={`${btn} border-line bg-transparent text-ink hover:bg-raised`}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -149,9 +155,9 @@ export default class ErrorBoundary extends Component {
             <button
               type="button"
               onClick={() => this.setState({ confirmingReset: true })}
-              className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-medium text-ink-3 underline-offset-4 transition-colors hover:text-err hover:underline"
+              className="cursor-pointer border-0 bg-transparent p-0 fs-13 font-medium text-ink-3 underline-offset-4 transition-colors hover:text-err hover:underline"
             >
-              Still broken? Reset saved data
+              {t('errorBoundary.reset')}
             </button>
           )}
         </div>
