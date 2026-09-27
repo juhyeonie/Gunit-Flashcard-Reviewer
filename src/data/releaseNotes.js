@@ -22,6 +22,41 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.5.0',
+    new: [
+      {
+        title: 'Gunit in Filipino',
+        detail: 'Choose English or Filipino in Settings. Your decks and cards stay exactly as you wrote them.',
+        fil: {
+          title: 'Gunit sa Filipino',
+          detail: 'Pumili ng English o Filipino sa Mga setting. Mananatili ang mga deck at card mo gaya ng pagkakasulat mo.',
+        },
+      },
+      {
+        title: 'Bigger or smaller text',
+        detail: 'Small, Default or Large — for cards, questions and everything around them.',
+        fil: {
+          title: 'Mas malaki o mas maliit na teksto',
+          detail: 'Maliit, Karaniwan o Malaki — para sa mga card, tanong at lahat ng nasa paligid nila.',
+        },
+      },
+      {
+        title: 'A profile picture',
+        detail: 'Add one in Settings. It shows in the top bar, on every device you sign in on.',
+        fil: {
+          title: 'Larawan sa profile',
+          detail: 'Magdagdag sa Mga setting. Makikita ito sa itaas na bar, sa bawat device na pag-sign-in-an mo.',
+        },
+      },
+    ],
+    fixed: [
+      {
+        title: 'Settings changed offline are no longer lost when you reconnect.',
+        fil: { title: 'Hindi na nawawala ang mga setting na binago nang offline kapag naka-connect ka na ulit.' },
+      },
+    ],
+  },
+  {
     version: '1.4.0',
     new: [
       {
