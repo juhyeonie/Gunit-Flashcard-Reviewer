@@ -12,6 +12,7 @@ import useT from '../i18n/useT.js'
 import Avatar from './Avatar.jsx'
 import useAvatar from '../data/useAvatar.js'
 import useTightBar from '../hooks/useTightBar.js'
+import useHomeRefresh from '../hooks/useHomeRefresh.js'
 
 const ITEMS = NAV.filter((item) => !item.accounts || isConfigured)
 const TOP_ITEMS = ITEMS.filter((item) => !item.phoneOnly)
@@ -143,6 +144,11 @@ const ICONS = { home: HomeIcon, decks: DecksIcon, shared: SharedIcon, alerts: Be
  *
  * The tabs are the same NavLinks as ever, so a quiz with answers in it still
  * asks before one of them takes the reader away.
+ *
+ * Home, tapped while already home, reloads the app — the way a phone reader
+ * reaches for "refresh" — after the icon turns once, so the tap is seen to
+ * have landed (useHomeRefresh). From anywhere else it is an ordinary link.
+ * The wide screen's top bar has no such thing, and does not change.
  */
 export function BottomNav() {
   const { unread } = useNotifications()
@@ -150,6 +156,7 @@ export function BottomNav() {
   const { pathname } = useLocation()
   const ref = useRef(null)
   useHideOnScroll(ref, { resetKey: pathname })
+  const { refreshing, refresh } = useHomeRefresh()
 
   return (
     <>
@@ -168,11 +175,14 @@ export function BottomNav() {
       >
         {ITEMS.map((item) => {
           const Icon = ICONS[item.icon]
+          const home = item.icon === 'home'
           return (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
+              onClick={home && pathname === '/' ? refresh : undefined}
+              aria-busy={home && refreshing ? true : undefined}
               className={({ isActive }) =>
                 `relative flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 px-1 transition-colors ${
                   isActive ? 'text-accent' : 'text-ink-2'
@@ -188,11 +198,11 @@ export function BottomNav() {
                   */}
                   <span
                     aria-hidden="true"
-                    className={`absolute top-1 h-[2px] w-7 rounded-full transition-colors ${
+                    className={`absolute top-1 h-[2px] rounded-full transition-[background-color,width] duration-300 ${
                       isActive ? 'bg-accent' : 'bg-transparent'
-                    }`}
+                    } ${home && refreshing ? 'w-9' : 'w-7'}`}
                   />
-                  <span className="relative">
+                  <span className={`relative ${home && refreshing ? 'home-refresh' : ''}`}>
                     <Icon size={22} />
                     {item.icon === 'alerts' && unread > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-paper bg-accent">
