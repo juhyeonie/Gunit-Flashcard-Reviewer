@@ -22,6 +22,19 @@
  */
 export const RELEASE_NOTES = [
   {
+    version: '1.5.1',
+    improved: [
+      {
+        title: 'Refresh from Home on your phone',
+        detail: 'Already on Home? Tap Home again to refresh Gunit.',
+        fil: {
+          title: 'Mag-refresh mula sa Tahanan sa phone mo',
+          detail: 'Nasa Tahanan ka na? Pindutin ulit ang Tahanan para i-refresh ang Gunit.',
+        },
+      },
+    ],
+  },
+  {
     version: '1.5.0',
     new: [
       {
