@@ -15,7 +15,8 @@ import { deck, entry, renderRoute, seed, stored } from '../../test/render-app.js
 
 const open = () => renderRoute('/settings', '/settings', <Settings />)
 
-const filePicker = () => document.querySelector('input[type="file"]')
+// The backup's picker; the profile picture has one of its own.
+const filePicker = () => document.querySelector('input[type="file"][accept*="json"]')
 
 const asFile = (payload) =>
   new File([JSON.stringify(payload)], 'backup.json', { type: 'application/json' })

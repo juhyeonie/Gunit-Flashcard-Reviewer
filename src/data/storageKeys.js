@@ -34,6 +34,20 @@ export const sharedKey = (userId) => `gunit.shared.${userId ?? 'guest'}`
 /** This device's notifications for an identity — see notices.js. */
 export const noticesKey = (userId) => `gunit.notices.${userId ?? 'guest'}`
 
+/**
+ * This device's copy of an identity's profile picture — see avatar.js. Beside
+ * the library rather than in it: it is a few kilobytes that change rarely,
+ * and the library is written on every card graded.
+ */
+export const avatarKey = (userId) => `gunit.avatar.${userId ?? 'guest'}`
+
+/**
+ * The language and text size last on screen in this browser, whoever was
+ * reading. Only for the moment after a reload before a signed-in session is
+ * restored — see `AppProvider`.
+ */
+export const READING_KEY = 'gunit.ui.reading'
+
 /** Whichever library the given identity reads. */
 export const keyFor = (userId) => (userId ? userKey(userId) : GUEST_KEY)
 
@@ -192,6 +206,45 @@ export function hasUnsent(userId) {
 }
 
 /**
+ * The same promise for preferences — the name, theme, language, text size and
+ * review settings on the profile row — kept apart from the library's.
+ *
+ * They were never marked at all. Changed offline, or on a failed request,
+ * they sat on this device until the next read of the account installed its
+ * older copy over them: switch to Filipino on a train, and reconnecting put
+ * the app back in English. While this is set the account's copy of them is
+ * not installed; this device's goes up instead, and then it is cleared.
+ */
+const prefsUnsentKey = (userId) => `gunit.sync.prefs.unsent.${userId}`
+
+export function markPrefsUnsent(userId) {
+  if (!userId) return
+  try {
+    localStorage.setItem(prefsUnsentKey(userId), 'yes')
+  } catch {
+    // Nowhere to keep the promise; the preferences are only in memory anyway.
+  }
+}
+
+export function clearPrefsUnsent(userId) {
+  if (!userId) return
+  try {
+    localStorage.removeItem(prefsUnsentKey(userId))
+  } catch {
+    // Left set: the next read sends preferences the account already has.
+  }
+}
+
+export function hasPrefsUnsent(userId) {
+  if (!userId) return false
+  try {
+    return localStorage.getItem(prefsUnsentKey(userId)) === 'yes'
+  } catch {
+    return false
+  }
+}
+
+/**
  * The ids the account last confirmed, as this browser saw them.
  *
  * The unsent mark says *that* something here has not gone up; this says what
@@ -235,6 +288,8 @@ export function forgetSyncStateFor(key) {
   try {
     localStorage.removeItem(confirmedKey(userId))
     localStorage.removeItem(unsentKey(userId))
+    // The preferences it marked lived in that library too.
+    localStorage.removeItem(prefsUnsentKey(userId))
   } catch {
     // Storage refused: then there is no record to read back either.
   }
@@ -277,6 +332,10 @@ export function forgetAccountLibrary(userId) {
     localStorage.removeItem(sharedKey(userId))
     // And the account's notifications, which name the people it shares with.
     localStorage.removeItem(noticesKey(userId))
+    // And their picture: a face on a borrowed machine is the same problem.
+    localStorage.removeItem(avatarKey(userId))
+    // Sign-out only gets here once everything was sent, preferences included.
+    localStorage.removeItem(prefsUnsentKey(userId))
     return true
   } catch {
     // Storage refused. The decks stay, which is the safe direction to fail in.

@@ -2,11 +2,10 @@ import { useState } from 'react'
 import Modal from './Modal.jsx'
 import Button from './Button.jsx'
 import Field from './Field.jsx'
+import useT from '../i18n/useT.js'
 
-const SOURCES = [
-  { key: 'write', label: 'Write my own', hint: 'Add cards by hand, one at a time.' },
-  { key: 'import', label: 'Import a file', hint: 'Read a document and split it into cards.' },
-]
+/** Their words are under deckModal.source in the dictionaries. */
+const SOURCES = [{ key: 'write' }, { key: 'import' }]
 
 /**
  * Create and Edit share one modal — the prototype uses the same fields for
@@ -34,6 +33,7 @@ export default function DeckModal({
       : { title: '', subject: '', desc: '', folderId: initialFolderId ?? null },
   )
   const [source, setSource] = useState('write')
+  const { t } = useT()
 
   const set = (key) => (e) => setDraft((d) => ({ ...d, [key]: e.target.value }))
   const valid = draft.title.trim() && draft.subject.trim()
@@ -49,18 +49,14 @@ export default function DeckModal({
     <Modal
       open
       onClose={onClose}
-      kicker={isEdit ? 'Edit deck' : 'New deck'}
-      title={isEdit ? 'Deck details' : 'Create a deck'}
-      body={
-        isEdit
-          ? 'Renaming a deck keeps all of its cards and review history.'
-          : 'Name it, then choose how its cards get written.'
-      }
-      confirmLabel={isEdit ? 'Save changes' : 'Create deck'}
+      kicker={isEdit ? t('deckModal.editKicker') : t('deckModal.newKicker')}
+      title={isEdit ? t('deckModal.editTitle') : t('deckModal.newTitle')}
+      body={isEdit ? t('deckModal.editBody') : t('deckModal.newBody')}
+      confirmLabel={isEdit ? t('common.saveChanges') : t('deckModal.create')}
       secondaryAction={
         isEdit && onDelete ? (
           <Button variant="danger" size="sm" onClick={() => onDelete(deck)}>
-            Delete deck
+            {t('deckModal.delete')}
           </Button>
         ) : null
       }
@@ -74,29 +70,29 @@ export default function DeckModal({
       <div className="mb-6 flex flex-col gap-4">
         <Field
           id="deck-title"
-          label="Deck name"
+          label={t('deckModal.name')}
           required
           value={draft.title}
           onChange={set('title')}
-          placeholder="e.g. Roman Provinces"
+          placeholder={t('deckModal.namePlaceholder')}
         />
         <Field
           id="deck-subject"
-          label="Subject"
+          label={t('deckModal.subject')}
           required
           value={draft.subject}
           onChange={set('subject')}
-          placeholder="Ancient Rome"
+          placeholder={t('deckModal.subjectPlaceholder')}
         />
         <Field
           id="deck-desc"
-          label="Description"
+          label={t('deckModal.description')}
           optional
           as="textarea"
           rows={3}
           value={draft.desc}
           onChange={set('desc')}
-          placeholder="What this deck covers"
+          placeholder={t('deckModal.descriptionPlaceholder')}
         />
         {/*
           Only once there is a folder to choose. A field whose one option is
@@ -106,14 +102,14 @@ export default function DeckModal({
         {folders.length > 0 && (
           <Field
             id="deck-folder"
-            label="Folder"
+            label={t('deckModal.folder')}
             optional
             as="select"
             value={draft.folderId ?? ''}
             onChange={(e) => setDraft((d) => ({ ...d, folderId: e.target.value || null }))}
             className="cursor-pointer"
           >
-            <option value="">No folder</option>
+            <option value="">{t('deckModal.noFolder')}</option>
             {[...folders]
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((f) => (
@@ -127,7 +123,7 @@ export default function DeckModal({
 
       {!isEdit && (
         <div className="mt-1 mb-[22px] flex flex-col gap-[9px]">
-          <span className="kicker !tracking-[0.12em]">Then, how do you want to fill it?</span>
+          <span className="kicker !tracking-[0.12em]">{t('deckModal.fillHow')}</span>
           <div className="grid grid-cols-2 gap-2">
             {SOURCES.map((s) => {
               const active = source === s.key
@@ -141,13 +137,13 @@ export default function DeckModal({
                   }`}
                 >
                   <span
-                    className={`text-[13px] leading-tight font-semibold ${
+                    className={`fs-13 leading-tight font-semibold ${
                       active ? 'text-accent' : 'text-ink'
                     }`}
                   >
-                    {s.label}
+                    {t(`deckModal.source.${s.key}.label`)}
                   </span>
-                  <span className="text-xs leading-[1.4] text-ink-3 text-pretty">{s.hint}</span>
+                  <span className="text-xs leading-[1.4] text-ink-3 text-pretty">{t(`deckModal.source.${s.key}.hint`)}</span>
                 </button>
               )
             })}

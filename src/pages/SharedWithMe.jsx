@@ -8,8 +8,8 @@ import { useAuth } from '../data/useAuth.js'
 import { listSharedWithMe, sharePath } from '../data/sharing.js'
 import { formatRelative } from '../data/activity.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import useT from '../i18n/useT.js'
 
-const ROLE_LABEL = { editor: 'Can edit', viewer: 'Can study' }
 
 const stamp = (iso) => {
   const ms = iso ? Date.parse(iso) : NaN
@@ -25,7 +25,8 @@ const stamp = (iso) => {
  * what this page says the next time it is opened.
  */
 export default function SharedWithMe() {
-  useDocumentTitle('Shared with me')
+  const { t } = useT()
+  useDocumentTitle(t('sharedWithMe.title'))
   const { user, available, status } = useAuth()
   const [state, setState] = useState({ phase: 'loading', items: [], error: null })
 
@@ -43,11 +44,10 @@ export default function SharedWithMe() {
 
   const header = (
     <header className="flex flex-col gap-3 border-b border-line pb-[26px]">
-      <div className="kicker">Shared</div>
-      <h1 className="m-0 font-serif text-[32px] leading-[1.05] tracking-[-0.02em] sm:text-[42px]">Shared with me</h1>
-      <p className="m-0 max-w-[560px] text-[15px] text-ink-2 text-pretty">
-        Decks and folders classmates shared with you. Study the shared version to keep up with their
-        changes, or add a copy to make it your own. Either way, your progress is yours alone.
+      <div className="kicker">{t('nav.shared')}</div>
+      <h1 className="m-0 font-serif fs-32 leading-[1.05] tracking-[-0.02em] sm:fs-42">{t('sharedWithMe.title')}</h1>
+      <p className="m-0 max-w-[560px] fs-15 text-ink-2 text-pretty">
+        {t('sharedWithMe.lede')}
       </p>
     </header>
   )
@@ -58,17 +58,17 @@ export default function SharedWithMe() {
         {header}
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[60px] text-center">
           <Mascot pose="thinking" size={92} className="mb-1" />
-          <div className="font-serif text-[24px] leading-[1.2]">
-            {available ? 'Sign in to see what’s shared with you' : 'This copy of Gunit has no accounts'}
+          <div className="font-serif fs-24 leading-[1.2]">
+            {available ? t('sharedWithMe.signInTitle') : t('resetPassword.noAccounts')}
           </div>
           <p className="m-0 max-w-[380px] text-sm text-ink-3 text-pretty">
             {available
-              ? 'A link someone sent you opens without signing in. Signing in keeps it here, and lets people invite you by email.'
-              : 'Everything stays in this browser, so there is nobody to share with. Open shared links on the main Gunit site.'}
+              ? t('sharedWithMe.signInBody')
+              : t('sharedWithMe.localBody')}
           </p>
           {available && (
             <Button as={Link} to="/sign-in?next=%2Fshared" size="sm">
-              Sign in
+              {t('common.signIn')}
             </Button>
           )}
         </div>
@@ -82,7 +82,7 @@ export default function SharedWithMe() {
 
       {state.phase === 'loading' ? (
         <div className="flex items-center gap-2.5 text-sm text-ink-3" role="status">
-          <Spinner /> Looking for decks shared with you…
+          <Spinner /> {t('sharedWithMe.looking')}
         </div>
       ) : state.phase === 'error' ? (
         <p role="alert" className="m-0 text-sm text-err">
@@ -91,9 +91,9 @@ export default function SharedWithMe() {
       ) : state.items.length === 0 ? (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[60px] text-center">
           <Mascot pose="thinking" size={92} className="mb-1" />
-          <div className="font-serif text-[24px] leading-[1.2]">Nothing shared with you yet</div>
+          <div className="font-serif fs-24 leading-[1.2]">{t('sharedWithMe.emptyTitle')}</div>
           <p className="m-0 max-w-[380px] text-sm text-ink-3 text-pretty">
-            When someone invites you, or you open a shared link and save it, it shows up here.
+            {t('sharedWithMe.emptyBody')}
           </p>
         </div>
       ) : (
@@ -110,30 +110,30 @@ export default function SharedWithMe() {
                   <Icon />
                 </span>
                 <div className="flex min-w-0 flex-1 basis-[220px] flex-col gap-1.5">
-                  <h2 className="m-0 font-serif text-[21px] leading-[1.2] font-normal text-pretty">
+                  <h2 className="m-0 font-serif fs-21 leading-[1.2] font-normal text-pretty">
                     <Link to={path} className="text-inherit no-underline hover:underline">
                       {item.name}
                     </Link>
                   </h2>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] leading-none font-medium tracking-[0.04em] text-ink-3">
-                    <span>{item.kind === 'folder' ? 'Folder' : 'Deck'}</span>
-                    <span>shared by {item.owner_name}</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono fs-11 leading-none font-medium tracking-[0.04em] text-ink-3">
+                    <span>{t(`sharedWithMe.kind.${item.kind === 'folder' ? 'folder' : 'deck'}`)}</span>
+                    <span>{t('sharedWithMe.by', { name: item.owner_name })}</span>
                     <span>
-                      {item.kind === 'folder' ? `${item.decks} ${item.decks === 1 ? 'deck' : 'decks'} · ` : ''}
-                      {item.cards} {item.cards === 1 ? 'card' : 'cards'}
+                      {item.kind === 'folder' ? `${t('folders.deckCount', { count: item.decks })} · ` : ''}
+                      {t('deck.cardCount', { count: item.cards })}
                     </span>
-                    <span>updated {formatRelative(stamp(item.updated_at)).toLowerCase()}</span>
+                    <span>{t('sharedWithMe.updated', { when: formatRelative(stamp(item.updated_at)).toLowerCase() })}</span>
                   </div>
                 </div>
                 <span
-                  className={`rounded-[5px] border px-2 py-[5px] font-mono text-[10px] leading-none font-medium tracking-[0.06em] whitespace-nowrap uppercase ${
+                  className={`rounded-[5px] border px-2 py-[5px] font-mono fs-10 leading-none font-medium tracking-[0.06em] whitespace-nowrap uppercase ${
                     item.role === 'editor' ? 'border-accent-line bg-accent-soft text-accent' : 'border-line text-ink-3'
                   }`}
                 >
-                  {ROLE_LABEL[item.role] ?? ROLE_LABEL.viewer}
+                  {t(`share.role.${item.role === 'editor' ? 'editor' : 'viewer'}.label`)}
                 </span>
                 <Button as={Link} to={path} size="sm" variant="outline">
-                  {item.kind === 'folder' ? 'Open' : 'Study'}
+                  {item.kind === 'folder' ? t('sharedWithMe.open') : t('sharedWithMe.study')}
                 </Button>
               </li>
             )

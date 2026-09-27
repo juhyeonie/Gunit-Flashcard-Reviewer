@@ -9,9 +9,10 @@
  *
  * Supabase's own pieces are stubbed as thinly as possible: an `auth.users`
  * table, `auth.uid()` and `auth.jwt()` reading the request's claims the way
- * Supabase's do, and the `anon` and `authenticated` roles with the table
- * grants Supabase gives them. Everything under supabase/migrations runs
- * unchanged, in order.
+ * Supabase's do, the `anon` and `authenticated` roles with the table grants
+ * Supabase gives them, and Storage's `buckets` and `objects` tables with the
+ * `storage.foldername()` its policies are written with. Everything under
+ * supabase/migrations runs unchanged, in order.
  */
 import { PGlite } from '@electric-sql/pglite'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -33,6 +34,28 @@ export async function freshDatabase() {
     grant usage on schema public, auth to anon, authenticated;
     grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
     alter default privileges in schema public grant all on tables to anon, authenticated;
+
+    -- Storage, as far as a policy can see it: the bucket list, the objects
+    -- table with row level security on, and the folder helper policies call.
+    create schema storage;
+    create table storage.buckets (
+      id text primary key, name text not null, public boolean default false,
+      file_size_limit bigint, allowed_mime_types text[]
+    );
+    create table storage.objects (
+      id uuid primary key default gen_random_uuid(),
+      bucket_id text references storage.buckets (id),
+      name text not null,
+      owner uuid default auth.uid(),
+      unique (bucket_id, name)
+    );
+    alter table storage.objects enable row level security;
+    create function storage.foldername(name text) returns text[] language sql immutable as
+      $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+    grant usage on schema storage to anon, authenticated;
+    grant select on storage.buckets to anon, authenticated;
+    grant all on storage.objects to anon, authenticated;
+    grant execute on function storage.foldername(text) to anon, authenticated;
   `)
   for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(`${MIGRATIONS}${file}`, 'utf8'))

@@ -18,6 +18,8 @@
  * of the app, and most sessions never import anything.
  */
 
+import { t } from '../i18n/index.js'
+
 /** Extensions this step can actually read, in the order the UI lists them. */
 export const READABLE = ['pdf', 'docx', 'pptx', 'txt', 'md']
 
@@ -66,8 +68,7 @@ export const wordCount = (text = '') => (text.trim() ? text.trim().split(/\s+/).
  */
 const readError = (message) => Object.assign(new Error(message), { readable: true })
 
-const messageFor = (err, ext) =>
-  err?.readable ? err.message : `Could not read that .${ext} — it may be damaged`
+const messageFor = (err, ext) => (err?.readable ? err.message : t('extract.damaged', { ext }))
 
 /** Word keeps its body in one file, which Mammoth knows how to walk. */
 export async function textFromDocx(buffer) {
@@ -92,7 +93,7 @@ export async function textFromPptx(buffer) {
       return n(a) - n(b)
     })
 
-  if (!slides.length) throw readError('No slides in that file')
+  if (!slides.length) throw readError(t('extract.noSlides'))
 
   const parts = await Promise.all(
     slides.map(async (slide, i) => {
@@ -120,11 +121,11 @@ const KINDS = {
 const EMPTY_MESSAGE = {
   // A PDF that yields nothing almost always holds page images rather than
   // text. The file is fine; it is a picture, and pictures need OCR.
-  pdf: 'No text layer — this looks like a scan',
+  pdf: 'extract.scan',
 }
 
 const emptyMessageFor = (ext) =>
-  IMAGES.includes(ext) ? 'A picture, with nothing to read out of it directly' : EMPTY_MESSAGE[ext]
+  IMAGES.includes(ext) ? t('extract.picture') : EMPTY_MESSAGE[ext] && t(EMPTY_MESSAGE[ext])
 
 const shape = (file) => {
   const ext = extensionOf(file.name)
@@ -159,10 +160,10 @@ export async function extractText(file) {
     return { ...base, status: 'empty', ocr: true, message: emptyMessageFor(ext) }
   }
   if (!READABLE.includes(ext)) {
-    return { ...base, status: 'unsupported', message: `Cannot read .${ext || 'this'} files` }
+    return { ...base, status: 'unsupported', message: ext ? t('extract.unsupported', { ext }) : t('extract.unsupportedUnknown') }
   }
   if (file.size > MAX_BYTES) {
-    return { ...base, status: 'error', message: 'Too large to read — 20 MB is the limit' }
+    return { ...base, status: 'error', message: t('extract.tooLarge') }
   }
 
   try {
@@ -179,7 +180,7 @@ export async function extractText(file) {
         ...base,
         status: 'empty',
         ocr: ext === 'pdf',
-        message: emptyMessageFor(ext) || 'No readable text found',
+        message: emptyMessageFor(ext) || t('extract.noText'),
       }
     }
     return { ...base, status: 'ok', text, words: wordCount(text), message: '' }
@@ -214,11 +215,11 @@ export async function readWithOcr(file, onProgress) {
       const rendered = await pagesToImages(await file.arrayBuffer())
       images = rendered.images
       skipped = rendered.skipped
-      if (skipped > 0) base.note = `first ${OCR_PAGE_LIMIT} pages, ${skipped} left unread`
+      if (skipped > 0) base.note = t('extract.ocrPages', { limit: OCR_PAGE_LIMIT, count: skipped })
     }
 
     const text = await textFromImages(images, onProgress)
-    if (!text) return { ...base, status: 'empty', message: 'Nothing legible on those pages' }
+    if (!text) return { ...base, status: 'empty', message: t('extract.illegible') }
     return { ...base, status: 'ok', text, words: wordCount(text), message: '' }
   } catch (err) {
     return { ...base, status: 'error', message: messageFor(err, ext) }

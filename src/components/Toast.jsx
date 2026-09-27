@@ -13,7 +13,7 @@ export default function Toast({ message }) {
       {message && (
         <div className="toast-in fixed bottom-[calc(env(safe-area-inset-bottom)+80px)] left-1/2 sm:bottom-7 z-60 flex -translate-x-1/2 items-center gap-3 rounded-[7px] bg-ink px-[18px] py-[13px] text-paper shadow-sh3">
           <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-          <span className="text-[13px] font-medium leading-none">{message}</span>
+          <span className="fs-13 font-medium leading-none">{message}</span>
         </div>
       )}
     </div>

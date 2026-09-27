@@ -15,6 +15,8 @@
  * Only the guest library is ever given this. An account starts empty — see
  * `load` in AppContext.
  */
+import { t } from '../i18n/index.js'
+
 export const EXAMPLE_DECK = {
   id: 'example',
   title: 'How Gunit works',
@@ -140,12 +142,12 @@ export const accentOf = (deck) => `oklch(0.800 0.098 ${hueOf(deck)})`
 /** Deck badge: Draft when empty, Mastered at 85%+, otherwise In progress. */
 export const badgeFor = (deck) => {
   if (!deck.cards.length) {
-    return { label: 'Draft', bg: 'var(--color-raised)', fg: 'var(--color-ink-3)', line: 'var(--color-line)' }
+    return { label: t('deck.badge.draft'), bg: 'var(--color-raised)', fg: 'var(--color-ink-3)', line: 'var(--color-line)' }
   }
   if (deck.progress >= 0.85) {
-    return { label: 'Mastered', bg: 'var(--color-ok-soft)', fg: 'var(--color-ok)', line: 'var(--color-ok-line)' }
+    return { label: t('deck.badge.mastered'), bg: 'var(--color-ok-soft)', fg: 'var(--color-ok)', line: 'var(--color-ok-line)' }
   }
-  return { label: 'In progress', bg: 'var(--color-raised)', fg: 'var(--color-ink-2)', line: 'var(--color-line)' }
+  return { label: t('deck.badge.inProgress'), bg: 'var(--color-raised)', fg: 'var(--color-ink-2)', line: 'var(--color-line)' }
 }
 
 export const SUBJECT_SUGGESTIONS = ['Ancient Rome', 'Roman law']

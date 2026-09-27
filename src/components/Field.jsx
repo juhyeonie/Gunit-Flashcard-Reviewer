@@ -1,5 +1,7 @@
+import useT from '../i18n/useT.js'
+
 const inputStyles =
-  'rounded-lg border border-line bg-paper px-3 py-[11px] text-[15px] text-ink outline-none ' +
+  'rounded-lg border border-line bg-paper px-3 py-[11px] fs-15 text-ink outline-none ' +
   'placeholder:text-ink-3/70 transition-colors focus:border-accent'
 
 /**
@@ -17,16 +19,17 @@ export default function Field({
   ...props
 }) {
   const Control = as
+  const { t } = useT()
   return (
     <label htmlFor={id} className="flex flex-col gap-[7px]">
       <span className="kicker !tracking-[0.12em]">
         {label}
         {required && <span className="text-accent"> *</span>}
-        {optional && <span className="normal-case tracking-normal opacity-70"> optional</span>}
+        {optional && <span className="normal-case tracking-normal opacity-70"> {t('field.optional')}</span>}
       </span>
       <Control
         id={id}
-        className={`${inputStyles} ${serif ? 'font-serif text-[17px] leading-[1.4]' : ''} ${
+        className={`${inputStyles} ${serif ? 'font-serif fs-17 leading-[1.4]' : ''} ${
           as === 'textarea' ? 'resize-y' : ''
         } ${className}`}
         {...props}

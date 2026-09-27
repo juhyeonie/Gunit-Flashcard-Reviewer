@@ -226,7 +226,8 @@ describe('the title', () => {
     open()
     const heading = screen.getByRole('heading', { name: 'Import a file' })
     expect(heading.className).toMatch(/font-serif/)
-    expect(heading.className).toMatch(/text-\[26px\]/)
+    // The design's 26px, as the scalable size token (index.css, `fs-*`).
+    expect(heading.className).toMatch(/\bfs-26\b/)
     expect(heading.className).toMatch(/font-normal/)
     expect(heading.className).toMatch(/mt-0/)
   })

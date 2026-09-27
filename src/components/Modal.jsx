@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Button from './Button.jsx'
+import useT from '../i18n/useT.js'
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),' +
@@ -31,7 +32,8 @@ export default function Modal({
   confirmVariant = 'primary',
   // "Cancel" is right for a form and wrong for an offer, where declining is
   // an ordinary answer rather than backing out of something.
-  cancelLabel = 'Cancel',
+  // Left out, it is "Cancel" in the reader's language.
+  cancelLabel,
   confirmDisabled = false,
   secondaryAction,
   maxWidth = 460,
@@ -39,6 +41,7 @@ export default function Modal({
   // "Leave" — so Enter or Space on opening does the harmless thing.
   focusCancel = false,
 }) {
+  const { t } = useT()
   const dialogRef = useRef(null)
   const cancelRef = useRef(null)
   const returnFocusTo = useRef(null)
@@ -157,9 +160,9 @@ export default function Modal({
         <button
           type="button"
           onClick={onClose}
-          title="Close"
-          aria-label="Close"
-          className="absolute top-5 right-5 grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-lg border border-line bg-transparent text-[16px] text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
+          title={t('common.close')}
+          aria-label={t('common.close')}
+          className="absolute top-5 right-5 grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-lg border border-line bg-transparent fs-16 text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink"
         >
           ×
         </button>
@@ -172,7 +175,7 @@ export default function Modal({
         */}
         <h2
           id={titleId}
-          className="mt-0 mb-2.5 pr-10 font-serif text-[26px] leading-[1.15] font-normal text-pretty"
+          className="mt-0 mb-2.5 pr-10 font-serif fs-26 leading-[1.15] font-normal text-pretty"
         >
           {title}
         </h2>
@@ -188,7 +191,7 @@ export default function Modal({
               same thing as the first would be a choice that is not one. */}
           {cancelLabel !== null && (
             <Button ref={cancelRef} variant="outline" size="sm" onClick={onClose}>
-              {cancelLabel}
+              {cancelLabel === undefined ? t('common.cancel') : cancelLabel}
             </Button>
           )}
           <Button size="sm" variant={confirmVariant} onClick={onConfirm} disabled={confirmDisabled}>

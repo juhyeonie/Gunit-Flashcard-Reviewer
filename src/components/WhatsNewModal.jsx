@@ -1,27 +1,29 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import Modal from './Modal.jsx'
 import { dismissWhatsNew, launchWhatsNew, sectionsOf, subscribeWhatsNew } from '../data/whatsNew.js'
+import useT from '../i18n/useT.js'
 
 /** One version's notes: a heading per category that has anything, and its items. */
 function Sections({ entry, headingLevel }) {
+  const { t, language } = useT()
   const Heading = `h${headingLevel}`
-  return sectionsOf(entry).map((section) => (
+  return sectionsOf(entry, language).map((section) => (
     <section key={section.key} aria-labelledby={`whats-new-${entry.version}-${section.key}`}>
       <Heading
         id={`whats-new-${entry.version}-${section.key}`}
         className="kicker m-0 mb-2.5 !tracking-[0.12em]"
       >
-        {section.label}
+        {t(`whatsNew.category.${section.key}`)}
       </Heading>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
         {section.items.map((item) => (
           <li key={item.title} className="flex gap-2.5">
-            <span aria-hidden="true" className="w-3 shrink-0 font-mono text-[13px] leading-[1.45] text-accent">
+            <span aria-hidden="true" className="w-3 shrink-0 font-mono fs-13 leading-[1.45] text-accent">
               +
             </span>
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="text-sm leading-[1.45] font-medium text-ink text-pretty">{item.title}</span>
-              {item.detail && <span className="text-[13px] leading-[1.45] text-ink-2 text-pretty">{item.detail}</span>}
+              {item.detail && <span className="fs-13 leading-[1.45] text-ink-2 text-pretty">{item.detail}</span>}
             </span>
           </li>
         ))}
@@ -42,6 +44,7 @@ function Sections({ entry, headingLevel }) {
  * next launch would be the nag this is meant not to be.
  */
 export function WhatsNewDialog({ version, entries, onClose }) {
+  const { t } = useT()
   if (!entries.length) return null
   const several = entries.length > 1
 
@@ -50,9 +53,9 @@ export function WhatsNewDialog({ version, entries, onClose }) {
       open
       onClose={onClose}
       kicker={`Gunit v${version}`}
-      title="What’s new"
-      body={several ? 'A few updates since you last opened Gunit.' : undefined}
-      confirmLabel="Got it"
+      title={t('whatsNew.title')}
+      body={several ? t('whatsNew.several') : undefined}
+      confirmLabel={t('whatsNew.gotIt')}
       onConfirm={onClose}
       cancelLabel={null}
       maxWidth={460}
@@ -61,8 +64,8 @@ export function WhatsNewDialog({ version, entries, onClose }) {
         {several
           ? entries.map((entry) => (
               <div key={entry.version} className="flex flex-col gap-4 border-t border-line-soft pt-4 first:border-t-0 first:pt-0">
-                <h3 className="m-0 font-mono text-[11px] leading-none font-medium tracking-[0.06em] text-ink-3">
-                  Version {entry.version}
+                <h3 className="m-0 font-mono fs-11 leading-none font-medium tracking-[0.06em] text-ink-3">
+                  {t('whatsNew.version', { version: entry.version })}
                 </h3>
                 <Sections entry={entry} headingLevel={4} />
               </div>

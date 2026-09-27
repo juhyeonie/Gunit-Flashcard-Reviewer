@@ -44,6 +44,51 @@
 
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* Tailwind's own sizes, in step with the reader's text size (below). */
+  --text-xs: calc(0.75rem * var(--text-scale));
+  --text-sm: calc(0.875rem * var(--text-scale));
+  --text-base: calc(1rem * var(--text-scale));
+  --text-2xl: calc(1.5rem * var(--text-scale));
+}
+
+/*
+ * The reader's text size: Settings → Appearance → Font size, written to
+ * <html data-font-size> by the store.
+ *
+ * Text only. Spacing, borders, radii and the layout's widths stay exactly as
+ * they are, so a larger size makes words bigger rather than zooming the page
+ * — which is also what keeps the layout from breaking under it.
+ */
+:root {
+  --text-scale: 1;
+}
+:root[data-font-size='small'] {
+  --text-scale: 0.9;
+}
+:root[data-font-size='large'] {
+  --text-scale: 1.15;
+}
+
+/*
+ * A text size, in the design's pixels, that follows the reader's setting:
+ * `fs-13` is 13px at the default size. Written in place of `text-[13px]`,
+ * which cannot follow anything.
+ *
+ * Two limits keep it readable and keep it from breaking the layout:
+ *
+ *   - Only the first 20px of a size scales. Card text, labels and body copy
+ *     grow by the whole step; a 42px page heading grows by the same 3px as a
+ *     20px one rather than by 6, so headings that already fill a phone's
+ *     width do not start to wrap mid-word.
+ *   - Small never takes text below 11px. The kickers and badges already sit
+ *     at 10-11px, and smaller than that is unreadable rather than compact.
+ */
+@utility fs-* {
+  font-size: max(
+    calc(--value(number) * 1px + (var(--text-scale) - 1) * min(--value(number), 20) * 1px),
+    min(calc(--value(number) * 1px), 11px)
+  );
 }
 
 /* The glass nav needs the paper colour at partial alpha, which can't live in
@@ -95,7 +140,7 @@ body {
   margin: 0;
   background: var(--color-frame);
   color: var(--color-ink);
-  font: 400 15px/1.55 Archivo, Helvetica, sans-serif;
+  font: 400 calc(15px * var(--text-scale)) / 1.55 Archivo, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 
@@ -225,7 +270,8 @@ select {
 /* The mono, letterspaced, uppercase label that headlines nearly every block in
    the prototype. Frequent enough to earn a class rather than five utilities. */
 .kicker {
-  font: 500 10px/1 var(--font-mono);
+  /* Never smaller than it was: 10px is already the floor for reading. */
+  font: 500 max(calc(10px * var(--text-scale)), 10px) / 1 var(--font-mono);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--color-ink-3);

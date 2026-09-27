@@ -13,9 +13,11 @@ import { FILTERS, SORTS, filterAndSortDecks } from '../data/library.js'
 import { fromTransfer } from '../data/transfer.js'
 import { dueCount } from '../data/scheduler.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import useT from '../i18n/useT.js'
 
-/** "1 deck", "3 decks". */
-const deckCount = (n) => `${n} ${n === 1 ? 'deck' : 'decks'}`
+/** Filters and sorts are named by their English value in library.js; these are their words. */
+const FILTER_KEYS = { 'All decks': 'all', 'In progress': 'inProgress', Mastered: 'mastered', Drafts: 'drafts' }
+const SORT_KEYS = { 'Recently studied': 'recent', Alphabetical: 'alphabetical', 'Most cards': 'mostCards' }
 
 /*
  * Which folders this reader has folded away, kept in this browser.
@@ -42,7 +44,10 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
     useApp()
   const navigate = useNavigate()
   const fileRef = useRef(null)
-  useDocumentTitle('My decks')
+  const { t } = useT()
+  /** "1 deck", "3 decks". */
+  const deckCount = (n) => t('folders.deckCount', { count: n })
+  useDocumentTitle(t('nav.decks'))
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All decks')
   const [sort, setSort] = useState('Recently studied')
@@ -62,8 +67,8 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
     const added = importDeck(deck)
     say(
       skipped
-        ? `Imported “${deck.title}” — ${skipped} unusable ${skipped === 1 ? 'card' : 'cards'} left out`
-        : `Imported “${deck.title}”`,
+        ? t('decks.importedSkipped', { title: deck.title, count: skipped })
+        : t('decks.imported', { title: deck.title }),
     )
     navigate(`/decks/${added.id}`)
   }
@@ -105,8 +110,8 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
     const byFolder = new Map()
     for (const deck of decks) {
       if (!deck.folderId) continue
-      const t = byFolder.get(deck.folderId) ?? { count: 0, due: 0 }
-      byFolder.set(deck.folderId, { count: t.count + 1, due: t.due + dueCount(deck) })
+      const sum = byFolder.get(deck.folderId) ?? { count: 0, due: 0 }
+      byFolder.set(deck.folderId, { count: sum.count + 1, due: sum.due + dueCount(deck) })
     }
     return byFolder
   }, [decks])
@@ -144,7 +149,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
       next.delete(folder.id)
       return next
     })
-    say(`Added ${deckCount(deckIds.length)} to “${folder.name}”`)
+    say(t('decks.addedTo', { decks: deckCount(deckIds.length), name: folder.name }))
   }
 
   const hasDecksElsewhere = (folder) => decks.some((d) => d.folderId !== folder.id)
@@ -156,11 +161,11 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
    */
   const emptyFolder = (folder) => (
     <div className="flex flex-col items-center gap-3.5 rounded-[12px] border border-dashed border-line px-5 py-7 text-center">
-      <p className="m-0 text-sm text-ink-2">Nothing filed here yet.</p>
+      <p className="m-0 text-sm text-ink-2">{t('decks.emptyFolder')}</p>
       <div className="flex flex-wrap justify-center gap-2">
         {hasDecksElsewhere(folder) && (
           <Button size="sm" onClick={() => setFolderDialog({ kind: 'add', folder })}>
-            Add decks
+            {t('addDecks.kicker')}
           </Button>
         )}
         <Button
@@ -168,7 +173,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
           variant={hasDecksElsewhere(folder) ? 'outline' : 'primary'}
           onClick={() => onNewDeck?.(folder.id)}
         >
-          New deck here
+          {t('decks.newDeckHere')}
         </Button>
       </div>
     </div>
@@ -189,9 +194,9 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
     <div className="rise-in mx-auto flex max-w-[1080px] flex-col gap-[26px]">
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div>
-          <div className="kicker mb-3.5">Library</div>
-          <h1 className="m-0 font-serif text-[32px] leading-[1.06] tracking-[-0.015em] sm:text-[40px]">
-            My decks
+          <div className="kicker mb-3.5">{t('decks.kicker')}</div>
+          <h1 className="m-0 font-serif fs-32 leading-[1.06] tracking-[-0.015em] sm:fs-40">
+            {t('nav.decks')}
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -205,12 +210,12 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
             className="max-sm:px-3.5"
           >
             <FolderIcon />
-            <span className="max-sm:sr-only">New folder</span>
+            <span className="max-sm:sr-only">{t('folderModal.newKicker')}</span>
           </Button>
           <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            Import deck
+            {t('decks.importDeck')}
           </Button>
-          <Button onClick={() => onNewDeck?.()}>New deck</Button>
+          <Button onClick={() => onNewDeck?.()}>{t('deckModal.newKicker')}</Button>
         </div>
       </header>
 
@@ -234,12 +239,12 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
 
       <div className="flex flex-wrap items-center gap-3 border-y border-line py-3.5">
         <div className="flex min-w-[200px] flex-1 items-center gap-[9px] rounded-[5px] border border-line bg-surface px-3 py-[9px]">
-          <span className="text-[13px] text-ink-3">⌕</span>
+          <span className="fs-13 text-ink-3">⌕</span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search decks and cards"
-            aria-label="Search decks and cards"
+            placeholder={t('decks.search')}
+            aria-label={t('decks.search')}
             className="flex-1 border-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
           />
         </div>
@@ -257,7 +262,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                     : 'border-line bg-transparent text-ink-2'
                 }`}
               >
-                {f}
+                {t(`decks.filter.${FILTER_KEYS[f]}`)}
               </button>
             )
           })}
@@ -265,11 +270,13 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          aria-label="Sort decks"
+          aria-label={t('decks.sort')}
           className="cursor-pointer rounded-[5px] border border-line bg-surface px-[11px] py-[9px] text-xs leading-none font-medium text-ink-2"
         >
           {SORTS.map((s) => (
-            <option key={s}>{s}</option>
+            <option key={s} value={s}>
+              {t(`decks.sortBy.${SORT_KEYS[s]}`)}
+            </option>
           ))}
         </select>
       </div>
@@ -286,7 +293,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
         </ul>
       ) : folders.length && (rows.length || !narrowing) ? (
         <div className="flex flex-col gap-9">
-          <div className="flex flex-col gap-8" role="group" aria-label="Folders">
+          <div className="flex flex-col gap-8" role="group" aria-label={t('decks.folders')}>
             {sortedFolders.map((folder) => {
               const inside = groups.inFolder.get(folder.id) ?? []
               // While searching, a folder with nothing matching says nothing.
@@ -326,7 +333,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                         <span className="shrink-0 text-ink-2">
                           <FolderIcon size={18} />
                         </span>
-                        <span className="truncate font-serif text-[22px] leading-[1.2]">
+                        <span className="truncate font-serif fs-22 leading-[1.2]">
                           {folder.name}
                         </span>
                       </button>
@@ -336,16 +343,16 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                       where sharing the row cut "Organic Chemistry" down to
                       "Organic C…". Indented to start where the name does.
                     */}
-                    <span className="shrink-0 font-mono text-[11px] leading-none font-medium tracking-[0.04em] whitespace-nowrap text-ink-3 max-sm:order-last max-sm:basis-full max-sm:pb-1 max-sm:pl-[50px]">
+                    <span className="shrink-0 font-mono fs-11 leading-none font-medium tracking-[0.04em] whitespace-nowrap text-ink-3 max-sm:order-last max-sm:basis-full max-sm:pb-1 max-sm:pl-[50px]">
                       {deckCount(count)}
-                      {due > 0 && <span className="text-accent"> · {due} due</span>}
-                      {shares.folder(folder.id) && <span className="text-accent"> · Shared</span>}
+                      {due > 0 && <span className="text-accent"> · {t('deck.due', { count: due })}</span>}
+                      {shares.folder(folder.id) && <span className="text-accent"> · {t('deck.shared')}</span>}
                     </span>
                     <div className="relative shrink-0">
                       <button
                         type="button"
                         onClick={() => setFolderMenu(folderMenu === folder.id ? null : folder.id)}
-                        aria-label={`Folder options for ${folder.name}`}
+                        aria-label={t('decks.folderOptions', { name: folder.name })}
                         aria-expanded={folderMenu === folder.id}
                         aria-haspopup="true"
                         className={`grid h-8 w-8 cursor-pointer place-items-center rounded-[6px] border bg-transparent text-sm leading-none font-medium text-ink-3 transition-colors hover:border-ink-3 hover:text-ink ${
@@ -361,12 +368,8 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                         width={236}
                       >
                         <MenuItem
-                          title="Add decks"
-                          hint={
-                            hasDecksElsewhere(folder)
-                              ? 'Pick several at once.'
-                              : 'Every deck is already here.'
-                          }
+                          title={t('addDecks.kicker')}
+                          hint={hasDecksElsewhere(folder) ? t('decks.pickSeveral') : t('decks.allHere')}
                           disabled={!hasDecksElsewhere(folder)}
                           onClick={() => {
                             setFolderMenu(null)
@@ -374,30 +377,30 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                           }}
                         />
                         <MenuItem
-                          title="New deck here"
+                          title={t('decks.newDeckHere')}
                           onClick={() => {
                             setFolderMenu(null)
                             onNewDeck?.(folder.id)
                           }}
                         />
                         <MenuItem
-                          title="Rename folder"
+                          title={t('folderModal.renameKicker')}
                           onClick={() => {
                             setFolderMenu(null)
                             setFolderDialog({ kind: 'rename', folder })
                           }}
                         />
                         <MenuItem
-                          title="Share folder"
-                          hint="Every deck in it, by link or invitation."
+                          title={t('share.kicker.folder')}
+                          hint={t('decks.shareHint')}
                           onClick={() => {
                             setFolderMenu(null)
                             onShareFolder?.(folder)
                           }}
                         />
                         <MenuItem
-                          title="Delete folder"
-                          hint="Its decks move to Ungrouped."
+                          title={t('decks.deleteFolder')}
+                          hint={t('decks.deleteHint')}
                           danger
                           onClick={() => {
                             setFolderMenu(null)
@@ -421,11 +424,11 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
                 {/* Level with the folder names above, which sit after a chevron and an icon. */}
                 <h2
                   id="folder-ungrouped"
-                  className="m-0 py-1.5 font-serif text-[22px] leading-[1.2] font-normal text-ink-2"
+                  className="m-0 py-1.5 font-serif fs-22 leading-[1.2] font-normal text-ink-2"
                 >
-                  Ungrouped
+                  {t('folders.ungrouped')}
                 </h2>
-                <span className="font-mono text-[11px] leading-none font-medium tracking-[0.04em] text-ink-3">
+                <span className="font-mono fs-11 leading-none font-medium tracking-[0.04em] text-ink-3">
                   {deckCount(groups.ungrouped.length)}
                 </span>
               </div>
@@ -435,15 +438,15 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
-          <div className="font-serif text-[24px] leading-[1.2]">
-            Nothing matches {search ? `“${search}”` : 'that filter'}
+          <div className="font-serif fs-24 leading-[1.2]">
+            {search ? t('decks.noMatchSearch', { query: search }) : t('decks.noMatchFilter')}
           </div>
           {/* Advice for what was actually done: telling someone to shorten a
               search term they never typed is worse than saying nothing. */}
           <p className="m-0 max-w-[340px] text-sm text-ink-3 text-pretty">
             {search
-              ? `Try a shorter search term, or clear the filter to see all ${decks.length} decks.`
-              : `Clear the filter to see all ${decks.length} decks.`}
+              ? t('decks.tryShorter', { count: decks.length })
+              : t('decks.clearToSee', { count: decks.length })}
           </p>
           <Button
             size="sm"
@@ -453,7 +456,7 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
               setFilter('All decks')
             }}
           >
-            {search ? 'Clear search' : 'Clear filter'}
+            {search ? t('decks.clearSearch') : t('decks.clearFilter')}
           </Button>
         </div>
       )}
@@ -468,11 +471,11 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
           onSave={(name) => {
             if (folderDialog.kind === 'rename') {
               renameFolder(folderDialog.folder.id, name)
-              say(`Renamed to “${name}”`)
+              say(t('decks.renamed', { name }))
               return
             }
             const folder = createFolder(name)
-            say(`Created “${name}”`)
+            say(t('decks.created', { name }))
             // Straight on to filling it, when there is anything to fill it
             // with. The dialog closing clears this, so it is set a beat later.
             if (folder && decks.length) {
@@ -496,20 +499,20 @@ export default function Decks({ onNewDeck, onEditDeck, onShareFolder }) {
 
       <ConfirmModal
         open={folderDialog?.kind === 'delete'}
-        kicker="Delete folder"
-        title={`Delete “${folderDialog?.folder?.name ?? ''}”?`}
+        kicker={t('decks.deleteFolder')}
+        title={t('decks.deleteTitle', { name: folderDialog?.folder?.name ?? '' })}
         body={(() => {
           const n = totals.get(folderDialog?.folder?.id)?.count ?? 0
           return n
-            ? `Its ${deckCount(n)} ${n === 1 ? 'moves' : 'move'} to Ungrouped. No decks or cards are deleted.`
-            : 'It is empty. No decks or cards are deleted.'
+            ? t('decks.deleteBody', { count: n })
+            : t('decks.deleteEmpty')
         })()}
-        confirmLabel="Delete folder"
+        confirmLabel={t('decks.deleteFolder')}
         onClose={() => setFolderDialog(null)}
         onConfirm={() => {
           const { id, name } = folderDialog.folder
           deleteFolder(id)
-          say(`Deleted “${name}” — its decks are in Ungrouped`)
+          say(t('decks.deletedFolder', { name }))
         }}
       />
     </div>

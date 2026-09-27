@@ -68,15 +68,22 @@ function update(userId, change) {
  * unread notice of the same group, so "saved locally" and "synced" do not pile
  * up — the newer one is the truth.
  */
-export function addNotice(userId, { kind, title, message, action = null, once = null, group = null, now = Date.now() }) {
+export function addNotice(
+  userId,
+  { kind, title, message, params = null, action = null, once = null, group = null, now = Date.now() },
+) {
   return update(userId, (s) => {
     if (once && s.marks[once]) return s
     const kept = group ? s.local.filter((n) => !(n.group === group && !n.readAt)) : s.local
     const notice = {
       id: `local-${now}-${Math.random().toString(36).slice(2, 8)}`,
       kind,
+      // With `params`, worded when shown, in the reader's language — see
+      // describeNotification.js. `title` and `message` are for a caller that
+      // has its own words.
       title,
       message,
+      params,
       action,
       group,
       createdAt: now,

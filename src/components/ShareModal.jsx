@@ -15,22 +15,19 @@ import {
   shareUrl,
   stopSharing,
 } from '../data/sharing.js'
+import useT from '../i18n/useT.js'
 
-const ACCESS = [
-  { value: 'link', label: 'Anyone with the link', hint: 'No account needed to study it.' },
-  { value: 'invited', label: 'Only invited people', hint: 'They sign in with the address you invite.' },
-]
-const ROLES = [
-  { value: 'viewer', label: 'Can study', hint: 'Study it, and add a copy to their own Gunit.' },
-  { value: 'editor', label: 'Can edit', hint: 'Also add and change cards. Never delete the deck.' },
-]
+/** Worded under share.access and share.role in the dictionaries. */
+const ACCESS = [{ value: 'link' }, { value: 'invited' }]
+const ROLES = [{ value: 'viewer' }, { value: 'editor' }]
 
 const inputStyles =
-  'rounded-lg border border-line bg-paper px-3 py-[11px] text-[15px] text-ink outline-none ' +
+  'rounded-lg border border-line bg-paper px-3 py-[11px] fs-15 text-ink outline-none ' +
   'placeholder:text-ink-3/70 transition-colors focus:border-accent'
 
 /** A radio drawn the way Move deck draws its folders. */
-function Choice({ name, option, checked, onChange, disabled }) {
+function Choice({ name, group, option, checked, onChange, disabled }) {
+  const { t } = useT()
   return (
     <label
       className={`flex cursor-pointer items-start gap-3 rounded-[7px] border px-3.5 py-3 transition-colors hover:border-ink-3 ${
@@ -46,8 +43,8 @@ function Choice({ name, option, checked, onChange, disabled }) {
         className="mt-0.5 accent-[var(--color-accent)]"
       />
       <span className="flex min-w-0 flex-1 flex-col text-sm font-medium">
-        {option.label}
-        <span className="text-xs font-normal text-ink-3">{option.hint}</span>
+        {t(`share.${group}.${option.value}.label`)}
+        <span className="text-xs font-normal text-ink-3">{t(`share.${group}.${option.value}.hint`)}</span>
       </span>
     </label>
   )
@@ -67,6 +64,7 @@ function Choice({ name, option, checked, onChange, disabled }) {
  */
 export default function ShareModal({ kind, resource, onClose, say }) {
   const navigate = useNavigate()
+  const { t } = useT()
   const { user, available } = useAuth()
   const name = kind === 'deck' ? resource.title : resource.name
 
@@ -143,11 +141,11 @@ export default function ShareModal({ kind, resource, onClose, say }) {
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
-      say?.('Link copied')
+      say?.(t('share.copied'))
     } catch {
       // No clipboard permission: the link is on screen, selected, to copy by hand.
       linkRef.current?.select()
-      setError('Copy the link above — this browser would not let Gunit do it.')
+      setError(t('share.copyYourself'))
     }
   }
 
@@ -160,7 +158,7 @@ export default function ShareModal({ kind, resource, onClose, say }) {
     const done = await run(() => inviteToShare(shared.id, address, inviteRole))
     if (done) {
       setEmail('')
-      say?.(`Invited ${address}`)
+      say?.(t('share.invited', { address }))
     }
   }
 
@@ -169,15 +167,11 @@ export default function ShareModal({ kind, resource, onClose, say }) {
       <Modal
         open
         onClose={onClose}
-        kicker={kind === 'deck' ? 'Share deck' : 'Share folder'}
-        title={`Share “${name}”`}
-        body={
-          available
-            ? 'Sharing needs an account, so the people you share with know it came from you. Sign in, then share from here.'
-            : 'This copy of Gunit keeps everything in this browser, with no accounts, so there is nothing to share from. Export the deck to hand it over as a file instead.'
-        }
-        confirmLabel={available ? 'Sign in' : 'Done'}
-        cancelLabel={available ? 'Not now' : 'Close'}
+        kicker={t(`share.kicker.${kind}`)}
+        title={t('share.title', { name })}
+        body={available ? t('share.needsAccount') : t('share.localOnly')}
+        confirmLabel={available ? t('common.signIn') : t('common.done')}
+        cancelLabel={available ? t('common.notNow') : t('common.close')}
         maxWidth={440}
         onConfirm={() => {
           onClose()
@@ -188,38 +182,34 @@ export default function ShareModal({ kind, resource, onClose, say }) {
   }
 
   const members = settings?.members ?? []
-  const who = draft.access === 'link' ? 'Anyone with the link' : 'Only people you invite'
-  const can = draft.role === 'editor' ? 'can study and edit it' : 'can study it'
+  const summary = t(`share.summary.${draft.access}.${draft.role}`)
 
   return (
     <Modal
       open
       onClose={onClose}
-      kicker={kind === 'deck' ? 'Share deck' : 'Share folder'}
-      title={`Share “${name}”`}
-      body={
-        kind === 'folder'
-          ? 'Everyone you share it with gets every deck in it — and any you file in it later. Their study progress stays their own, and so does yours.'
-          : 'They see your cards, never your progress: each person studies on their own schedule.'
-      }
-      confirmLabel={copied ? 'Copied' : active ? 'Copy link' : 'Share and copy link'}
+      kicker={t(`share.kicker.${kind}`)}
+      title={t('share.title', { name })}
+      body={t(`share.body.${kind}`)}
+      confirmLabel={copied ? t('share.copiedButton') : active ? t('share.copyLink') : t('share.shareAndCopy')}
       onConfirm={copyLink}
       confirmDisabled={loading || busy}
-      cancelLabel="Done"
+      cancelLabel={t('common.done')}
       maxWidth={500}
     >
       {loading ? (
         <p className="mb-6 text-sm text-ink-3" role="status">
-          Checking how this is shared…
+          {t('share.checking')}
         </p>
       ) : (
         <div className="mb-6 flex flex-col gap-5">
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-            <legend className="kicker mb-2.5 !tracking-[0.12em]">Who can open it</legend>
+            <legend className="kicker mb-2.5 !tracking-[0.12em]">{t('share.whoCanOpen')}</legend>
             {ACCESS.map((option) => (
               <Choice
                 key={option.value}
                 name="share-access"
+                group="access"
                 option={option}
                 checked={draft.access === option.value}
                 disabled={busy}
@@ -230,12 +220,13 @@ export default function ShareModal({ kind, resource, onClose, say }) {
 
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
             <legend className="kicker mb-2.5 !tracking-[0.12em]">
-              {draft.access === 'link' ? 'People with the link' : 'Invited people start as'}
+              {draft.access === 'link' ? t('share.linkPeople') : t('share.invitedStart')}
             </legend>
             {ROLES.map((option) => (
               <Choice
                 key={option.value}
                 name="share-role"
+                group="role"
                 option={option}
                 checked={draft.role === option.value}
                 disabled={busy}
@@ -247,7 +238,7 @@ export default function ShareModal({ kind, resource, onClose, say }) {
           {active ? (
             <div className="flex flex-col gap-[7px]">
               <label htmlFor="share-link" className="kicker !tracking-[0.12em]">
-                Link
+                {t('share.link')}
               </label>
               <input
                 id="share-link"
@@ -255,23 +246,23 @@ export default function ShareModal({ kind, resource, onClose, say }) {
                 readOnly
                 value={link}
                 onFocus={(e) => e.target.select()}
-                className={`${inputStyles} min-w-0 font-mono text-[13px]`}
+                className={`${inputStyles} min-w-0 font-mono fs-13`}
               />
               <p className="m-0 text-xs text-ink-3">
-                {who} {can}.
+                {summary}
               </p>
             </div>
           ) : (
-            <p className="m-0 rounded-[7px] border border-dashed border-line px-3.5 py-3 text-[13px] text-ink-2">
+            <p className="m-0 rounded-[7px] border border-dashed border-line px-3.5 py-3 fs-13 text-ink-2">
               {settings && !settings.active
-                ? 'Sharing is off. Turning it back on makes a new link — the old one stays dead.'
-                : 'Not shared yet. Nothing is shared until you copy the link or invite someone.'}
+                ? t('share.off')
+                : t('share.notYet')}
             </p>
           )}
 
           <form onSubmit={invite} className="flex flex-col gap-[7px]">
             <label htmlFor="share-invite" className="kicker !tracking-[0.12em]">
-              Invite by email
+              {t('share.inviteByEmail')}
             </label>
             <div className="flex flex-wrap gap-2">
               <input
@@ -280,27 +271,27 @@ export default function ShareModal({ kind, resource, onClose, say }) {
                 autoComplete="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="classmate@school.edu"
+                placeholder={t('share.emailPlaceholder')}
                 className={`${inputStyles} min-w-0 flex-1 basis-[180px]`}
               />
               <select
-                aria-label="Invited person can"
+                aria-label={t('share.invitedCan')}
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
                 className={`${inputStyles} py-[10px]`}
               >
-                <option value="viewer">Can study</option>
-                <option value="editor">Can edit</option>
+                <option value="viewer">{t('share.role.viewer.label')}</option>
+                <option value="editor">{t('share.role.editor.label')}</option>
               </select>
               <Button type="submit" size="sm" variant="outline" disabled={busy || !email.trim()}>
-                Invite
+                {t('share.invite')}
               </Button>
             </div>
           </form>
 
           {members.length > 0 && (
             <div className="flex flex-col gap-[7px]">
-              <div className="kicker !tracking-[0.12em]">Shared with</div>
+              <div className="kicker !tracking-[0.12em]">{t('share.sharedWith')}</div>
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                 {members.map((m) => (
                   <li
@@ -311,27 +302,27 @@ export default function ShareModal({ kind, resource, onClose, say }) {
                       <span className="truncate text-sm font-medium">{m.name ?? m.email}</span>
                       <span className="truncate text-xs text-ink-3">
                         {m.name && m.email ? `${m.email} · ` : ''}
-                        {m.via === 'link' ? 'joined by link' : m.joined ? 'joined' : 'invited — not opened yet'}
+                        {m.via === 'link' ? t('share.joinedByLink') : m.joined ? t('share.joined') : t('share.pending')}
                       </span>
                     </span>
                     <select
-                      aria-label={`What ${m.name ?? m.email} can do`}
+                      aria-label={t('share.memberCan', { name: m.name ?? m.email })}
                       value={m.role}
                       disabled={busy}
                       onChange={(e) => run(() => setMemberRole(m.id, e.target.value))}
-                      className={`${inputStyles} py-[7px] text-[13px]`}
+                      className={`${inputStyles} py-[7px] fs-13`}
                     >
-                      <option value="viewer">Can study</option>
-                      <option value="editor">Can edit</option>
+                      <option value="viewer">{t('share.role.viewer.label')}</option>
+                      <option value="editor">{t('share.role.editor.label')}</option>
                     </select>
                     <Button
                       size="sm"
                       variant="ghost"
                       disabled={busy}
                       onClick={() => run(() => removeMember(m.id))}
-                      aria-label={`Remove ${m.name ?? m.email}`}
+                      aria-label={t('share.removeMember', { name: m.name ?? m.email })}
                     >
-                      Remove
+                      {t('share.remove')}
                     </Button>
                   </li>
                 ))}
@@ -347,7 +338,7 @@ export default function ShareModal({ kind, resource, onClose, say }) {
                 aria-expanded={advanced}
                 className="self-start border-0 bg-transparent p-0 text-xs font-medium text-ink-3 transition-colors hover:text-ink"
               >
-                {advanced ? 'Hide link options' : 'Link options'}
+                {advanced ? t('share.hideOptions') : t('share.options')}
               </button>
               {advanced && (
                 <div className="flex flex-wrap gap-2">
@@ -358,11 +349,11 @@ export default function ShareModal({ kind, resource, onClose, say }) {
                     onClick={async () => {
                       if (await run(() => resetShareLink(settings.id))) {
                         setCopied(false)
-                        say?.('New link made — the old one no longer works')
+                        say?.(t('share.linkReset'))
                       }
                     }}
                   >
-                    Reset link
+                    {t('share.resetLink')}
                   </Button>
                   <Button
                     size="sm"
@@ -372,11 +363,11 @@ export default function ShareModal({ kind, resource, onClose, say }) {
                       if (await run(() => stopSharing(settings.id))) {
                         setCopied(false)
                         setAdvanced(false)
-                        say?.(`Stopped sharing “${name}”`)
+                        say?.(t('share.stopped', { name }))
                       }
                     }}
                   >
-                    Stop sharing
+                    {t('share.stop')}
                   </Button>
                 </div>
               )}
@@ -384,7 +375,7 @@ export default function ShareModal({ kind, resource, onClose, say }) {
           )}
 
           {error && (
-            <p role="alert" className="m-0 text-[13px] text-err">
+            <p role="alert" className="m-0 fs-13 text-err">
               {error}
             </p>
           )}

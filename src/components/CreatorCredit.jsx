@@ -19,11 +19,19 @@
  *
  * A `<p>`, because it is a sentence.
  */
+import useT from '../i18n/useT.js'
+
 export default function CreatorCredit({ className = '' }) {
+  const { parts } = useT()
   return (
-    <p className={`m-0 text-center text-[12px] leading-[1.5] text-ink-2 ${className}`}>
-      Designed &amp; developed by{' '}
-      <span className="font-medium text-ink">Justine Pelgone</span>
+    <p className={`m-0 text-center fs-12 leading-[1.5] text-ink-2 ${className}`}>
+      {parts('credit.line', {
+        name: (
+          <span key="name" className="font-medium text-ink">
+            Justine Pelgone
+          </span>
+        ),
+      })}
     </p>
   )
 }

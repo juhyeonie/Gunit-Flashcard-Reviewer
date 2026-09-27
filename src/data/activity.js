@@ -9,6 +9,8 @@
  * because "did I study today" is a local-calendar question, not a UTC one.
  */
 
+import { t } from '../i18n/index.js'
+
 export const DAY_MS = 86_400_000
 
 /** Local calendar day as YYYY-MM-DD, so buckets survive timezone offsets. */
@@ -69,7 +71,8 @@ export function streak(sessions = [], now = Date.now()) {
   return count
 }
 
-const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+/** Sunday first, as Date#getDay counts: "S M T W T F S" in English. */
+const weekdayInitials = () => t('activity.weekdays').split(' ')
 
 /**
  * The trailing seven local days, oldest first, for the streak strip and the
@@ -79,12 +82,13 @@ export function lastSevenDays(sessions = [], now = Date.now()) {
   const totals = minutesByDay(sessions)
   const today = startOfDay(now)
   const days = []
+  const initials = weekdayInitials()
   for (let i = 6; i >= 0; i -= 1) {
     const ts = addDays(today, -i)
     const raw = totals.get(dayKey(ts))
     days.push({
       key: dayKey(ts),
-      day: WEEKDAY_INITIALS[new Date(ts).getDay()],
+      day: initials[new Date(ts).getDay()],
       minutes: Math.round(raw ?? 0),
       // Any studied day counts, even one too short to round up to a minute —
       // otherwise the strip would contradict the streak, which counts days.
@@ -116,14 +120,14 @@ const HOUR_MS = 3_600_000
  * instead, so it is right whenever it is read.
  */
 export function formatRelative(ts, now = Date.now()) {
-  if (!ts) return 'Never'
+  if (!ts) return t('activity.never')
 
   const diff = now - ts
-  if (diff < 0) return 'Just now'
-  if (diff < 2 * MINUTE_MS) return 'Just now'
+  if (diff < 0) return t('activity.justNow')
+  if (diff < 2 * MINUTE_MS) return t('activity.justNow')
   if (diff < HOUR_MS) {
     const mins = Math.round(diff / MINUTE_MS)
-    return `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`
+    return t('activity.minutesAgo', { count: mins })
   }
 
   // Calendar-aware from here: "yesterday" means the previous calendar day, not
@@ -131,14 +135,14 @@ export function formatRelative(ts, now = Date.now()) {
   const days = Math.round((startOfDay(now) - startOfDay(ts)) / DAY_MS)
   if (days === 0) {
     const hours = Math.round(diff / HOUR_MS)
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+    return t('activity.hoursAgo', { count: hours })
   }
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days ago`
-  if (days < 14) return 'A week ago'
-  if (days < 31) return `${Math.floor(days / 7)} weeks ago`
+  if (days === 1) return t('activity.yesterday')
+  if (days < 7) return t('activity.daysAgo', { count: days })
+  if (days < 14) return t('activity.weekAgo')
+  if (days < 31) return t('activity.weeksAgo', { count: Math.floor(days / 7) })
   const months = Math.floor(days / 30)
-  return `${months} ${months === 1 ? 'month' : 'months'} ago`
+  return t('activity.monthsAgo', { count: months })
 }
 
 /**
@@ -193,5 +197,5 @@ export function estimateFor(count, sessions = []) {
   const rate = secondsPerCard(sessions)
   if (!rate || count <= 0) return null
   const minutes = Math.max(1, Math.round((count * rate) / 60))
-  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+  return t('activity.minutes', { count: minutes })
 }

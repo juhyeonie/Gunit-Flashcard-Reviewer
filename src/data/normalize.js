@@ -1,6 +1,8 @@
 import { DECKS, EXAMPLE_DECK, RETIRED_DEFAULT_DECKS, uid } from './seed.js'
 import { grade, isSuspended } from './scheduler.js'
 import { parseLegacyStudied } from './activity.js'
+import { DEFAULT_LANGUAGE, isLanguage } from '../i18n/index.js'
+import { FONT_SIZES } from './preferences.js'
 
 /**
  * Turning whatever is in storage into state the app can render.
@@ -35,7 +37,24 @@ export const DEFAULT_SETTINGS = {
    */
   name: '',
   goalMinutes: 20,
+  /*
+   * Settings → Language & text. The language is one of i18n's LANGUAGES; the
+   * size is one of FONT_SIZES (preferences.js).
+   */
+  language: DEFAULT_LANGUAGE,
+  fontSize: 'default',
 }
+
+export { FONT_SIZES }
+
+/**
+ * A stored language or size that this version does not know — written by a
+ * newer one, or by hand — reads as the default rather than as nothing.
+ */
+const knownPreferences = (settings) => ({
+  language: isLanguage(settings.language) ? settings.language : DEFAULT_LANGUAGE,
+  fontSize: FONT_SIZES.includes(settings.fontSize) ? settings.fontSize : 'default',
+})
 
 export const DEFAULT_STATE = {
   decks: DECKS,
@@ -209,6 +228,8 @@ const withId = (s) => (typeof s.id === 'string' && s.id ? s : { ...s, id: uid() 
 const MOCK_NAME = 'Mara Kessler'
 const forgetMockName = (settings) => (settings?.name === MOCK_NAME ? { name: '' } : {})
 
+const withKnownPreferences = (settings) => ({ ...settings, ...knownPreferences(settings) })
+
 export function normalizeState(state, now = Date.now()) {
   const source = state && typeof state === 'object' ? state : {}
   const decks = Array.isArray(source.decks) ? source.decks : DEFAULT_STATE.decks
@@ -216,7 +237,11 @@ export function normalizeState(state, now = Date.now()) {
 
   return {
     theme: source.theme === 'dark' ? 'dark' : 'light',
-    settings: { ...DEFAULT_SETTINGS, ...(source.settings ?? {}), ...forgetMockName(source.settings) },
+    settings: withKnownPreferences({
+      ...DEFAULT_SETTINGS,
+      ...(source.settings ?? {}),
+      ...forgetMockName(source.settings),
+    }),
     sessions: Array.isArray(source.sessions) ? source.sessions.filter(isSession).map(withId) : [],
     folders,
     decks: fileDecks(decks.map((d) => reviveDeck(d, now)).filter(Boolean), folders),

@@ -7,13 +7,15 @@ import { MIN_QUIZ_CARDS, buildQuestions, verdictFor } from '../data/quiz.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
 import MissingDeck from '../components/MissingDeck.jsx'
 import Mascot from '../components/Mascot.jsx'
+import useT from '../i18n/useT.js'
 
 export default function Quiz() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { decks, recordGrades, recordSession, deckPath } = useApp()
   const deck = decks.find((d) => d.id === id)
-  useDocumentTitle(deck ? `Quiz · ${deck.title}` : 'Quiz')
+  const { t } = useT()
+  useDocumentTitle(deck ? t('quiz.title', { title: deck.title }) : t('deckDetail.quiz'))
 
   const questions = useMemo(() => (deck ? buildQuestions(deck.cards) : []), [deck])
   const [qIdx, setQIdx] = useState(0)
@@ -66,22 +68,21 @@ export default function Quiz() {
     const has = deck.cards.length
     return (
       <div className="rise-in mx-auto flex max-w-[520px] flex-col items-center gap-4 py-24 text-center">
-        <div className="kicker">Not enough cards</div>
-        <h1 className="m-0 font-serif text-[34px] leading-[1.1] tracking-[-0.02em]">
-          A quiz needs {MIN_QUIZ_CARDS} cards
+        <div className="kicker">{t('quiz.notEnough')}</div>
+        <h1 className="m-0 font-serif fs-34 leading-[1.1] tracking-[-0.02em]">
+          {t('quiz.needs', { count: MIN_QUIZ_CARDS })}
         </h1>
-        <p className="m-0 max-w-[400px] text-[15px] text-ink-2 text-pretty">
-          {deck.title} has {has === 0 ? 'none yet' : has === 1 ? 'one' : `only ${has}`}. Multiple
-          choice needs other cards to draw the wrong answers from, so until then a quiz would only
-          ever show the right one.
+        <p className="m-0 max-w-[400px] fs-15 text-ink-2 text-pretty">
+          {t(has === 0 ? 'quiz.hasNone' : has === 1 ? 'quiz.hasOne' : 'quiz.hasOnly', { title: deck.title, count: has })}{' '}
+          {t('quiz.why')}
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-2">
           <Button as={Link} to={deckPath(deck.id)}>
-            Add cards
+            {t('deckDetail.addCards')}
           </Button>
           {has > 0 && (
             <Button as={Link} to={deckPath(deck.id, '/review')} variant="outline">
-              Study with flashcards
+              {t('quiz.withFlashcards')}
             </Button>
           )}
         </div>
@@ -125,16 +126,16 @@ export default function Quiz() {
             verdict underneath says too.
           */}
           <Mascot pose={score / questions.length >= 0.5 ? 'correct' : 'studying'} size={104} />
-          <div className="kicker">Quiz complete</div>
+          <div className="kicker">{t('quiz.complete')}</div>
           <div className="flex items-baseline gap-1.5">
-            <span className="font-serif text-[64px] leading-none font-light tracking-[-0.02em] sm:text-[84px]">
+            <span className="font-serif fs-64 leading-none font-light tracking-[-0.02em] sm:fs-84">
               {score}
             </span>
-            <span className="font-serif text-[30px] leading-none text-ink-3">
+            <span className="font-serif fs-30 leading-none text-ink-3">
               / {questions.length}
             </span>
           </div>
-          <p className="m-0 max-w-[440px] text-[16px] text-ink-2 text-pretty">
+          <p className="m-0 max-w-[440px] fs-16 text-ink-2 text-pretty">
             {verdictFor(score, questions.length)}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
@@ -148,10 +149,10 @@ export default function Quiz() {
                 setStartedAt(Date.now())
               }}
             >
-              Retake quiz
+              {t('quiz.retake')}
             </Button>
             <Button variant="outline" onClick={() => navigate('/')}>
-              Back to dashboard
+              {t('errorBoundary.home')}
             </Button>
           </div>
         </div>
@@ -164,9 +165,9 @@ export default function Quiz() {
       <div className="flex flex-col gap-[30px]">
         <header className="flex flex-col gap-3.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="kicker truncate">Quiz · {deck.title}</span>
+            <span className="kicker truncate">{t('quiz.title', { title: deck.title })}</span>
             <span className="font-mono text-xs font-medium tracking-[0.06em] whitespace-nowrap text-ink-3">
-              Question {qIdx + 1} of {questions.length}
+              {t('quiz.progress', { n: qIdx + 1, count: questions.length })}
             </span>
           </div>
           <div className="flex gap-1">
@@ -181,7 +182,7 @@ export default function Quiz() {
           </div>
         </header>
 
-        <h1 className="m-0 font-serif text-[26px] leading-[1.24] tracking-[-0.01em] text-pretty [overflow-wrap:anywhere] sm:text-[34px]">
+        <h1 className="m-0 font-serif fs-26 leading-[1.24] tracking-[-0.01em] text-pretty [overflow-wrap:anywhere] sm:fs-34">
           {q.card.front}
         </h1>
 
@@ -199,13 +200,13 @@ export default function Quiz() {
             if (answered && isAnswer) {
               tone = 'border-ok bg-ok-soft text-ink'
               badge = 'border-ok bg-ok text-paper'
-              mark = '✓ Correct'
+              mark = `✓ ${t('quiz.correct')}`
               markTone = 'text-ok'
             }
             if (answered && picked && !isAnswer) {
               tone = 'border-err bg-err-soft text-ink'
               badge = 'border-err bg-err text-paper'
-              mark = '✕ Your answer'
+              mark = `✕ ${t('quiz.yourAnswer')}`
               markTone = 'text-err'
             }
 
@@ -224,10 +225,10 @@ export default function Quiz() {
                 >
                   {'ABCD'[i]}
                 </span>
-                <span className="min-w-0 flex-1 text-[16px] text-pretty [overflow-wrap:anywhere]">
+                <span className="min-w-0 flex-1 fs-16 text-pretty [overflow-wrap:anywhere]">
                   {option.back}
                 </span>
-                <span className={`text-[13px] leading-none font-semibold ${markTone}`}>{mark}</span>
+                <span className={`fs-13 leading-none font-semibold ${markTone}`}>{mark}</span>
               </button>
             )
           })}
@@ -251,12 +252,12 @@ export default function Quiz() {
                     correct ? 'text-ok' : 'text-err'
                   }`}
                 >
-                  {correct ? 'Correct' : 'Not quite'}
+                  {correct ? t('quiz.correct') : t('quiz.notQuite')}
                 </div>
                 <div className="text-sm text-ink-2 text-pretty [overflow-wrap:anywhere]">{q.card.back}</div>
               </div>
               <Button onClick={advance}>
-                {qIdx >= questions.length - 1 ? 'See results' : 'Next question'}
+                {qIdx >= questions.length - 1 ? t('quiz.results') : t('quiz.nextQuestion')}
               </Button>
             </div>
           )}
@@ -270,11 +271,11 @@ export default function Quiz() {
       <Modal
         open={blocker.state === 'blocked'}
         onClose={stay}
-        kicker="Quiz in progress"
-        title="Leave quiz?"
-        body="Your current quiz session will be ended if you leave this page. Your answers so far won’t be saved."
-        cancelLabel="Stay"
-        confirmLabel="Leave quiz"
+        kicker={t('quiz.leave.kicker')}
+        title={t('quiz.leave.title')}
+        body={t('quiz.leave.body')}
+        cancelLabel={t('quiz.leave.stay')}
+        confirmLabel={t('quiz.leave.confirm')}
         confirmVariant="danger"
         onConfirm={leave}
         focusCancel

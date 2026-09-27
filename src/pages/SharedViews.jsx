@@ -14,8 +14,10 @@ import { MIN_QUIZ_CARDS, canQuiz } from '../data/quiz.js'
 import { formatRelative } from '../data/activity.js'
 import { accentOf } from '../data/seed.js'
 import useDocumentTitle from '../hooks/useDocumentTitle.js'
+import useT from '../i18n/useT.js'
 
-const ROLE_LABEL = { owner: 'Yours', editor: 'Can edit', viewer: 'Can study' }
+/** sharedViews.role.<role> in the dictionaries. */
+const ROLES = ['owner', 'editor', 'viewer']
 
 const stamp = (iso) => {
   const ms = iso ? Date.parse(iso) : NaN
@@ -24,15 +26,16 @@ const stamp = (iso) => {
 
 /** Who shared it and what the reader may do with it, in one line. */
 function Byline({ owner, role }) {
+  const { t } = useT()
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
-      <span>{role === 'owner' ? 'Shared by you' : `Shared by ${owner}`}</span>
+    <div className="flex flex-wrap items-center gap-2 fs-13 text-ink-2">
+      <span>{role === 'owner' ? t('sharedViews.byYou') : t('sharedViews.by', { name: owner })}</span>
       <span
-        className={`rounded-[5px] border px-2 py-[5px] font-mono text-[10px] leading-none font-medium tracking-[0.06em] whitespace-nowrap uppercase ${
+        className={`rounded-[5px] border px-2 py-[5px] font-mono fs-10 leading-none font-medium tracking-[0.06em] whitespace-nowrap uppercase ${
           role === 'viewer' ? 'border-line text-ink-3' : 'border-accent-line bg-accent-soft text-accent'
         }`}
       >
-        {ROLE_LABEL[role] ?? ROLE_LABEL.viewer}
+        {t(`sharedViews.role.${ROLES.includes(role) ? role : 'viewer'}`)}
       </span>
     </div>
   )
@@ -44,7 +47,7 @@ function Stats({ items }) {
       {items.map((s) => (
         <div key={s.label} className="py-0.5 pr-5">
           <div
-            className="mb-[7px] font-serif text-[26px] leading-none"
+            className="mb-[7px] font-serif fs-26 leading-none"
             style={s.accent ? { color: 'var(--color-accent)' } : undefined}
           >
             {s.value}
@@ -58,21 +61,20 @@ function Stats({ items }) {
 
 /** Said once, near the top: the thing a reader most needs to trust about this. */
 function Notes({ shared, noun }) {
+  const { t } = useT()
   return (
     <>
       {shared.isOwner && (
-        <p className="m-0 rounded-[10px] border border-line bg-surface px-4 py-3 text-[13px] text-ink-2 text-pretty">
-          This is your {noun}, as the people you shared it with see it. They get the cards, never your
-          progress. Change who has it from Share on your own {noun}.
+        <p className="m-0 rounded-[10px] border border-line bg-surface px-4 py-3 fs-13 text-ink-2 text-pretty">
+          {t(`sharedViews.yours.${noun}`)}
         </p>
       )}
       {shared.offline && (
         <p
           role="status"
-          className="m-0 rounded-[10px] border border-dashed border-line px-4 py-3 text-[13px] text-ink-2"
+          className="m-0 rounded-[10px] border border-dashed border-line px-4 py-3 fs-13 text-ink-2"
         >
-          You’re offline — this is the copy saved on this device. Your progress is kept and goes up when
-          you reconnect.
+          {t('sharedViews.offline')}
         </p>
       )}
     </>
@@ -84,22 +86,23 @@ function Notes({ shared, noun }) {
  * browser as the rest of a guest's decks do, or in an account; they choose.
  */
 function GuestCopyModal({ title, signInPath, onClose, onConfirm }) {
+  const { t } = useT()
   return (
     <Modal
       open
       onClose={onClose}
-      kicker="Add to My Gunit"
-      title={`Add “${title}”?`}
-      body="You’re not signed in, so the copy stays in this browser, with your other decks here. Sign in first to keep it in your account and on your other devices."
-      confirmLabel="Add to this browser"
-      cancelLabel="Not now"
+      kicker={t('sharedViews.addToMine')}
+      title={t('sharedViews.guestTitle', { title })}
+      body={t('sharedViews.guestBody')}
+      confirmLabel={t('sharedViews.addHere')}
+      cancelLabel={t('common.notNow')}
       onConfirm={() => {
         onClose()
         onConfirm()
       }}
       secondaryAction={
         <Button as={Link} to={signInPath} size="sm" variant="ghost">
-          Sign in
+          {t('common.signIn')}
         </Button>
       }
       maxWidth={440}
@@ -115,7 +118,8 @@ export function SharedDeckView() {
   const navigate = useNavigate()
   const deck = id ? shared.decks.find((d) => d.id === id) : shared.decks[0]
   const { answer, role } = shared
-  useDocumentTitle(deck ? `${deck.title} — shared` : 'Shared deck')
+  const { t } = useT()
+  useDocumentTitle(deck ? t('sharedViews.docTitle', { title: deck.title }) : t('sharedArea.title.deck'))
 
   const [studyMenu, setStudyMenu] = useState(false)
   const [moreMenu, setMoreMenu] = useState(false)
@@ -126,10 +130,10 @@ export function SharedDeckView() {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center py-20 text-center">
         <Mascot pose="thinking" size={96} className="mb-5" />
-        <div className="font-serif text-2xl">That deck is no longer in this share.</div>
-        <p className="mt-3 mb-0 text-sm text-ink-2">It may have been moved out of the folder, or deleted.</p>
+        <div className="font-serif text-2xl">{t('sharedViews.goneTitle')}</div>
+        <p className="mt-3 mb-0 text-sm text-ink-2">{t('sharedViews.goneBody')}</p>
         <Button as={Link} to={shared.base} className="mt-5">
-          Back to {answer?.kind === 'folder' ? answer.name : 'the share'}
+          {answer?.kind === 'folder' ? t('sharedViews.backTo', { name: answer.name }) : t('sharedViews.backToShare')}
         </Button>
       </div>
     )
@@ -144,11 +148,11 @@ export function SharedDeckView() {
   const startStudy = (mode) => {
     setStudyMenu(false)
     if (!hasCards) {
-      say('There are no cards in this deck yet')
+      say(t('sharedViews.noCardsYet'))
       return
     }
     if (mode === 'quiz' && !canQuiz(deck)) {
-      say(`A quiz needs ${MIN_QUIZ_CARDS} cards — this deck has ${deck.cards.length}`)
+      say(t('deckDetail.quizNeeds', { min: MIN_QUIZ_CARDS, count: deck.cards.length }))
       return
     }
     shared.study(deck.id, mode)
@@ -156,7 +160,7 @@ export function SharedDeckView() {
 
   const copy = () => {
     const [[, ownId]] = shared.addToMine([deck])
-    say(`Added “${deck.title}” to My Gunit`)
+    say(t('sharedViews.added', { title: deck.title }))
     navigate(`/decks/${ownId}`)
   }
   const askCopy = () => (shared.signedIn || !shared.accounts ? copy() : setDialog({ kind: 'guest-copy' }))
@@ -167,7 +171,7 @@ export function SharedDeckView() {
     const ok = await shared.editCards(deck.id, [
       { id: existing?.id ?? globalThis.crypto.randomUUID(), front: card.front, back: card.back, position },
     ])
-    if (ok) say(existing ? 'Card saved for everyone' : 'Card added for everyone')
+    if (ok) say(existing ? t('sharedViews.cardSaved') : t('sharedViews.cardAdded'))
   }
 
   return (
@@ -176,19 +180,19 @@ export function SharedDeckView() {
         to={inFolder ? shared.base : shared.signedIn ? '/shared' : '/'}
         className="self-start border-0 bg-transparent p-0 text-xs font-medium whitespace-nowrap text-ink-3 transition-colors hover:text-ink"
       >
-        ← {inFolder ? answer.name : shared.signedIn ? 'Shared with me' : 'Gunit'}
+        ← {inFolder ? answer.name : shared.signedIn ? t('sharedWithMe.title') : 'Gunit'}
       </Link>
 
       <header className="flex flex-wrap items-end justify-between gap-[22px] border-b border-line pb-[26px]">
         <div className="min-w-0 max-w-[560px]">
           <div className="kicker mb-3.5">{deck.subject}</div>
-          <h1 className="m-0 mb-3 min-w-0 font-serif text-[32px] leading-[1.05] tracking-[-0.02em] text-pretty sm:text-[42px]">
+          <h1 className="m-0 mb-3 min-w-0 font-serif fs-32 leading-[1.05] tracking-[-0.02em] text-pretty sm:fs-42">
             {deck.title}
           </h1>
           <div className="mb-3">
             <Byline owner={answer.owner_name} role={role} />
           </div>
-          {deck.desc && <p className="m-0 text-[15px] text-ink-2 text-pretty">{deck.desc}</p>}
+          {deck.desc && <p className="m-0 fs-15 text-ink-2 text-pretty">{deck.desc}</p>}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -199,26 +203,30 @@ export function SharedDeckView() {
               aria-expanded={studyMenu}
               aria-haspopup="true"
             >
-              <span>Study shared version</span>
-              <span className="text-[10px] opacity-70">▾</span>
+              <span>{t('sharedViews.study')}</span>
+              <span className="fs-10 opacity-70">▾</span>
             </Button>
             <Menu open={studyMenu} onClose={() => setStudyMenu(false)} align="responsive">
-              <MenuItem title="Flashcards" hint="Your own schedule — private to you." onClick={() => startStudy('review')} />
-              <MenuItem title="Quiz" hint="Answer multiple choice and get scored." onClick={() => startStudy('quiz')} />
+              <MenuItem
+                title={t('deckDetail.flashcards')}
+                hint={t('sharedViews.flashcardsHint')}
+                onClick={() => startStudy('review')}
+              />
+              <MenuItem title={t('deckDetail.quiz')} hint={t('deckDetail.quizHint')} onClick={() => startStudy('quiz')} />
             </Menu>
           </div>
 
           {shared.isOwner ? (
             <Button as={Link} to={`/decks/${deck.id}`} variant="outline">
-              Open in My decks
+              {t('sharedViews.openMine')}
             </Button>
           ) : mine ? (
             <Button as={Link} to={`/decks/${mine}`} variant="outline">
-              Open your copy
+              {t('sharedViews.openCopy')}
             </Button>
           ) : (
             <Button variant="outline" onClick={askCopy}>
-              Add to My Gunit
+              {t('sharedViews.addToMine')}
             </Button>
           )}
 
@@ -227,11 +235,11 @@ export function SharedDeckView() {
               <button
                 type="button"
                 onClick={() => setMoreMenu((v) => !v)}
-                title="More"
-                aria-label="More options"
+                title={t('sharedViews.more')}
+                aria-label={t('sharedViews.moreOptions')}
                 aria-expanded={moreMenu}
                 aria-haspopup="true"
-                className={`grid h-[42px] w-[42px] cursor-pointer place-items-center rounded-lg border bg-transparent p-0 text-[15px] leading-none text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink ${
+                className={`grid h-[42px] w-[42px] cursor-pointer place-items-center rounded-lg border bg-transparent p-0 fs-15 leading-none text-ink-3 transition-colors hover:border-ink-3 hover:bg-raised hover:text-ink ${
                   moreMenu ? 'border-ink-3 bg-raised' : 'border-line'
                 }`}
               >
@@ -240,8 +248,8 @@ export function SharedDeckView() {
               <Menu open={moreMenu} onClose={() => setMoreMenu(false)} align="right" width={250}>
                 {canEdit && (
                   <MenuItem
-                    title="Add a card"
-                    hint="Everyone with this deck sees it."
+                    title={t('deckDetail.addCard')}
+                    hint={t('sharedViews.everyoneSees')}
                     onClick={() => {
                       setMoreMenu(false)
                       setDialog({ kind: 'card-new' })
@@ -250,8 +258,8 @@ export function SharedDeckView() {
                 )}
                 {mine && (
                   <MenuItem
-                    title="Add another copy"
-                    hint="You already have one in My Gunit."
+                    title={t('sharedViews.anotherCopy')}
+                    hint={t('sharedViews.haveOne')}
                     onClick={() => {
                       setMoreMenu(false)
                       askCopy()
@@ -261,8 +269,8 @@ export function SharedDeckView() {
                 {shared.signedIn && !shared.isOwner && !inFolder && !shared.offline &&
                   (shared.joined ? (
                     <MenuItem
-                      title="Remove from Shared with me"
-                      hint="Your copy, if you made one, stays."
+                      title={t('sharedViews.removeFromShared')}
+                      hint={t('sharedViews.copyStays')}
                       danger
                       onClick={() => {
                         setMoreMenu(false)
@@ -271,11 +279,11 @@ export function SharedDeckView() {
                     />
                   ) : (
                     <MenuItem
-                      title="Save to Shared with me"
-                      hint="Find it again from the Shared tab."
+                      title={t('sharedViews.saveToShared')}
+                      hint={t('sharedViews.findAgain')}
                       onClick={async () => {
                         setMoreMenu(false)
-                        if (await shared.join()) say('Saved to Shared with me')
+                        if (await shared.join()) say(t('sharedViews.saved'))
                       }}
                     />
                   ))}
@@ -289,16 +297,16 @@ export function SharedDeckView() {
 
       <Stats
         items={[
-          { label: 'Cards', value: String(deck.cards.length) },
+          { label: t('summary.cards'), value: String(deck.cards.length) },
           // The owner's own schedule is on their own deck, not here: counting
           // theirs from this page's empty store would say every card is due.
           ...(shared.isOwner
             ? []
             : [
-                { label: 'Due for you', value: String(due), accent: due > 0 },
-                { label: 'You know', value: `${Math.round(deck.progress * 100)}%` },
+                { label: t('sharedViews.dueForYou'), value: String(due), accent: due > 0 },
+                { label: t('sharedViews.youKnow'), value: `${Math.round(deck.progress * 100)}%` },
               ]),
-          { label: 'Updated', value: formatRelative(stamp(deck.updatedAt)) },
+          { label: t('sharedViews.updated'), value: formatRelative(stamp(deck.updatedAt)) },
         ]}
       />
 
@@ -314,18 +322,18 @@ export function SharedDeckView() {
                 }`}
               >
                 <div className="flex items-start gap-[18px]">
-                  <span className="w-[26px] shrink-0 pt-1 font-mono text-[11px] leading-[1.5] font-medium tracking-[0.06em] text-ink-3">
+                  <span className="w-[26px] shrink-0 pt-1 font-mono fs-11 leading-[1.5] font-medium tracking-[0.06em] text-ink-3">
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <div className={`min-w-0 flex-1 font-serif text-[19px] leading-[1.32] text-pretty ${off ? 'text-ink-3' : ''}`}>
+                  <div className={`min-w-0 flex-1 font-serif fs-19 leading-[1.32] text-pretty ${off ? 'text-ink-3' : ''}`}>
                     {card.front}
                   </div>
                   <div className="relative shrink-0">
                     <button
                       type="button"
                       onClick={() => setCardMenu(cardMenu === i ? null : i)}
-                      title="Card options"
-                      aria-label="Card options"
+                      title={t('deckDetail.cardOptions')}
+                      aria-label={t('deckDetail.cardOptions')}
                       className={`grid h-7 w-7 cursor-pointer place-items-center rounded-[5px] border bg-transparent text-sm leading-none font-medium text-ink-3 transition-colors hover:border-ink-3 hover:text-ink ${
                         cardMenu === i ? 'border-ink-3 bg-raised' : 'border-line'
                       }`}
@@ -335,8 +343,8 @@ export function SharedDeckView() {
                     <Menu open={cardMenu === i} onClose={() => setCardMenu(null)} width={220}>
                       {canEdit && (
                         <MenuItem
-                          title="Edit card"
-                          hint="For everyone with this deck."
+                          title={t('cardModal.editKicker')}
+                          hint={t('sharedViews.forEveryone')}
                           onClick={() => {
                             setCardMenu(null)
                             setDialog({ kind: 'card-edit', index: i, card })
@@ -346,8 +354,8 @@ export function SharedDeckView() {
                       <SuspendItem deck={deck} card={card} off={off} index={i} close={() => setCardMenu(null)} />
                       {canEdit && (
                         <MenuItem
-                          title="Delete card"
-                          hint="For everyone with this deck."
+                          title={t('deckDetail.deleteCard')}
+                          hint={t('sharedViews.forEveryone')}
                           danger
                           onClick={() => {
                             setCardMenu(null)
@@ -368,13 +376,13 @@ export function SharedDeckView() {
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
           <Mascot pose="thinking" size={92} className="mb-1" />
-          <div className="font-serif text-[24px] leading-[1.2]">No cards yet</div>
+          <div className="font-serif fs-24 leading-[1.2]">{t('deckDetail.emptyTitle')}</div>
           <p className="m-0 max-w-[360px] text-sm text-ink-3 text-pretty">
-            {canEdit ? 'Add the first card — everyone with this deck will see it.' : 'Cards the owner adds will appear here.'}
+            {canEdit ? t('sharedViews.addFirst') : t('sharedViews.ownerAdds')}
           </p>
           {canEdit && (
             <Button size="sm" onClick={() => setDialog({ kind: 'card-new' })}>
-              Add a card
+              {t('deckDetail.addCard')}
             </Button>
           )}
         </div>
@@ -392,13 +400,13 @@ export function SharedDeckView() {
 
       <ConfirmModal
         open={dialog?.kind === 'card-delete'}
-        kicker="Delete card"
-        title="Delete this card for everyone?"
-        body="It comes out of the shared deck for everyone who studies it, the owner included. Copies people already made keep theirs."
-        confirmLabel="Delete card"
+        kicker={t('deckDetail.deleteCard')}
+        title={t('sharedViews.deleteTitle')}
+        body={t('sharedViews.deleteBody')}
+        confirmLabel={t('deckDetail.deleteCard')}
         onClose={() => setDialog(null)}
         onConfirm={async () => {
-          if (await shared.editCards(deck.id, [], [dialog.card.id])) say('Card deleted for everyone')
+          if (await shared.editCards(deck.id, [], [dialog.card.id])) say(t('sharedViews.cardDeleted'))
         }}
       />
 
@@ -417,14 +425,15 @@ export function SharedDeckView() {
 /** Suspending is the reader's own business, whatever their role. */
 function SuspendItem({ deck, card, off, index, close }) {
   const { setCardSuspended, say } = useApp()
+  const { t } = useT()
   return (
     <MenuItem
-      title={off ? 'Unsuspend for me' : 'Suspend for me'}
-      hint={off ? 'Back into your rotation.' : 'Only your rotation. Nobody else’s changes.'}
+      title={off ? t('sharedViews.unsuspend') : t('sharedViews.suspend')}
+      hint={off ? t('sharedViews.unsuspendHint') : t('sharedViews.suspendHint')}
       onClick={() => {
         close()
         setCardSuspended(deck.id, card.id, !off)
-        say(off ? `Card ${index + 1} is back in your rotation` : `Card ${index + 1} suspended for you`)
+        say(off ? t('sharedViews.unsuspended', { n: index + 1 }) : t('sharedViews.suspended', { n: index + 1 }))
       }}
     />
   )
@@ -437,7 +446,8 @@ export function SharedFolderView() {
   const navigate = useNavigate()
   const { answer, decks, role } = shared
   const [dialog, setDialog] = useState(null)
-  useDocumentTitle(`${answer.name} — shared`)
+  const { t } = useT()
+  useDocumentTitle(t('sharedViews.docTitle', { title: answer.name }))
 
   const cards = decks.reduce((n, d) => n + d.cards.length, 0)
   const updated = decks.reduce((latest, d) => Math.max(latest, stamp(d.updatedAt) ?? 0), 0) || null
@@ -445,11 +455,7 @@ export function SharedFolderView() {
 
   const copy = () => {
     shared.addToMine(toCopy, answer.name)
-    say(
-      toCopy.length === 1
-        ? `Added 1 deck to “${answer.name}” in My Gunit`
-        : `Added ${toCopy.length} decks to “${answer.name}” in My Gunit`,
-    )
+    say(t('sharedViews.addedFolder', { count: toCopy.length, name: answer.name }))
     navigate('/decks')
   }
   const askCopy = () => (shared.signedIn || !shared.accounts ? copy() : setDialog('guest-copy'))
@@ -460,13 +466,13 @@ export function SharedFolderView() {
         to={shared.signedIn ? '/shared' : '/'}
         className="self-start border-0 bg-transparent p-0 text-xs font-medium whitespace-nowrap text-ink-3 transition-colors hover:text-ink"
       >
-        ← {shared.signedIn ? 'Shared with me' : 'Gunit'}
+        ← {shared.signedIn ? t('sharedWithMe.title') : 'Gunit'}
       </Link>
 
       <header className="flex flex-wrap items-end justify-between gap-[22px] border-b border-line pb-[26px]">
         <div className="min-w-0 max-w-[560px]">
-          <div className="kicker mb-3.5">Shared folder</div>
-          <h1 className="m-0 mb-3 font-serif text-[32px] leading-[1.05] tracking-[-0.02em] text-pretty sm:text-[42px]">
+          <div className="kicker mb-3.5">{t('sharedArea.title.folder')}</div>
+          <h1 className="m-0 mb-3 font-serif fs-32 leading-[1.05] tracking-[-0.02em] text-pretty sm:fs-42">
             {answer.name}
           </h1>
           <Byline owner={answer.owner_name} role={role} />
@@ -474,30 +480,30 @@ export function SharedFolderView() {
         <div className="flex flex-wrap gap-2">
           {shared.isOwner ? (
             <Button as={Link} to="/decks" variant="outline">
-              Open in My decks
+              {t('sharedViews.openMine')}
             </Button>
           ) : toCopy.length ? (
             <Button onClick={askCopy} disabled={!decks.length}>
-              {toCopy.length === decks.length ? 'Add all to My Gunit' : `Add the ${toCopy.length} new to My Gunit`}
+              {toCopy.length === decks.length ? t('sharedViews.addAll') : t('sharedViews.addNew', { count: toCopy.length })}
             </Button>
           ) : (
             <Button as={Link} to="/decks" variant="outline">
-              All in My Gunit
+              {t('sharedViews.allInMine')}
             </Button>
           )}
           {shared.signedIn && !shared.isOwner && !shared.offline &&
             (shared.joined ? (
               <Button variant="ghost" onClick={() => shared.leave()}>
-                Remove from Shared with me
+                {t('sharedViews.removeFromShared')}
               </Button>
             ) : (
               <Button
                 variant="outline"
                 onClick={async () => {
-                  if (await shared.join()) say('Saved to Shared with me')
+                  if (await shared.join()) say(t('sharedViews.saved'))
                 }}
               >
-                Save to Shared with me
+                {t('sharedViews.saveToShared')}
               </Button>
             ))}
         </div>
@@ -507,9 +513,9 @@ export function SharedFolderView() {
 
       <Stats
         items={[
-          { label: 'Decks', value: String(decks.length) },
-          { label: 'Cards', value: String(cards) },
-          { label: 'Updated', value: formatRelative(updated) },
+          { label: t('dashboard.stats.decks'), value: String(decks.length) },
+          { label: t('summary.cards'), value: String(cards) },
+          { label: t('sharedViews.updated'), value: formatRelative(updated) },
         ]}
       />
 
@@ -526,9 +532,9 @@ export function SharedFolderView() {
                   <div className="flex items-center gap-2 pt-0.5">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
                     <span className="kicker !tracking-[0.12em] truncate">{deck.subject}</span>
-                    {shared.copyOf(deck.id) && <span className="kicker ml-auto shrink-0 !tracking-[0.1em]">Copied</span>}
+                    {shared.copyOf(deck.id) && <span className="kicker ml-auto shrink-0 !tracking-[0.1em]">{t('sharedViews.copied')}</span>}
                   </div>
-                  <h2 className="m-0 font-serif text-[23px] leading-[1.2] font-normal text-pretty">
+                  <h2 className="m-0 font-serif fs-23 leading-[1.2] font-normal text-pretty">
                     <Link
                       to={shared.deckPath(deck.id)}
                       className="cursor-pointer text-inherit no-underline after:absolute after:inset-0 after:content-['']"
@@ -537,16 +543,16 @@ export function SharedFolderView() {
                     </Link>
                   </h2>
                   <div className="mt-auto flex flex-col gap-[9px]">
-                    <div className="flex justify-between font-mono text-[10px] leading-none font-medium tracking-[0.06em] text-ink-3">
-                      <span>{deck.cards.length ? `${deck.cards.length} cards` : 'No cards'}</span>
+                    <div className="flex justify-between font-mono fs-10 leading-none font-medium tracking-[0.06em] text-ink-3">
+                      <span>{deck.cards.length ? t('deck.cardCount', { count: deck.cards.length }) : t('deck.noCards')}</span>
                       {!shared.isOwner && (
                         <span style={due ? { color: 'var(--color-accent)' } : undefined}>
-                          {due ? `${due} due for you` : `${pct}% known`}
+                          {due ? t('sharedViews.dueCount', { count: due }) : t('deck.known', { pct })}
                         </span>
                       )}
                     </div>
                     {!shared.isOwner && (
-                      <ProgressBar value={pct} accent={accent} label={`${deck.title}: your progress`} />
+                      <ProgressBar value={pct} accent={accent} label={t('sharedViews.progress', { title: deck.title })} />
                     )}
                   </div>
                 </article>
@@ -557,9 +563,9 @@ export function SharedFolderView() {
       ) : (
         <div className="flex flex-col items-center gap-3.5 rounded-[14px] border border-dashed border-line px-5 py-[70px] text-center">
           <Mascot pose="thinking" size={92} className="mb-1" />
-          <div className="font-serif text-[24px] leading-[1.2]">No decks in this folder yet</div>
+          <div className="font-serif fs-24 leading-[1.2]">{t('sharedViews.emptyFolder')}</div>
           <p className="m-0 max-w-[360px] text-sm text-ink-3 text-pretty">
-            Decks the owner files here will appear for you too.
+            {t('sharedViews.emptyFolderBody')}
           </p>
         </div>
       )}

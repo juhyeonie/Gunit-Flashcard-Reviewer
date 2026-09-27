@@ -4,6 +4,7 @@ import Field from './Field.jsx'
 import { combineText, extractText, readWithOcr } from '../data/extract.js'
 import { SEPARATORS, parseCards } from '../data/parse.js'
 import Spinner from './Spinner.jsx'
+import useT from '../i18n/useT.js'
 
 const ACCEPT =
   '.pdf,.pptx,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,application/pdf,' +
@@ -24,8 +25,9 @@ const describe = (file) => ({
 /** Statuses that mean the file gave up no text, and so deserve muted styling. */
 const FAILED = ['empty', 'unsupported', 'error']
 
-const formatLabel = (id) =>
-  id === 'qa' ? 'Q and A lines' : (SEPARATORS.find((s) => s.id === id)?.label ?? id)
+/** A separator's name in the reader's language, from its id. */
+const formatLabel = (t, id) =>
+  id === 'qa' || SEPARATORS.some((s) => s.id === id) ? t(`importFile.separator.${id}`) : id
 
 /**
  * Import lives in a modal, never a page.
@@ -57,6 +59,7 @@ export default function ImportFileModal({
   onOpenDeck,
   say,
 }) {
+  const { t, parts, locale } = useT()
   const [files, setFiles] = useState([])
   const [draft, setDraft] = useState(() => ({
     title: initialDraft?.title ?? '',
@@ -144,17 +147,17 @@ export default function ImportFileModal({
 
     if (!open.current) return
     update(row.key, { ...result, pct: undefined })
-    say(result.status === 'ok' ? `Read ${result.words} words from ${row.name}` : result.message)
+    say(result.status === 'ok' ? t('importFile.readWords', { count: result.words, name: row.name }) : result.message)
   }
 
   const copyText = async () => {
     try {
       await navigator.clipboard.writeText(text)
-      say('Text copied')
+      say(t('importFile.copied'))
     } catch {
       // Clipboard access is refused outside a secure context; the textarea is
       // still there to select from by hand.
-      say('Could not copy — select the text instead')
+      say(t('importFile.copyFailed'))
     }
   }
 
@@ -168,12 +171,12 @@ export default function ImportFileModal({
 
     if (pendingDeck) {
       if (!draft.title.trim()) {
-        say('Name the deck first')
+        say(t('importFile.nameFirst'))
         return
       }
       id = onCreateDeck({
         title: draft.title,
-        subject: draft.subject || 'General',
+        subject: draft.subject || t('importFile.defaultSubject'),
         desc: draft.desc,
         // Chosen in Create a deck before switching to import, and kept.
         folderId: initialDraft?.folderId ?? null,
@@ -184,10 +187,10 @@ export default function ImportFileModal({
     onClose()
     say(
       cards.length
-        ? `Added ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}`
+        ? t('importFile.added', { count: cards.length })
         : pendingDeck
-          ? 'Deck created — add your first card'
-          : 'Nothing to add — write the cards yourself',
+          ? t('toast.deckCreated')
+          : t('importFile.nothingToAdd'),
     )
     onOpenDeck?.(id)
   }
@@ -199,15 +202,15 @@ export default function ImportFileModal({
       open
       onClose={onClose}
       maxWidth={520}
-      kicker={pendingDeck ? 'New deck' : 'Import material'}
-      title="Import a file"
-      body="Your material is read here in the browser and never uploaded. Lines already shaped like a card become one — check the preview before you add them."
+      kicker={pendingDeck ? t('deckModal.newKicker') : t('importFile.kicker')}
+      title={t('importFile.title')}
+      body={t('importFile.body')}
       confirmLabel={
         cards.length
-          ? `Add ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}`
+          ? t('importFile.addCount', { count: cards.length })
           : pendingDeck
-            ? 'Create empty deck'
-            : 'Add cards by hand'
+            ? t('importFile.createEmpty')
+            : t('importFile.byHand')
       }
       onConfirm={confirm}
     >
@@ -215,25 +218,25 @@ export default function ImportFileModal({
         <div className="mb-5 flex flex-col gap-3.5 border-b border-line-soft pb-5">
           <Field
             id="import-title"
-            label="Deck name"
+            label={t('deckModal.name')}
             value={draft.title}
             onChange={set('title')}
-            placeholder="e.g. Roman Provinces"
+            placeholder={t('deckModal.namePlaceholder')}
           />
           <div className="grid grid-cols-2 gap-2.5">
             <Field
               id="import-subject"
-              label="Subject"
+              label={t('deckModal.subject')}
               value={draft.subject}
               onChange={set('subject')}
-              placeholder="Ancient Rome"
+              placeholder={t('deckModal.subjectPlaceholder')}
             />
             <Field
               id="import-desc"
-              label="Description"
+              label={t('deckModal.description')}
               value={draft.desc}
               onChange={set('desc')}
-              placeholder="What this deck covers"
+              placeholder={t('deckModal.descriptionPlaceholder')}
             />
           </div>
         </div>
@@ -260,17 +263,23 @@ export default function ImportFileModal({
                 : 'border-line bg-transparent hover:border-accent hover:bg-accent-soft'
             }`}
           >
-            <span className="grid h-[42px] w-[42px] place-items-center rounded-full border border-line bg-surface text-[17px] text-ink-3">
+            <span className="grid h-[42px] w-[42px] place-items-center rounded-full border border-line bg-surface fs-17 text-ink-3">
               ↑
             </span>
-            <span className="font-serif text-[22px] leading-[1.2]">
-              {dragging ? 'Drop to add' : 'Drop your material here'}
+            <span className="font-serif fs-22 leading-[1.2]">
+              {dragging ? t('importFile.dropToAdd') : t('importFile.drop')}
             </span>
-            <span className="text-[13px] text-ink-3">
-              or <span className="border-b border-accent-line text-accent">browse your device</span>
+            <span className="fs-13 text-ink-3">
+              {parts('importFile.orBrowse', {
+                browse: (
+                  <span key="browse" className="border-b border-accent-line text-accent">
+                    {t('importFile.browse')}
+                  </span>
+                ),
+              })}
             </span>
             <span className="kicker mt-1 !leading-[1.6] !tracking-[0.1em]">
-              PDF · DOCX · PPTX · TXT · scans
+              {t('importFile.formats')}
             </span>
           </button>
         )}
@@ -278,13 +287,13 @@ export default function ImportFileModal({
         {hasFiles && (
           <>
             <div className="flex items-center justify-between gap-3">
-              <span className="kicker !tracking-[0.12em]">Selected files</span>
+              <span className="kicker !tracking-[0.12em]">{t('importFile.selected')}</span>
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-medium text-ink-2 transition-colors hover:text-accent"
+                className="cursor-pointer border-0 bg-transparent p-0 fs-13 font-medium text-ink-2 transition-colors hover:text-accent"
               >
-                + Add more
+                {t('importFile.addMore')}
               </button>
             </div>
 
@@ -293,26 +302,26 @@ export default function ImportFileModal({
                 key={f.key}
                 className="flex items-center gap-3.5 rounded-lg border border-line bg-transparent px-[15px] py-[13px]"
               >
-                <span className="grid h-10 w-8 shrink-0 place-items-center rounded border border-line bg-surface font-mono text-[9px] leading-none font-medium tracking-[0.05em] text-ink-3">
+                <span className="grid h-10 w-8 shrink-0 place-items-center rounded border border-line bg-surface font-mono fs-9 leading-none font-medium tracking-[0.05em] text-ink-3">
                   {f.badge}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-sm leading-[1.3] font-medium">{f.name}</span>
                   <span
-                    className={`font-mono text-[11px] leading-[1.5] tracking-[0.04em] ${
+                    className={`font-mono fs-11 leading-[1.5] tracking-[0.04em] ${
                       f.status === 'error' ? 'text-err' : 'text-ink-3'
                     }`}
                   >
                     {f.size}
                     {f.status === 'reading' &&
-                      (f.pct === undefined ? ' · Reading…' : ` · Recognising… ${f.pct}%`)}
+                      ` · ${f.pct === undefined ? t('importFile.reading') : t('importFile.recognising', { pct: f.pct })}`}
                     {/* A long read looks the same as a stuck one in text alone.
                         The OCR button carries its own when there is one. */}
                     {f.status === 'reading' && !f.ocr && (
                       <Spinner size={10} className="ml-1.5 align-[-1px]" />
                     )}
                     {f.status === 'ok' &&
-                      ` · ${f.words.toLocaleString()} words${f.viaOcr ? ', read by OCR' : ''}`}
+                      ` · ${t(f.viaOcr ? 'importFile.wordsOcr' : 'importFile.words', { count: f.words, n: f.words.toLocaleString(locale) })}`}
                     {f.status === 'ok' && f.note && ` · ${f.note}`}
                     {FAILED.includes(f.status) && ` · ${f.message}`}
                   </span>
@@ -337,18 +346,18 @@ export default function ImportFileModal({
                     aria-disabled={f.status === 'reading'}
                     aria-label={
                       f.status === 'reading'
-                        ? `Recognising ${f.name}`
-                        : `Read ${f.name} with OCR`
+                        ? t('importFile.recognisingFile', { name: f.name })
+                        : t('importFile.ocrFile', { name: f.name })
                     }
                     className="shrink-0 cursor-pointer rounded-[20px] border border-line bg-transparent px-3 py-1.5 text-xs leading-none font-medium text-ink-2 transition-colors hover:border-accent hover:text-accent aria-disabled:cursor-default aria-disabled:opacity-55 aria-disabled:hover:border-line aria-disabled:hover:text-ink-2"
                   >
                     {f.status === 'reading' ? (
                       <span className="inline-flex items-center gap-1.5">
                         <Spinner size={10} />
-                        Reading…
+                        {t('importFile.reading')}
                       </span>
                     ) : (
-                      'Read with OCR'
+                      t('importFile.ocr')
                     )}
                   </button>
                 )}
@@ -356,8 +365,8 @@ export default function ImportFileModal({
                 <button
                   type="button"
                   onClick={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
-                  aria-label={`Remove ${f.name}`}
-                  className="cursor-pointer rounded border-0 bg-transparent px-1.5 py-1 text-[16px] text-ink-3 transition-colors hover:bg-err-soft hover:text-err"
+                  aria-label={t('importFile.remove', { name: f.name })}
+                  className="cursor-pointer rounded border-0 bg-transparent px-1.5 py-1 fs-16 text-ink-3 transition-colors hover:bg-err-soft hover:text-err"
                 >
                   ×
                 </button>
@@ -371,45 +380,44 @@ export default function ImportFileModal({
             */}
             <div role="status" className="sr-only">
               {reading
-                ? 'Reading files'
-                : `Read ${read.length} of ${files.length} files, ${words} words`}
+                ? t('importFile.readingFiles')
+                : t('importFile.readSummary', { read: read.length, total: files.length, count: words })}
             </div>
 
             {read.length > 0 && (
               <div className="mt-1 flex flex-col gap-2.5">
                 <Field
                   id="import-text"
-                  label={`Extracted text · ${words.toLocaleString()} words`}
+                  label={t('importFile.extracted', { count: words, n: words.toLocaleString(locale) })}
                   as="textarea"
                   rows={7}
                   value={text}
                   onChange={(e) => setEdited(e.target.value)}
-                  className="!text-[13px] leading-[1.55]"
+                  className="!fs-13 leading-[1.55]"
                 />
                 {recognised && (
-                  <p className="m-0 text-[13px] leading-[1.5] text-ink-3">
-                    Some of this was recognised from a picture. OCR reads well but not perfectly —
-                    worth a look before you build cards on it.
+                  <p className="m-0 fs-13 leading-[1.5] text-ink-3">
+                    {t('importFile.ocrCaution')}
                   </p>
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label
                     htmlFor="import-format"
-                    className="flex items-center gap-2 text-[13px] text-ink-2"
+                    className="flex items-center gap-2 fs-13 text-ink-2"
                   >
-                    Split on
+                    {t('importFile.splitOn')}
                     <select
                       id="import-format"
                       value={format}
                       onChange={(e) => setFormat(e.target.value)}
                       className="cursor-pointer rounded-[5px] border border-line bg-surface px-[9px] py-[7px] text-xs leading-none font-medium text-ink-2"
                     >
-                      <option value="auto">Work it out</option>
-                      <option value="qa">Q and A lines</option>
+                      <option value="auto">{t('importFile.auto')}</option>
+                      <option value="qa">{t('importFile.separator.qa')}</option>
                       {SEPARATORS.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.label}
+                          {formatLabel(t, s.id)}
                         </option>
                       ))}
                     </select>
@@ -424,17 +432,17 @@ export default function ImportFileModal({
                       <button
                         type="button"
                         onClick={() => setEdited(null)}
-                        className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-medium text-ink-2 transition-colors hover:text-accent"
+                        className="cursor-pointer border-0 bg-transparent p-0 fs-13 font-medium text-ink-2 transition-colors hover:text-accent"
                       >
-                        Reset text
+                        {t('importFile.resetText')}
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={copyText}
-                      className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-medium text-ink-2 transition-colors hover:text-accent"
+                      className="cursor-pointer border-0 bg-transparent p-0 fs-13 font-medium text-ink-2 transition-colors hover:text-accent"
                     >
-                      Copy text
+                      {t('importFile.copyText')}
                     </button>
                   </div>
                 </div>
@@ -447,32 +455,40 @@ export default function ImportFileModal({
                 {cards.length > 0 ? (
                   <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-raised p-3">
                     <div className="kicker !tracking-[0.12em]">
-                      {cards.length} {cards.length === 1 ? 'card' : 'cards'}
+                      {t('deck.cardCount', { count: cards.length })}
                       {/* Says what "work it out" worked out, so a wrong guess
                           is visible rather than just a wrong preview. */}
-                      {format === 'auto' && used && ` · split on ${formatLabel(used)}`}
-                      {skipped > 0 && ` · ${skipped} ${skipped === 1 ? 'line' : 'lines'} skipped`}
+                      {format === 'auto' && used && ` · ${t('importFile.splitUsed', { name: formatLabel(t, used) })}`}
+                      {skipped > 0 && ` · ${t('importFile.skipped', { count: skipped })}`}
                     </div>
                     <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                       {cards.slice(0, 3).map((card, i) => (
-                        <li key={i} className="text-[13px] leading-[1.45]">
+                        <li key={i} className="fs-13 leading-[1.45]">
                           <span className="font-medium">{card.front}</span>
                           <span className="text-ink-3"> → {card.back}</span>
                         </li>
                       ))}
                     </ul>
                     {cards.length > 3 && (
-                      <div className="text-[13px] text-ink-3">
-                        and {cards.length - 3} more, in the deck once you add them
+                      <div className="fs-13 text-ink-3">
+                        {t('importFile.more', { count: cards.length - 3 })}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed border-line px-3 py-2.5 text-[13px] leading-[1.5] text-ink-3">
-                    Nothing here splits into cards. Lines shaped{' '}
-                    <span className="text-ink-2">Term — definition</span> or{' '}
-                    <span className="text-ink-2">Q: … / A: …</span> do — edit the text above, or
-                    pick the separator yourself.
+                  <div className="rounded-lg border border-dashed border-line px-3 py-2.5 fs-13 leading-[1.5] text-ink-3">
+                    {parts('importFile.noSplit', {
+                      term: (
+                        <span key="term" className="text-ink-2">
+                          {t('importFile.termShape')}
+                        </span>
+                      ),
+                      qa: (
+                        <span key="qa" className="text-ink-2">
+                          Q: … / A: …
+                        </span>
+                      ),
+                    })}
                   </div>
                 )}
               </div>
@@ -483,15 +499,15 @@ export default function ImportFileModal({
               cards appearing actually forms. Splitting lines is not the same
               as understanding them, and the difference is worth stating.
             */}
-            <div className="rounded-lg border border-line bg-raised px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2">
-              <div className="mb-1 text-[13px] font-semibold text-ink">
-                {read.length > 0 ? 'Cards are split, not written' : 'Cards are not written for you'}
+            <div className="rounded-lg border border-line bg-raised px-4 py-3.5 fs-13 leading-[1.5] text-ink-2">
+              <div className="mb-1 fs-13 font-semibold text-ink">
+                {read.length > 0 ? t('importFile.splitNotWritten') : t('importFile.notWritten')}
               </div>
               {read.length > 0
-                ? 'The text was read on this device and went nowhere else. Lines already shaped like a card become one; turning prose into questions would need an AI model this version does not include.'
+                ? t('importFile.readHere')
                 : files.some((f) => f.ocr)
-                  ? 'Nothing has been read yet. Those pages are pictures, so try Read with OCR above — or add the cards yourself.'
-                  : 'Nothing readable came out of your selection, and no cards can be drafted from it. You can still add the cards yourself.'}
+                  ? t('importFile.nothingReadYet')
+                  : t('importFile.nothingReadable')}
             </div>
           </>
         )}
